@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'register.dart';
+import 'screens/register/register1.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -11,7 +11,7 @@ class LoginScreen extends StatelessWidget {
         child: SingleChildScrollView(
           child: Column(
             children: [
-              // 🔴 TOP RED HEADER
+              // TOP RED HEADER
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 40),
@@ -93,7 +93,7 @@ class LoginScreen extends StatelessWidget {
 
                     const SizedBox(height: 15),
 
-                    // 🔒 Password
+                    // Password
                     const Text('Password'),
                     const SizedBox(height: 5),
                     TextField(
@@ -111,7 +111,7 @@ class LoginScreen extends StatelessWidget {
 
                     const SizedBox(height: 25),
 
-                    // 🔘 Login Button
+                    // Login Button
                     SizedBox(
                       width: double.infinity,
                       height: 45,
@@ -128,7 +128,7 @@ class LoginScreen extends StatelessWidget {
 
                     const SizedBox(height: 20),
 
-                    // 🔗 Register Link
+                    // Register Link
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
