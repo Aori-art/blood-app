@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'register.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -164,17 +165,27 @@ class Iphone161 extends StatelessWidget {
             ),
           ),
 
-          const Positioned(
-            left: 200,
-            top: 620,
-            child: Text(
-              'Create an Account',
-              style: TextStyle(
-                color: Color(0xFF850000),
-                fontWeight: FontWeight.bold,
+          Positioned(
+           left: 200,
+           top: 620,
+           child: GestureDetector(
+           onTap: () {
+           Navigator.push(
+            context,
+          MaterialPageRoute(
+              builder: (context) => const RegisterScreen(),
               ),
-            ),
+            );
+          },
+          child: const Text(
+            'Create an Account',
+              style: TextStyle(
+              color: Color(0xFF850000),
+              fontWeight: FontWeight.bold,
+              ),
           ),
+        ),
+      ),
 
           // App title
           const Positioned(
