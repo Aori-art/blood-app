@@ -7,212 +7,158 @@ class LoginScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: ListView(
-        children: const [
-          Iphone161(),
-        ],
-      ),
-    );
-  }
-}
-
-class Iphone161 extends StatelessWidget {
-  const Iphone161({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 393,
-      height: 852,
-      clipBehavior: Clip.antiAlias,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment(0.50, 0.09),
-          end: Alignment(0.50, 0.34),
-          colors: [Color(0xFF750000), Color(0xFFDA2D2D)],
-        ),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            left: 0,
-            top: 294,
-            child: Container(
-              width: 393,
-              height: 709,
-              decoration: ShapeDecoration(
-                color: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(25),
-                ),
-              ),
-            ),
-          ),
-
-          // Title
-          const Positioned(
-            left: 17,
-            top: 319,
-            child: Text(
-              'Welcome Back',
-              style: TextStyle(
-                color: Color(0xFF750000),
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-
-          const Positioned(
-            left: 17,
-            top: 346,
-            child: Text(
-              'Sign in to continue saving lives',
-              style: TextStyle(
-                color: Color(0xFF666464),
-                fontSize: 14,
-              ),
-            ),
-          ),
-
-          // Email label
-          const Positioned(
-            left: 17,
-            top: 397,
-            child: Text(
-              'Email Address',
-              style: TextStyle(fontSize: 10),
-            ),
-          ),
-
-          // Email field (FIXED → real TextField)
-          Positioned(
-            left: 17,
-            top: 414,
-            child: SizedBox(
-              width: 357,
-              height: 40,
-              child: TextField(
-                decoration: InputDecoration(
-                  hintText: 'your.email@gmail.com',
-                  filled: true,
-                  fillColor: const Color(0xFFD9D9D9),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(9),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              // 🔴 TOP RED HEADER
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 40),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF750000), Color(0xFFDA2D2D)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
                   ),
                 ),
+                child: const Column(
+                  children: [
+                    Text(
+                      'eDonate',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 5),
+                    Text(
+                      'Blood Donation App',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ),
 
-          // Password label
-          const Positioned(
-            left: 17,
-            top: 460,
-            child: Text(
-              'Password',
-              style: TextStyle(fontSize: 10),
-            ),
-          ),
-
-          // Password field (FIXED → real TextField)
-          Positioned(
-            left: 17,
-            top: 480,
-            child: SizedBox(
-              width: 357,
-              height: 40,
-              child: TextField(
-                obscureText: true,
-                decoration: InputDecoration(
-                  hintText: 'Enter your password',
-                  filled: true,
-                  fillColor: const Color(0xFFD9D9D9),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(9),
+              // ⚪ WHITE FORM CONTAINER
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(25),
                   ),
                 ),
-              ),
-            ),
-          ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Welcome Back',
+                      style: TextStyle(
+                        color: Color(0xFF750000),
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    const Text(
+                      'Sign in to continue saving lives',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: 14,
+                      ),
+                    ),
 
-          // Login Button (FIXED → clickable)
-          Positioned(
-            left: 100,
-            top: 550,
-            child: SizedBox(
-              width: 200,
-              height: 45,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF850000),
+                    const SizedBox(height: 25),
+
+                    // 📧 Email
+                    const Text('Email Address'),
+                    const SizedBox(height: 5),
+                    TextField(
+                      decoration: InputDecoration(
+                        hintText: 'your.email@gmail.com',
+                        filled: true,
+                        fillColor: const Color(0xFFD9D9D9),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(9),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 15),
+
+                    // 🔒 Password
+                    const Text('Password'),
+                    const SizedBox(height: 5),
+                    TextField(
+                      obscureText: true,
+                      decoration: InputDecoration(
+                        hintText: 'Enter your password',
+                        filled: true,
+                        fillColor: const Color(0xFFD9D9D9),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(9),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 25),
+
+                    // 🔘 Login Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 45,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF850000),
+                        ),
+                        onPressed: () {
+                          // TODO: Navigate to home
+                        },
+                        child: const Text("Sign In"),
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // 🔗 Register Link
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text('New to eDonate? '),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const RegisterScreen(),
+                              ),
+                            );
+                          },
+                          child: const Text(
+                            'Create an Account',
+                            style: TextStyle(
+                              color: Color(0xFF850000),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                onPressed: () {
-                  // TODO: Navigate to home screen
-                },
-                child: const Text("Sign In"),
               ),
-            ),
-          ),
-
-          // Footer text
-          const Positioned(
-            left: 80,
-            top: 620,
-            child: Text(
-              'New to eDonate?',
-              style: TextStyle(fontSize: 12),
-            ),
-          ),
-
-          Positioned(
-           left: 200,
-           top: 620,
-           child: GestureDetector(
-           onTap: () {
-           Navigator.push(
-            context,
-          MaterialPageRoute(
-              builder: (context) => const RegisterScreen(),
-              ),
-            );
-          },
-          child: const Text(
-            'Create an Account',
-              style: TextStyle(
-              color: Color(0xFF850000),
-              fontWeight: FontWeight.bold,
-              ),
+            ],
           ),
         ),
-      ),
-
-          // App title
-          const Positioned(
-            left: 120,
-            top: 85,
-            child: Text(
-              'eDonate',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 32,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-
-          const Positioned(
-            left: 120,
-            top: 125,
-            child: Text(
-              'Blood Donation App',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
