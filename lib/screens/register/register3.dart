@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'register2.dart';
+import 'otp.dart';
 
 class RegisterStep3 extends StatelessWidget {
   const RegisterStep3({super.key});
@@ -98,6 +98,12 @@ class RegisterStep3 extends StatelessWidget {
                               ),
                               onPressed: () {
                                 // TODO: Complete Registration
+                                Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const OtpScreen(),
+                              ),
+                            );
                                 // e.g., submit form or navigate to home screen
                               },
                               child: const Text('Complete Registration'),

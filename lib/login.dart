@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'screens/register/register1.dart';
+import 'home.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -120,6 +121,12 @@ class LoginScreen extends StatelessWidget {
                           backgroundColor: const Color(0xFF850000),
                         ),
                         onPressed: () {
+                          Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const HomeScreen(),
+                              ),
+                            );
                           // TODO: Navigate to home
                         },
                         child: const Text("Sign In"),
