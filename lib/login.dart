@@ -1,9 +1,96 @@
 import 'package:flutter/material.dart';
 import 'screens/register/register1.dart';
 import 'home.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+
+  bool isLoading = false;
+
+  Future<void> loginUser() async {
+    if (emailController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter your email")),
+      );
+      return;
+    }
+    
+    if (passwordController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter your password")),
+      );
+      return;
+    }
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse("http://192.168.1.8/edonate_api/login.php"),
+        body: {
+          "email": emailController.text.trim(),
+          "password": passwordController.text.trim(),
+        },
+      );
+
+      print("Response status: ${response.statusCode}");
+      print("Response body: ${response.body}");
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        
+        if (data["status"] == "success") {
+          if (!mounted) return;
+          
+          // You can save user data if needed
+          // For example, using shared_preferences
+          
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const HomeScreen(),
+            ),
+          );
+        } else {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(data["message"])),
+          );
+        }
+      } else {
+        throw Exception('Failed to connect to server');
+      }
+    } catch (e) {
+      print("Error: $e");
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Connection error. Please check your internet connection.")),
+      );
+    }
+
+    setState(() {
+      isLoading = false;
+    });
+  }
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -12,7 +99,7 @@ class LoginScreen extends StatelessWidget {
         child: SingleChildScrollView(
           child: Column(
             children: [
-              // TOP RED HEADER
+              // Header
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 40),
@@ -45,7 +132,7 @@ class LoginScreen extends StatelessWidget {
                 ),
               ),
 
-              // ⚪ WHITE FORM CONTAINER
+              // Form
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
@@ -77,10 +164,11 @@ class LoginScreen extends StatelessWidget {
 
                     const SizedBox(height: 25),
 
-                    // 📧 Email
                     const Text('Email Address'),
                     const SizedBox(height: 5),
                     TextField(
+                      controller: emailController,
+                      keyboardType: TextInputType.emailAddress,
                       decoration: InputDecoration(
                         hintText: 'your.email@gmail.com',
                         filled: true,
@@ -94,10 +182,10 @@ class LoginScreen extends StatelessWidget {
 
                     const SizedBox(height: 15),
 
-                    // Password
                     const Text('Password'),
                     const SizedBox(height: 5),
                     TextField(
+                      controller: passwordController,
                       obscureText: true,
                       decoration: InputDecoration(
                         hintText: 'Enter your password',
@@ -112,7 +200,6 @@ class LoginScreen extends StatelessWidget {
 
                     const SizedBox(height: 25),
 
-                    // Login Button
                     SizedBox(
                       width: double.infinity,
                       height: 45,
@@ -120,22 +207,17 @@ class LoginScreen extends StatelessWidget {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF850000),
                         ),
-                        onPressed: () {
-                          Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const HomeScreen(),
-                              ),
-                            );
-                          // TODO: Navigate to home
-                        },
-                        child: const Text("Sign In"),
+                        onPressed: isLoading ? null : loginUser,
+                        child: isLoading
+                            ? const CircularProgressIndicator(
+                                color: Colors.white,
+                              )
+                            : const Text("Sign In"),
                       ),
                     ),
 
                     const SizedBox(height: 20),
 
-                    // Register Link
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
