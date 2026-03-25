@@ -1,7 +1,147 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:blood/config.dart';
+import 'package:blood/login.dart';
 
-class OtpScreen extends StatelessWidget {
-  const OtpScreen({super.key});
+class OtpScreen extends StatefulWidget {
+  final String email;
+
+  const OtpScreen({super.key, required this.email});
+
+  @override
+  State<OtpScreen> createState() => _OtpScreenState();
+}
+
+class _OtpScreenState extends State<OtpScreen> {
+  final List<TextEditingController> controllers =
+      List.generate(6, (_) => TextEditingController());
+
+  bool isVerifying = false;
+  bool isResending = false;
+
+  String get otpCode => controllers.map((c) => c.text).join();
+
+  @override
+  void dispose() {
+    for (final controller in controllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> verifyOtp() async {
+    if (otpCode.length != 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter the 6-digit OTP.")),
+      );
+      return;
+    }
+
+    setState(() {
+      isVerifying = true;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse("${AppConfig.baseUrl}/verify_otp.php"),
+        body: {
+          "email": widget.email,
+          "otp": otpCode,
+        },
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (!mounted) return;
+
+      if (data["status"] == "success") {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(data["message"] ?? "OTP verified successfully.")),
+        );
+
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          (route) => false,
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(data["message"] ?? "Invalid OTP.")),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Connection error: $e")),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isVerifying = false;
+        });
+      }
+    }
+  }
+
+  Future<void> resendOtp() async {
+    setState(() {
+      isResending = true;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse("${AppConfig.baseUrl}/resend_otp.php"),
+        body: {
+          "email": widget.email,
+        },
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(data["message"] ?? "OTP resend response received.")),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Connection error: $e")),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isResending = false;
+        });
+      }
+    }
+  }
+
+  Widget _otpBox(int index, double screenWidth) {
+    return SizedBox(
+      width: screenWidth * 0.12,
+      child: TextField(
+        controller: controllers[index],
+        textAlign: TextAlign.center,
+        keyboardType: TextInputType.number,
+        maxLength: 1,
+        onChanged: (value) {
+          if (value.isNotEmpty && index < 5) {
+            FocusScope.of(context).nextFocus();
+          }
+        },
+        decoration: InputDecoration(
+          counterText: '',
+          filled: true,
+          fillColor: const Color(0xFFFFF7C5),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(9),
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -14,8 +154,6 @@ class OtpScreen extends StatelessWidget {
         child: Column(
           children: [
             SizedBox(height: screenHeight * 0.08),
-
-            // Header
             const Text(
               'Verification',
               style: TextStyle(
@@ -24,24 +162,18 @@ class OtpScreen extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
-
             SizedBox(height: screenHeight * 0.02),
-
             const Text(
               'Enter Verification Code',
               style: TextStyle(color: Colors.white, fontSize: 14),
             ),
-
             SizedBox(height: screenHeight * 0.01),
-
-            const Text(
-              "We've sent a 6-digit code to your email.",
+            Text(
+              "We've sent a 6-digit code to ${widget.email}.",
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white70, fontSize: 12),
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
             ),
-
             SizedBox(height: screenHeight * 0.04),
-
             Expanded(
               child: Container(
                 width: double.infinity,
@@ -51,62 +183,32 @@ class OtpScreen extends StatelessWidget {
                 ),
                 decoration: const BoxDecoration(
                   color: Colors.white,
-                  borderRadius:
-                      BorderRadius.vertical(top: Radius.circular(25)),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
                 ),
                 child: Column(
                   children: [
                     const Text(
                       'Enter the 6-digit code',
-                      style:
-                          TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                     ),
-
                     SizedBox(height: screenHeight * 0.03),
-
-                    // OTP Boxes
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: List.generate(6, (index) {
-                        return SizedBox(
-                          width: screenWidth * 0.12,
-                          child: TextField(
-                            textAlign: TextAlign.center,
-                            keyboardType: TextInputType.number,
-                            maxLength: 1,
-                            decoration: InputDecoration(
-                              counterText: '',
-                              filled: true,
-                              fillColor: const Color(0xFFFFF7C5),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(9),
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
+                      children: List.generate(6, (index) => _otpBox(index, screenWidth)),
                     ),
-
                     SizedBox(height: screenHeight * 0.03),
-
                     const Text(
                       "Didn't receive the code?",
                       style: TextStyle(fontSize: 12),
                     ),
-
                     TextButton(
-                      onPressed: () {
-                        // TODO: Resend OTP logic
-                      },
-                      child: const Text(
-                        'Resend OTP',
-                        style: TextStyle(color: Color(0xFF850000)),
+                      onPressed: isResending ? null : resendOtp,
+                      child: Text(
+                        isResending ? 'Resending...' : 'Resend OTP',
+                        style: const TextStyle(color: Color(0xFF850000)),
                       ),
                     ),
-
                     SizedBox(height: screenHeight * 0.02),
-
-                    // Verify Button
                     SizedBox(
                       width: double.infinity,
                       height: 45,
@@ -114,16 +216,20 @@ class OtpScreen extends StatelessWidget {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF850000),
                         ),
-                        onPressed: () {
-                          // TODO: Verify OTP
-                        },
-                        child: const Text('Verify OTP'),
+                        onPressed: isVerifying ? null : verifyOtp,
+                        child: isVerifying
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text('Verify OTP'),
                       ),
                     ),
-
                     SizedBox(height: screenHeight * 0.03),
-
-                    // Security Notice
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -140,10 +246,7 @@ class OtpScreen extends StatelessWidget {
                         ),
                       ],
                     ),
-
                     const Spacer(),
-
-                    // Back Button
                     SizedBox(
                       width: double.infinity,
                       height: 45,
@@ -152,9 +255,7 @@ class OtpScreen extends StatelessWidget {
                           foregroundColor: const Color(0xFF850000),
                           side: const BorderSide(color: Color(0xFF850000)),
                         ),
-                        onPressed: () {
-                          Navigator.pop(context); // ✅ Back works
-                        },
+                        onPressed: () => Navigator.pop(context),
                         child: const Text('Back'),
                       ),
                     ),

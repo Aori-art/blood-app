@@ -1,23 +1,91 @@
 import 'package:flutter/material.dart';
 import 'register2.dart';
 
-class RegisterScreen extends StatelessWidget {
+class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
   @override
+  State<RegisterScreen> createState() => _RegisterScreenState();
+}
+
+class _RegisterScreenState extends State<RegisterScreen> {
+  final TextEditingController fullNameController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController phoneController = TextEditingController();
+  final TextEditingController birthdateController = TextEditingController();
+  final TextEditingController genderController = TextEditingController();
+
+  @override
+  void dispose() {
+    fullNameController.dispose();
+    emailController.dispose();
+    phoneController.dispose();
+    birthdateController.dispose();
+    genderController.dispose();
+    super.dispose();
+  }
+
+  void goNext() {
+    if (fullNameController.text.trim().isEmpty ||
+        emailController.text.trim().isEmpty ||
+        phoneController.text.trim().isEmpty ||
+        birthdateController.text.trim().isEmpty ||
+        genderController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please fill in all fields.")),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RegisterStep2(
+          fullName: fullNameController.text.trim(),
+          email: emailController.text.trim(),
+          phone: phoneController.text.trim(),
+          birthdate: birthdateController.text.trim(),
+          gender: genderController.text.trim(),
+        ),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Step1(),
+    return Scaffold(
+      body: Step1(
+        fullNameController: fullNameController,
+        emailController: emailController,
+        phoneController: phoneController,
+        birthdateController: birthdateController,
+        genderController: genderController,
+        onNext: goNext,
+      ),
     );
   }
 }
 
 class Step1 extends StatelessWidget {
-  const Step1({super.key});
+  final TextEditingController fullNameController;
+  final TextEditingController emailController;
+  final TextEditingController phoneController;
+  final TextEditingController birthdateController;
+  final TextEditingController genderController;
+  final VoidCallback onNext;
+
+  const Step1({
+    super.key,
+    required this.fullNameController,
+    required this.emailController,
+    required this.phoneController,
+    required this.birthdateController,
+    required this.genderController,
+    required this.onNext,
+  });
 
   @override
   Widget build(BuildContext context) {
-    // Get screen size
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
@@ -44,8 +112,9 @@ class Step1 extends StatelessWidget {
             child: Container(
               width: double.infinity,
               padding: EdgeInsets.symmetric(
-                  horizontal: screenWidth * 0.05,
-                  vertical: screenHeight * 0.03),
+                horizontal: screenWidth * 0.05,
+                vertical: screenHeight * 0.03,
+              ),
               decoration: const BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
@@ -55,19 +124,19 @@ class Step1 extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildFieldLabel('Full Name'),
-                    _buildTextField('Juan Dela Cruz'),
+                    _buildTextField('Juan Dela Cruz', fullNameController),
                     SizedBox(height: screenHeight * 0.02),
                     _buildFieldLabel('Email Address'),
-                    _buildTextField('your.email@gmail.com'),
+                    _buildTextField('your.email@gmail.com', emailController),
                     SizedBox(height: screenHeight * 0.02),
                     _buildFieldLabel('Phone Number'),
-                    _buildTextField('0912 345 6789'),
+                    _buildTextField('0912 345 6789', phoneController),
                     SizedBox(height: screenHeight * 0.02),
                     _buildFieldLabel('Date of Birth'),
-                    _buildTextField('dd/mm/yyyy'),
+                    _buildTextField('yyyy-mm-dd', birthdateController),
                     SizedBox(height: screenHeight * 0.02),
                     _buildFieldLabel('Gender'),
-                    _buildTextField('Male / Female'),
+                    _buildTextField('Male / Female', genderController),
                     SizedBox(height: screenHeight * 0.04),
                     Center(
                       child: SizedBox(
@@ -77,15 +146,7 @@ class Step1 extends StatelessWidget {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF850000),
                           ),
-                          onPressed: () {
-                            // Navigate to RegisterStep2
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const RegisterStep2(),
-                              ),
-                            );
-                          },
+                          onPressed: onNext,
                           child: const Text("Next"),
                         ),
                       ),
@@ -106,16 +167,14 @@ class Step1 extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 5),
       child: Text(
         label,
-        style: const TextStyle(
-          fontWeight: FontWeight.w600,
-          fontSize: 14,
-        ),
+        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
       ),
     );
   }
 
-  Widget _buildTextField(String hint) {
+  Widget _buildTextField(String hint, TextEditingController controller) {
     return TextField(
+      controller: controller,
       decoration: InputDecoration(
         hintText: hint,
         filled: true,

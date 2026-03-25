@@ -1,8 +1,12 @@
-import 'package:flutter/material.dart';
-import 'screens/register/register1.dart';
-import 'home.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'config.dart';
+import 'home.dart';
+import 'screens/register/register1.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,15 +21,35 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool isLoading = false;
 
+  @override
+  void initState() {
+    super.initState();
+    loadLastUsedEmail();
+  }
+
+  Future<void> loadLastUsedEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+    final lastUsedEmail = prefs.getString('lastUsedEmail') ?? '';
+
+    if (mounted) {
+      setState(() {
+        emailController.text = lastUsedEmail;
+      });
+    }
+  }
+
   Future<void> loginUser() async {
-    if (emailController.text.trim().isEmpty) {
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
+
+    if (email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please enter your email")),
       );
       return;
     }
-    
-    if (passwordController.text.trim().isEmpty) {
+
+    if (password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please enter your password")),
       );
@@ -38,51 +62,69 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final response = await http.post(
-        Uri.parse("http://192.168.1.8/edonate_api/login.php"),
+        Uri.parse("${AppConfig.baseUrl}/login.php"),
         body: {
-          "email": emailController.text.trim(),
-          "password": passwordController.text.trim(),
+          "email": email,
+          "password": password,
         },
       );
 
-      print("Response status: ${response.statusCode}");
-      print("Response body: ${response.body}");
+      debugPrint("Response status: ${response.statusCode}");
+      debugPrint("Response body: ${response.body}");
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        
-        if (data["status"] == "success") {
-          if (!mounted) return;
-          
-          // You can save user data if needed
-          // For example, using shared_preferences
-          
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const HomeScreen(),
-            ),
-          );
-        } else {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(data["message"])),
-          );
+      if (response.statusCode != 200) {
+        throw Exception("Failed to connect to server");
+      }
+
+      final data = jsonDecode(response.body);
+
+      if (!mounted) return;
+
+      if (data["status"] == "success") {
+        final prefs = await SharedPreferences.getInstance();
+
+        await prefs.setBool('isLoggedIn', true);
+        await prefs.setString('lastUsedEmail', email);
+        await prefs.setString('userEmail', email);
+
+        if (data["user_name"] != null) {
+          await prefs.setString('userName', data["user_name"]);
         }
+
+        if (data["donor_id"] != null) {
+          await prefs.setString('donorId', data["donor_id"].toString());
+        }
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const HomeScreen(),
+          ),
+        );
       } else {
-        throw Exception('Failed to connect to server');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(data["message"] ?? "Login failed"),
+          ),
+        );
       }
     } catch (e) {
-      print("Error: $e");
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Connection error. Please check your internet connection.")),
-      );
-    }
+      debugPrint("Login error: $e");
 
-    setState(() {
-      isLoading = false;
-    });
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Connection error: $e"),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -92,6 +134,30 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  InputDecoration _inputDecoration(String hintText) {
+    return InputDecoration(
+      hintText: hintText,
+      filled: true,
+      fillColor: const Color(0xFFD9D9D9),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(9),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(9),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(9),
+        borderSide: const BorderSide(color: Color(0xFF850000)),
+      ),
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: 14,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -99,7 +165,6 @@ class _LoginScreenState extends State<LoginScreen> {
         child: SingleChildScrollView(
           child: Column(
             children: [
-              // Header
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 40),
@@ -131,8 +196,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                 ),
               ),
-
-              // Form
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
@@ -161,45 +224,23 @@ class _LoginScreenState extends State<LoginScreen> {
                         fontSize: 14,
                       ),
                     ),
-
                     const SizedBox(height: 25),
-
                     const Text('Email Address'),
                     const SizedBox(height: 5),
                     TextField(
                       controller: emailController,
                       keyboardType: TextInputType.emailAddress,
-                      decoration: InputDecoration(
-                        hintText: 'your.email@gmail.com',
-                        filled: true,
-                        fillColor: const Color(0xFFD9D9D9),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(9),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
+                      decoration: _inputDecoration('your.email@gmail.com'),
                     ),
-
                     const SizedBox(height: 15),
-
                     const Text('Password'),
                     const SizedBox(height: 5),
                     TextField(
                       controller: passwordController,
                       obscureText: true,
-                      decoration: InputDecoration(
-                        hintText: 'Enter your password',
-                        filled: true,
-                        fillColor: const Color(0xFFD9D9D9),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(9),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
+                      decoration: _inputDecoration('Enter your password'),
                     ),
-
                     const SizedBox(height: 25),
-
                     SizedBox(
                       width: double.infinity,
                       height: 45,
@@ -209,15 +250,18 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         onPressed: isLoading ? null : loginUser,
                         child: isLoading
-                            ? const CircularProgressIndicator(
-                                color: Colors.white,
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
                               )
                             : const Text("Sign In"),
                       ),
                     ),
-
                     const SizedBox(height: 20),
-
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [

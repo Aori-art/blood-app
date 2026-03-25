@@ -1,8 +1,73 @@
 import 'package:flutter/material.dart';
 import 'register3.dart';
 
-class RegisterStep2 extends StatelessWidget {
-  const RegisterStep2({super.key});
+class RegisterStep2 extends StatefulWidget {
+  final String fullName;
+  final String email;
+  final String phone;
+  final String birthdate;
+  final String gender;
+
+  const RegisterStep2({
+    super.key,
+    required this.fullName,
+    required this.email,
+    required this.phone,
+    required this.birthdate,
+    required this.gender,
+  });
+
+  @override
+  State<RegisterStep2> createState() => _RegisterStep2State();
+}
+
+class _RegisterStep2State extends State<RegisterStep2> {
+  final TextEditingController bloodTypeController = TextEditingController();
+  final TextEditingController streetController = TextEditingController();
+  final TextEditingController barangayController = TextEditingController();
+  final TextEditingController municipalityController = TextEditingController();
+  final TextEditingController provinceController = TextEditingController();
+
+  @override
+  void dispose() {
+    bloodTypeController.dispose();
+    streetController.dispose();
+    barangayController.dispose();
+    municipalityController.dispose();
+    provinceController.dispose();
+    super.dispose();
+  }
+
+  void goNext() {
+    if (bloodTypeController.text.trim().isEmpty ||
+        streetController.text.trim().isEmpty ||
+        barangayController.text.trim().isEmpty ||
+        municipalityController.text.trim().isEmpty ||
+        provinceController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please fill in all fields.")),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RegisterStep3(
+          fullName: widget.fullName,
+          email: widget.email,
+          phone: widget.phone,
+          birthdate: widget.birthdate,
+          gender: widget.gender,
+          bloodType: bloodTypeController.text.trim(),
+          streetAddress: streetController.text.trim(),
+          barangay: barangayController.text.trim(),
+          municipality: municipalityController.text.trim(),
+          province: provinceController.text.trim(),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,22 +107,22 @@ class RegisterStep2 extends StatelessWidget {
               child: Container(
                 width: double.infinity,
                 padding: EdgeInsets.symmetric(
-                    horizontal: screenWidth * 0.05,
-                    vertical: screenHeight * 0.03),
+                  horizontal: screenWidth * 0.05,
+                  vertical: screenHeight * 0.03,
+                ),
                 decoration: const BoxDecoration(
                   color: Colors.white,
-                  borderRadius:
-                      BorderRadius.vertical(top: Radius.circular(25)),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
                 ),
                 child: SingleChildScrollView(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildFieldLabel('Blood Type'),
-                      _buildTextField('Select Blood Type'),
+                      _buildTextField('O+, A+, B+, AB+', bloodTypeController),
                       SizedBox(height: screenHeight * 0.02),
                       _buildFieldLabel('Street Address'),
-                      _buildTextField('123 Main Street'),
+                      _buildTextField('123 Main Street', streetController),
                       SizedBox(height: screenHeight * 0.02),
                       Row(
                         children: [
@@ -66,7 +131,7 @@ class RegisterStep2 extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 _buildFieldLabel('Barangay'),
-                                _buildTextField('Balintawak'),
+                                _buildTextField('Balintawak', barangayController),
                               ],
                             ),
                           ),
@@ -76,7 +141,7 @@ class RegisterStep2 extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 _buildFieldLabel('Municipality'),
-                                _buildTextField('Lipa'),
+                                _buildTextField('Lipa', municipalityController),
                               ],
                             ),
                           ),
@@ -84,7 +149,7 @@ class RegisterStep2 extends StatelessWidget {
                       ),
                       SizedBox(height: screenHeight * 0.02),
                       _buildFieldLabel('Province'),
-                      _buildTextField('Batangas'),
+                      _buildTextField('Batangas', provinceController),
                       SizedBox(height: screenHeight * 0.04),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -94,12 +159,10 @@ class RegisterStep2 extends StatelessWidget {
                             height: 45,
                             child: OutlinedButton(
                               style: OutlinedButton.styleFrom(
-                                  foregroundColor: const Color(0xFF850000),
-                                  side: const BorderSide(
-                                      color: Color(0xFF850000))),
-                              onPressed: () {
-                                Navigator.pop(context);
-                              },
+                                foregroundColor: const Color(0xFF850000),
+                                side: const BorderSide(color: Color(0xFF850000)),
+                              ),
+                              onPressed: () => Navigator.pop(context),
                               child: const Text('Back'),
                             ),
                           ),
@@ -110,15 +173,7 @@ class RegisterStep2 extends StatelessWidget {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF850000),
                               ),
-                              onPressed: () {
-                                Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const RegisterStep3(),
-                              ),
-                            );
-                                // TODO: Go to Step 3
-                              },
+                              onPressed: goNext,
                               child: const Text('Next'),
                             ),
                           ),
@@ -150,8 +205,9 @@ class RegisterStep2 extends StatelessWidget {
     );
   }
 
-  Widget _buildTextField(String hint) {
+  Widget _buildTextField(String hint, TextEditingController controller) {
     return TextField(
+      controller: controller,
       decoration: InputDecoration(
         hintText: hint,
         filled: true,
