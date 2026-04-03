@@ -1,9 +1,13 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'alerts.dart';
 import 'book.dart';
 import 'check.dart';
+import 'config.dart';
 import 'history.dart';
 import 'login.dart';
 
@@ -43,10 +47,19 @@ class _HomeScreenState extends State<HomeScreen> {
         unselectedItemColor: Colors.black,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: 'Book'),
-          BottomNavigationBarItem(icon: Icon(Icons.check_circle), label: 'Check'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.calendar_today),
+            label: 'Book',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.check_circle),
+            label: 'Check',
+          ),
           BottomNavigationBarItem(icon: Icon(Icons.history), label: 'History'),
-          BottomNavigationBarItem(icon: Icon(Icons.notifications), label: 'Alerts'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.notifications),
+            label: 'Alerts',
+          ),
         ],
       ),
     );
@@ -62,11 +75,15 @@ class HomeContent extends StatefulWidget {
 
 class _HomeContentState extends State<HomeContent> {
   String userName = "User";
+  String bloodType = "Loading...";
+  int totalDonations = 0;
+  bool isProfileLoading = true;
 
   @override
   void initState() {
     super.initState();
     loadUserName();
+    loadProfileData();
   }
 
   Future<void> loadUserName() async {
@@ -77,6 +94,72 @@ class _HomeContentState extends State<HomeContent> {
       setState(() {
         userName = name;
       });
+    }
+  }
+
+  Future<void> loadProfileData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final donorId = prefs.getString('donorId');
+
+    if (donorId == null || donorId.isEmpty) {
+      if (mounted) {
+        setState(() {
+          bloodType = "N/A";
+          totalDonations = 0;
+          isProfileLoading = false;
+        });
+      }
+      return;
+    }
+
+    try {
+      final response = await http.get(
+        Uri.parse("${AppConfig.baseUrl}/get_profile.php?donor_id=$donorId"),
+      );
+
+      debugPrint("Profile status: ${response.statusCode}");
+      debugPrint("Profile body: ${response.body}");
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        if (data["status"] == "success") {
+          if (mounted) {
+            setState(() {
+              bloodType = (data["blood_type"] ?? "N/A").toString();
+              totalDonations =
+                  int.tryParse(data["total_donations"].toString()) ?? 0;
+              isProfileLoading = false;
+            });
+          }
+        } else {
+          if (mounted) {
+            setState(() {
+              bloodType = "N/A";
+              totalDonations = 0;
+              isProfileLoading = false;
+            });
+          }
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            bloodType = "N/A";
+            totalDonations = 0;
+            isProfileLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Profile error: $e");
+
+      if (mounted) {
+        setState(() {
+          bloodType = "N/A";
+          totalDonations = 0;
+          isProfileLoading = false;
+        });
+      }
     }
   }
 
@@ -231,17 +314,17 @@ class _HomeContentState extends State<HomeContent> {
                           BoxShadow(blurRadius: 4, color: Colors.black26),
                         ],
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Your Blood Type'),
-                              SizedBox(height: 5),
+                              const Text('Your Blood Type'),
+                              const SizedBox(height: 5),
                               Text(
-                                'O+',
-                                style: TextStyle(
+                                isProfileLoading ? 'Loading...' : bloodType,
+                                style: const TextStyle(
                                   fontSize: 18,
                                   color: Color(0xFF750000),
                                   fontWeight: FontWeight.bold,
@@ -251,11 +334,13 @@ class _HomeContentState extends State<HomeContent> {
                           ),
                           Column(
                             children: [
-                              Text('Total Donations'),
-                              SizedBox(height: 5),
+                              const Text('Total Donations'),
+                              const SizedBox(height: 5),
                               Text(
-                                '12',
-                                style: TextStyle(
+                                isProfileLoading
+                                    ? '...'
+                                    : totalDonations.toString(),
+                                style: const TextStyle(
                                   fontSize: 18,
                                   color: Color(0xFF750000),
                                   fontWeight: FontWeight.bold,
@@ -370,20 +455,20 @@ class _HomeContentState extends State<HomeContent> {
                         ),
                         borderRadius: BorderRadius.circular(9),
                       ),
-                      child: const Column(
+                      child: Column(
                         children: [
-                          Text(
+                          const Text(
                             'Your Impact',
                             style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          SizedBox(height: 10),
+                          const SizedBox(height: 10),
                           Text(
-                            'Your 12 donations have potentially saved up to 36 lives!',
+                            'Your $totalDonations donations have potentially saved up to ${totalDonations * 3} lives!',
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.white),
+                            style: const TextStyle(color: Colors.white),
                           ),
                         ],
                       ),

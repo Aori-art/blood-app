@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'login.dart';
-import 'home.dart';
+import 'splash_screen/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,7 +24,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.red,
       ),
-      home: isLoggedIn ? const HomeScreen() : const LoginScreen(),
+      home: SplashScreen(isLoggedIn: isLoggedIn),
     );
   }
 }
