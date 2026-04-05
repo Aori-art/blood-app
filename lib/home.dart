@@ -77,13 +77,17 @@ class _HomeContentState extends State<HomeContent> {
   String userName = "User";
   String bloodType = "Loading...";
   int totalDonations = 0;
+  String nextEligibleDate = "Loading...";
+  String eligibilityStatus = "Loading...";
   bool isProfileLoading = true;
+  bool isEligibilityLoading = true;
 
   @override
   void initState() {
     super.initState();
     loadUserName();
     loadProfileData();
+    loadEligibilityData();
   }
 
   Future<void> loadUserName() async {
@@ -163,6 +167,98 @@ class _HomeContentState extends State<HomeContent> {
     }
   }
 
+  Future<void> loadEligibilityData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final donorId = prefs.getString('donorId');
+
+    if (donorId == null || donorId.isEmpty) {
+      if (mounted) {
+        setState(() {
+          nextEligibleDate = "N/A";
+          eligibilityStatus = "Unknown";
+          isEligibilityLoading = false;
+        });
+      }
+      return;
+    }
+
+    try {
+      final response = await http.get(
+        Uri.parse("${AppConfig.baseUrl}/get_eligibility.php?donor_id=$donorId"),
+      );
+
+      debugPrint("Eligibility status: ${response.statusCode}");
+      debugPrint("Eligibility body: ${response.body}");
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        if (data["status"] == "success") {
+          if (mounted) {
+            setState(() {
+              nextEligibleDate =
+                  formatDate(data["next_eligible_date"]?.toString() ?? "");
+              eligibilityStatus = (data["eligibility"] ?? "Unknown").toString();
+              isEligibilityLoading = false;
+            });
+          }
+        } else {
+          if (mounted) {
+            setState(() {
+              nextEligibleDate = "N/A";
+              eligibilityStatus = "Unknown";
+              isEligibilityLoading = false;
+            });
+          }
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            nextEligibleDate = "N/A";
+            eligibilityStatus = "Unknown";
+            isEligibilityLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Eligibility error: $e");
+
+      if (mounted) {
+        setState(() {
+          nextEligibleDate = "N/A";
+          eligibilityStatus = "Unknown";
+          isEligibilityLoading = false;
+        });
+      }
+    }
+  }
+
+  String formatDate(String dateString) {
+    if (dateString.isEmpty) return "N/A";
+
+    try {
+      final date = DateTime.parse(dateString);
+      const months = [
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December',
+      ];
+
+      return "${months[date.month - 1]} ${date.day}, ${date.year}";
+    } catch (e) {
+      return dateString;
+    }
+  }
+
   Future<void> _handleMenuSelection(BuildContext context, String value) async {
     switch (value) {
       case 'profile':
@@ -192,33 +288,55 @@ class _HomeContentState extends State<HomeContent> {
     }
   }
 
-  Widget _actionCard(String title, String subtitle) {
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
+  Widget _actionCard({
+    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required Widget destination,
+  }) {
+    return SizedBox(
+      height: 115,
+      child: Material(
         color: Colors.white,
         borderRadius: BorderRadius.circular(9),
-        boxShadow: const [
-          BoxShadow(
-            blurRadius: 4,
-            color: Colors.black26,
+        elevation: 2,
+        shadowColor: Colors.black26,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(9),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => destination),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(15),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    subtitle,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 11, color: Colors.grey),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -369,7 +487,17 @@ class _HomeContentState extends State<HomeContent> {
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 10),
-                          const Text('Next Eligible Date: December 1, 2026'),
+                          Text(
+                            'Next Eligible Date: ${isEligibilityLoading ? "Loading..." : nextEligibleDate}',
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            'Status: ${isEligibilityLoading ? "Loading..." : eligibilityStatus}',
+                            style: const TextStyle(
+                              color: Color(0xFF750000),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                           const SizedBox(height: 10),
                           SizedBox(
                             width: double.infinity,
@@ -377,9 +505,23 @@ class _HomeContentState extends State<HomeContent> {
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF750000),
+                                foregroundColor: Colors.white,
+                                textStyle: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                              onPressed: () {},
-                              child: const Text('Check Eligibility'),
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const CheckScreen(),
+                                  ),
+                                );
+                              },
+                              child: const Text(
+                                'Check Eligibility',
+                                style: TextStyle(color: Colors.white),
+                              ),
                             ),
                           ),
                         ],
@@ -390,15 +532,19 @@ class _HomeContentState extends State<HomeContent> {
                       children: [
                         Expanded(
                           child: _actionCard(
-                            'Book\nAppointment',
-                            'Schedule your donation',
+                            context: context,
+                            title: 'Book\nAppointment',
+                            subtitle: 'Schedule your donation',
+                            destination: const BookScreen(),
                           ),
                         ),
                         SizedBox(width: screenWidth * 0.04),
                         Expanded(
                           child: _actionCard(
-                            'History',
-                            'View past donations',
+                            context: context,
+                            title: 'History',
+                            subtitle: 'View past donations',
+                            destination: const HistoryScreen(),
                           ),
                         ),
                       ],

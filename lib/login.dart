@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'config.dart';
 import 'home.dart';
 import 'screens/register/register1.dart';
+import 'forgot_password.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -240,13 +241,37 @@ class _LoginScreenState extends State<LoginScreen> {
                       obscureText: true,
                       decoration: _inputDecoration('Enter your password'),
                     ),
-                    const SizedBox(height: 25),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const ForgotPasswordScreen(),
+                            ),
+                          );
+                        },
+                        child: const Text(
+                          'Forgot Password?',
+                          style: TextStyle(
+                            color: Color(0xFF850000),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
                     SizedBox(
                       width: double.infinity,
                       height: 45,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF850000),
+                          foregroundColor: Colors.white,
                         ),
                         onPressed: isLoading ? null : loginUser,
                         child: isLoading
@@ -258,7 +283,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                   color: Colors.white,
                                 ),
                               )
-                            : const Text("Sign In"),
+                            : const Text(
+                                "Sign In",
+                                style: TextStyle(color: Colors.white),
+                              ),
                       ),
                     ),
                     const SizedBox(height: 20),
