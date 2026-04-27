@@ -8,6 +8,11 @@ import 'register3.dart';
 
 class RegisterStep2 extends StatefulWidget {
   final String fullName;
+  // Add these new fields
+  final String firstName;
+  final String middleInitial;
+  final String lastName;
+  final String suffix;
   final String email;
   final String phone;
   final String birthdate;
@@ -16,6 +21,10 @@ class RegisterStep2 extends StatefulWidget {
   const RegisterStep2({
     super.key,
     required this.fullName,
+    required this.firstName,
+    required this.middleInitial,
+    required this.lastName,
+    required this.suffix,
     required this.email,
     required this.phone,
     required this.birthdate,
@@ -169,36 +178,41 @@ class _RegisterStep2State extends State<RegisterStep2> {
   }
 
   void goNext() {
-    if (selectedBloodType == null ||
-        selectedBloodType!.isEmpty ||
-        streetController.text.trim().isEmpty ||
-        selectedProvinceName == null ||
-        selectedCityName == null ||
-        selectedBarangayName == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please fill in all fields.")),
-      );
-      return;
-    }
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => RegisterStep3(
-          fullName: widget.fullName,
-          email: widget.email,
-          phone: widget.phone,
-          birthdate: widget.birthdate,
-          gender: widget.gender,
-          bloodType: selectedBloodType!,
-          streetAddress: streetController.text.trim(),
-          barangay: selectedBarangayName!,
-          municipality: selectedCityName!,
-          province: selectedProvinceName!,
-        ),
-      ),
+  if (selectedBloodType == null ||
+      selectedBloodType!.isEmpty ||
+      streetController.text.trim().isEmpty ||
+      selectedProvinceName == null ||
+      selectedCityName == null ||
+      selectedBarangayName == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Please fill in all fields.")),
     );
+    return;
   }
+
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => RegisterStep3(
+        fullName: widget.fullName,
+        // Pass individual name parts
+        firstName: widget.firstName,
+        middleInitial: widget.middleInitial,
+        lastName: widget.lastName,
+        suffix: widget.suffix,
+        email: widget.email,
+        phone: widget.phone,
+        birthdate: widget.birthdate,
+        gender: widget.gender,
+        bloodType: selectedBloodType!,
+        streetAddress: streetController.text.trim(),
+        barangay: selectedBarangayName!,
+        municipality: selectedCityName!,
+        province: selectedProvinceName!,
+      ),
+    ),
+  );
+}
 
   Widget _buildFieldLabel(String label) {
     return Padding(

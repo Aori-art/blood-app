@@ -262,18 +262,39 @@ class _HomeContentState extends State<HomeContent> {
   Future<void> _handleMenuSelection(BuildContext context, String value) async {
     switch (value) {
       case 'profile':
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile clicked')),
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const HistoryScreen()),
         );
         break;
 
-      case 'settings':
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Settings clicked')),
-        );
-        break;
+      // case 'settings':
+      //   ScaffoldMessenger.of(context).showSnackBar(
+      //     const SnackBar(content: Text('Settings clicked')),
+      //   );
+      //   break;
 
       case 'logout':
+        final shouldLogout = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Logout'),
+            content: const Text('Are you sure you want to logout?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+
+        if (shouldLogout != true) return;
+
         final prefs = await SharedPreferences.getInstance();
         await prefs.clear();
 

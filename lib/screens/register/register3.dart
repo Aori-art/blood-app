@@ -6,6 +6,10 @@ import 'otp.dart';
 
 class RegisterStep3 extends StatefulWidget {
   final String fullName;
+  final String firstName;
+  final String middleInitial;
+  final String lastName;
+  final String suffix;
   final String email;
   final String phone;
   final String birthdate;
@@ -19,6 +23,10 @@ class RegisterStep3 extends StatefulWidget {
   const RegisterStep3({
     super.key,
     required this.fullName,
+    required this.firstName,
+    required this.middleInitial,
+    required this.lastName,
+    required this.suffix,
     required this.email,
     required this.phone,
     required this.birthdate,
@@ -39,6 +47,8 @@ class _RegisterStep3State extends State<RegisterStep3> {
   final TextEditingController confirmPasswordController = TextEditingController();
 
   bool isLoading = false;
+  bool isPasswordHidden = true;
+  bool isConfirmPasswordHidden = true;
 
   @override
   void dispose() {
@@ -78,21 +88,25 @@ class _RegisterStep3State extends State<RegisterStep3> {
 
     try {
       final response = await http.post(
-        Uri.parse("${AppConfig.baseUrl}/register.php"),
-        body: {
-          "full_name": widget.fullName,
-          "email": widget.email,
-          "phone": widget.phone,
-          "birthdate": widget.birthdate,
-          "gender": widget.gender,
-          "blood_type": widget.bloodType,
-          "street_address": widget.streetAddress,
-          "barangay": widget.barangay,
-          "municipality": widget.municipality,
-          "province": widget.province,
-          "password": password,
-        },
-      );
+  Uri.parse("${AppConfig.baseUrl}/register.php"),
+  body: {
+    // Send individual name parts
+    "first_name": widget.firstName,
+    "middle_initial": widget.middleInitial,
+    "last_name": widget.lastName,
+    "suffix": widget.suffix,
+    "email": widget.email,
+    "phone": widget.phone,
+    "birthdate": widget.birthdate,
+    "gender": widget.gender,
+    "blood_type": widget.bloodType,
+    "street_address": widget.streetAddress,
+    "barangay": widget.barangay,
+    "municipality": widget.municipality,
+    "province": widget.province,
+    "password": password,
+  },
+);
 
       final data = jsonDecode(response.body);
 
@@ -178,10 +192,29 @@ class _RegisterStep3State extends State<RegisterStep3> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildFieldLabel('Password'),
-                      _buildTextField('Create Password', passwordController),
+                      _buildTextField(
+                        'Create Password',
+                        passwordController,
+                        isPasswordHidden,
+                        () {
+                          setState(() {
+                            isPasswordHidden = !isPasswordHidden;
+                          });
+                        },
+                      ),
                       SizedBox(height: screenHeight * 0.02),
                       _buildFieldLabel('Confirm Password'),
-                      _buildTextField('Confirm Password', confirmPasswordController),
+                      _buildTextField(
+                        'Confirm Password',
+                        confirmPasswordController,
+                        isConfirmPasswordHidden,
+                        () {
+                          setState(() {
+                            isConfirmPasswordHidden =
+                                !isConfirmPasswordHidden;
+                          });
+                        },
+                      ),
                       SizedBox(height: screenHeight * 0.04),
                       Text(
                         'Password must contain:',
@@ -217,6 +250,7 @@ class _RegisterStep3State extends State<RegisterStep3> {
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF850000),
+                                foregroundColor: Colors.white,
                               ),
                               onPressed: isLoading ? null : completeRegistration,
                               child: isLoading
@@ -228,7 +262,10 @@ class _RegisterStep3State extends State<RegisterStep3> {
                                         color: Colors.white,
                                       ),
                                     )
-                                  : const Text('Complete Registration'),
+                                  : const Text(
+                                      'Confirm',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
                             ),
                           ),
                         ],
@@ -255,14 +292,26 @@ class _RegisterStep3State extends State<RegisterStep3> {
     );
   }
 
-  Widget _buildTextField(String hint, TextEditingController controller) {
+  Widget _buildTextField(
+    String hint,
+    TextEditingController controller,
+    bool isHidden,
+    VoidCallback onToggleVisibility,
+  ) {
     return TextField(
       controller: controller,
-      obscureText: true,
+      obscureText: isHidden,
       decoration: InputDecoration(
         hintText: hint,
         filled: true,
         fillColor: const Color(0xFFD9D9D9),
+        suffixIcon: IconButton(
+          onPressed: onToggleVisibility,
+          icon: Icon(
+            isHidden ? Icons.visibility_off : Icons.visibility,
+            color: const Color(0xFF850000),
+          ),
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(9),
         ),

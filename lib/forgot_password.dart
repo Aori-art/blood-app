@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import 'config.dart';
+import 'login.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -73,11 +74,23 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
       if (!mounted) return;
 
+      final message = data["message"] ?? "Request sent";
+      final isSuccess = data["status"] == "success";
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(data["message"] ?? "Request sent"),
-        ),
+        SnackBar(content: Text(message)),
       );
+
+      if (isSuccess) {
+        await Future.delayed(const Duration(seconds: 1));
+
+        if (!mounted) return;
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+        );
+      }
     } catch (e) {
       debugPrint("Forgot password error: $e");
 

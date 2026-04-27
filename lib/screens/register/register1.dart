@@ -33,56 +33,62 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   void goNext() {
-    final firstName = firstNameController.text.trim();
-    final middleInitial = middleInitialController.text.trim();
-    final lastName = lastNameController.text.trim();
-    final suffix = suffixController.text.trim();
-    final email = emailController.text.trim();
-    final phone = phoneController.text.trim();
-    final birthdate = birthdateController.text.trim();
+  final firstName = firstNameController.text.trim();
+  final middleInitial = middleInitialController.text.trim();
+  final lastName = lastNameController.text.trim();
+  final suffix = suffixController.text.trim();
+  final email = emailController.text.trim();
+  final phone = phoneController.text.trim();
+  final birthdate = birthdateController.text.trim();
 
-    if (firstName.isEmpty ||
-        lastName.isEmpty ||
-        email.isEmpty ||
-        phone.isEmpty ||
-        birthdate.isEmpty ||
-        selectedGender == null ||
-        selectedGender!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please fill in all required fields.")),
-      );
-      return;
-    }
+  if (firstName.isEmpty ||
+      lastName.isEmpty ||
+      email.isEmpty ||
+      phone.isEmpty ||
+      birthdate.isEmpty ||
+      selectedGender == null ||
+      selectedGender!.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Please fill in all required fields.")),
+    );
+    return;
+  }
 
-    if (!phone.startsWith('09') || phone.length != 11) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Phone number must be 11 digits and start with 09."),
-        ),
-      );
-      return;
-    }
-
-    final fullName = [
-      firstName,
-      if (middleInitial.isNotEmpty) middleInitial,
-      lastName,
-      if (suffix.isNotEmpty) suffix,
-    ].join(' ');
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => RegisterStep2(
-          fullName: fullName,
-          email: email,
-          phone: phone,
-          birthdate: birthdate,
-          gender: selectedGender!,
-        ),
+  if (!phone.startsWith('09') || phone.length != 11) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Phone number must be 11 digits and start with 09."),
       ),
     );
+    return;
   }
+
+  // Create full name for display only
+  final fullName = [
+    firstName,
+    if (middleInitial.isNotEmpty) middleInitial,
+    lastName,
+    if (suffix.isNotEmpty) suffix,
+  ].join(' ');
+
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => RegisterStep2(
+        fullName: fullName,
+        // Add these new fields to pass individual name parts
+        firstName: firstName,
+        middleInitial: middleInitial,
+        lastName: lastName,
+        suffix: suffix,
+        email: email,
+        phone: phone,
+        birthdate: birthdate,
+        gender: selectedGender!,
+      ),
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {

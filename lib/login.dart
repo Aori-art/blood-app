@@ -21,6 +21,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController passwordController = TextEditingController();
 
   bool isLoading = false;
+  bool isPasswordHidden = true;
 
   @override
   void initState() {
@@ -238,8 +239,24 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 5),
                     TextField(
                       controller: passwordController,
-                      obscureText: true,
-                      decoration: _inputDecoration('Enter your password'),
+                      obscureText: isPasswordHidden,
+                      decoration: _inputDecoration(
+                        'Enter your password',
+                      ).copyWith(
+                        suffixIcon: IconButton(
+                          onPressed: () {
+                            setState(() {
+                              isPasswordHidden = !isPasswordHidden;
+                            });
+                          },
+                          icon: Icon(
+                            isPasswordHidden
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            color: const Color(0xFF850000),
+                          ),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Align(
