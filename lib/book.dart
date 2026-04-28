@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'config.dart';
 
 class BookScreen extends StatefulWidget {
   const BookScreen({super.key});
@@ -12,9 +15,7 @@ class _BookScreenState extends State<BookScreen> {
   String? selectedCenter;
   String? selectedTime;
 
-  final List<String> centers = [
-    "Lipa City Hall"
-  ];
+  final List<String> centers = ["Lipa City Hall"];
 
   final List<String> timeSlots = [
     "8:00 AM - 9:00 AM",
@@ -39,6 +40,64 @@ class _BookScreenState extends State<BookScreen> {
     }
   }
 
+  Future<void> _submitBooking() async {
+    if (selectedDate == null ||
+        selectedCenter == null ||
+        selectedTime == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please complete all fields")),
+      );
+      return;
+    }
+
+    final url = Uri.parse("${AppConfig.baseUrl}/book_appointment.php");
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: jsonEncode({
+          "donor_id": 30,
+          "appointment_date":
+              "${selectedDate!.year}-${selectedDate!.month}-${selectedDate!.day}",
+          "appointment_time": selectedTime,
+          "donation_center": selectedCenter,
+        }),
+      );
+
+      // 🔥 DEBUG OUTPUT (VERY IMPORTANT)
+      print("STATUS CODE: ${response.statusCode}");
+      print("RAW RESPONSE: ${response.body}");
+
+      if (response.statusCode != 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Server error: ${response.statusCode}")),
+        );
+        return;
+      }
+
+      final data = jsonDecode(response.body);
+
+      if (data["success"] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Booking successful")),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(data["message"] ?? "Unknown error")),
+        );
+      }
+    } catch (e) {
+      print("ERROR: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Connection error: $e")),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -46,7 +105,6 @@ class _BookScreenState extends State<BookScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // HEADER
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 20),
@@ -63,30 +121,16 @@ class _BookScreenState extends State<BookScreen> {
               ),
             ),
 
-            // CONTENT
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Schedule Your Donation',
-                      style: TextStyle(
-                        color: Color(0xFF850000),
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Select your preferred date, time and location',
-                      style: TextStyle(color: Colors.grey),
-                    ),
 
                     const SizedBox(height: 20),
 
-                    // ✅ DATE BUTTON
+                    // DATE
                     SizedBox(
                       width: double.infinity,
                       height: 50,
@@ -99,9 +143,7 @@ class _BookScreenState extends State<BookScreen> {
                           selectedDate == null
                               ? "Select Date"
                               : "${selectedDate!.year}-${selectedDate!.month}-${selectedDate!.day}",
-                          style: const TextStyle(
-                            color: Color(0xFF850000),
-                          ),
+                          style: const TextStyle(color: Color(0xFF850000)),
                         ),
                       ),
                     ),
@@ -109,9 +151,7 @@ class _BookScreenState extends State<BookScreen> {
                     const SizedBox(height: 20),
 
                     const Text("Donation Center"),
-                    const SizedBox(height: 8),
 
-                    // ✅ DROPDOWN CENTER
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       decoration: BoxDecoration(
@@ -121,19 +161,17 @@ class _BookScreenState extends State<BookScreen> {
                       ),
                       child: DropdownButton<String>(
                         value: selectedCenter,
-                        hint: const Text("Choose Donation Center"),
                         isExpanded: true,
+                        hint: const Text("Choose Donation Center"),
                         underline: const SizedBox(),
-                        items: centers.map((center) {
-                          return DropdownMenuItem(
-                            value: center,
-                            child: Text(center),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            selectedCenter = value;
-                          });
+                        items: centers
+                            .map((e) => DropdownMenuItem(
+                                  value: e,
+                                  child: Text(e),
+                                ))
+                            .toList(),
+                        onChanged: (val) {
+                          setState(() => selectedCenter = val);
                         },
                       ),
                     ),
@@ -141,9 +179,7 @@ class _BookScreenState extends State<BookScreen> {
                     const SizedBox(height: 20),
 
                     const Text("Time Slot"),
-                    const SizedBox(height: 8),
 
-                    // ✅ TIME SLOT DROPDOWN
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       decoration: BoxDecoration(
@@ -153,37 +189,32 @@ class _BookScreenState extends State<BookScreen> {
                       ),
                       child: DropdownButton<String>(
                         value: selectedTime,
-                        hint: const Text("Choose Time Slot"),
                         isExpanded: true,
+                        hint: const Text("Choose Time Slot"),
                         underline: const SizedBox(),
-                        items: timeSlots.map((time) {
-                          return DropdownMenuItem(
-                            value: time,
-                            child: Text(time),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            selectedTime = value;
-                          });
+                        items: timeSlots
+                            .map((e) => DropdownMenuItem(
+                                  value: e,
+                                  child: Text(e),
+                                ))
+                            .toList(),
+                        onChanged: (val) {
+                          setState(() => selectedTime = val);
                         },
                       ),
                     ),
 
                     const SizedBox(height: 30),
 
-                    // ✅ CONFIRM BUTTON FIXED
                     SizedBox(
                       width: double.infinity,
                       height: 45,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF850000),
-                          foregroundColor: Colors.white, // FIX TEXT COLOR
+                          foregroundColor: Colors.white,
                         ),
-                        onPressed: () {
-                          // TODO: Handle booking logic
-                        },
+                        onPressed: _submitBooking,
                         child: const Text("Confirm Booking"),
                       ),
                     ),
