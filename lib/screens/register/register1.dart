@@ -66,6 +66,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController birthdateController = TextEditingController();
 
   String? selectedGender;
+  String? selectedSuffix; // Add this to track dropdown selection
 
   @override
   void dispose() {
@@ -147,9 +148,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
         phoneController: phoneController,
         birthdateController: birthdateController,
         selectedGender: selectedGender,
+        selectedSuffix: selectedSuffix,
         onGenderChanged: (value) {
           setState(() {
             selectedGender = value;
+          });
+        },
+        onSuffixChanged: (value) {
+          setState(() {
+            selectedSuffix = value;
+            suffixController.text = value ?? '';
           });
         },
         onNext: goNext,
@@ -169,7 +177,9 @@ class Step1 extends StatelessWidget {
   final TextEditingController phoneController;
   final TextEditingController birthdateController;
   final String? selectedGender;
+  final String? selectedSuffix;
   final ValueChanged<String?> onGenderChanged;
+  final ValueChanged<String?> onSuffixChanged;
   final VoidCallback onNext;
 
   const Step1({
@@ -182,7 +192,9 @@ class Step1 extends StatelessWidget {
     required this.phoneController,
     required this.birthdateController,
     required this.selectedGender,
+    required this.selectedSuffix,
     required this.onGenderChanged,
+    required this.onSuffixChanged,
     required this.onNext,
   });
 
@@ -395,7 +407,7 @@ class Step1 extends StatelessWidget {
 
   Widget _buildSuffixDropdown() {
     return DropdownButtonFormField<String>(
-      value: suffixController.text.isEmpty ? null : suffixController.text,
+      value: selectedSuffix,
       isExpanded: true,
       decoration: InputDecoration(
         hintText: 'Select Suffix (optional)',
@@ -405,20 +417,23 @@ class Step1 extends StatelessWidget {
           borderRadius: BorderRadius.circular(9),
         ),
       ),
-      items: const [
-        DropdownMenuItem(value: 'Jr.', child: Text('Jr.')),
-        DropdownMenuItem(value: 'Sr.', child: Text('Sr.')),
-        DropdownMenuItem(value: 'II', child: Text('II')),
-        DropdownMenuItem(value: 'III', child: Text('III')),
-        DropdownMenuItem(value: 'IV', child: Text('IV')),
-        DropdownMenuItem(value: 'V', child: Text('V')),
-        DropdownMenuItem(value: '1st', child: Text('1st')),
-        DropdownMenuItem(value: '2nd', child: Text('2nd')),
-        DropdownMenuItem(value: '3rd', child: Text('3rd')),
+      items: [
+        // Add "None" option at the top
+        const DropdownMenuItem(
+          value: '',
+          child: Text('None'),
+        ),
+        const DropdownMenuItem(value: 'Jr.', child: Text('Jr.')),
+        const DropdownMenuItem(value: 'Sr.', child: Text('Sr.')),
+        const DropdownMenuItem(value: 'II', child: Text('II')),
+        const DropdownMenuItem(value: 'III', child: Text('III')),
+        const DropdownMenuItem(value: 'IV', child: Text('IV')),
+        const DropdownMenuItem(value: 'V', child: Text('V')),
+        const DropdownMenuItem(value: '1st', child: Text('1st')),
+        const DropdownMenuItem(value: '2nd', child: Text('2nd')),
+        const DropdownMenuItem(value: '3rd', child: Text('3rd')),
       ],
-      onChanged: (value) {
-        suffixController.text = value ?? '';
-      },
+      onChanged: onSuffixChanged,
     );
   }
 
