@@ -8,10 +8,39 @@ class BookScreen extends StatefulWidget {
 }
 
 class _BookScreenState extends State<BookScreen> {
+  DateTime? selectedDate;
+  String? selectedCenter;
+  String? selectedTime;
+
+  final List<String> centers = [
+    "Lipa City Hall"
+  ];
+
+  final List<String> timeSlots = [
+    "8:00 AM - 9:00 AM",
+    "9:00 AM - 10:00 AM",
+    "10:00 AM - 11:00 AM",
+    "1:00 PM - 2:00 PM",
+    "2:00 PM - 3:00 PM",
+  ];
+
+  Future<void> _pickDate() async {
+    DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2030),
+    );
+
+    if (picked != null) {
+      setState(() {
+        selectedDate = picked;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -57,16 +86,23 @@ class _BookScreenState extends State<BookScreen> {
 
                     const SizedBox(height: 20),
 
-                    // DATE BOX
-                    Container(
+                    // ✅ DATE BUTTON
+                    SizedBox(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE6E6E6),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Center(
-                        child: Text("Calendar UI here (simplified)"),
+                      height: 50,
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFF850000)),
+                        ),
+                        onPressed: _pickDate,
+                        child: Text(
+                          selectedDate == null
+                              ? "Select Date"
+                              : "${selectedDate!.year}-${selectedDate!.month}-${selectedDate!.day}",
+                          style: const TextStyle(
+                            color: Color(0xFF850000),
+                          ),
+                        ),
                       ),
                     ),
 
@@ -74,25 +110,80 @@ class _BookScreenState extends State<BookScreen> {
 
                     const Text("Donation Center"),
                     const SizedBox(height: 8),
-                    _inputBox("Choose Donation Center"),
+
+                    // ✅ DROPDOWN CENTER
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD9D9D9),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey),
+                      ),
+                      child: DropdownButton<String>(
+                        value: selectedCenter,
+                        hint: const Text("Choose Donation Center"),
+                        isExpanded: true,
+                        underline: const SizedBox(),
+                        items: centers.map((center) {
+                          return DropdownMenuItem(
+                            value: center,
+                            child: Text(center),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            selectedCenter = value;
+                          });
+                        },
+                      ),
+                    ),
 
                     const SizedBox(height: 20),
 
                     const Text("Time Slot"),
                     const SizedBox(height: 8),
-                    _inputBox("Choose Time Slot"),
+
+                    // ✅ TIME SLOT DROPDOWN
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD9D9D9),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey),
+                      ),
+                      child: DropdownButton<String>(
+                        value: selectedTime,
+                        hint: const Text("Choose Time Slot"),
+                        isExpanded: true,
+                        underline: const SizedBox(),
+                        items: timeSlots.map((time) {
+                          return DropdownMenuItem(
+                            value: time,
+                            child: Text(time),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            selectedTime = value;
+                          });
+                        },
+                      ),
+                    ),
 
                     const SizedBox(height: 30),
 
-                    // BUTTON
+                    // ✅ CONFIRM BUTTON FIXED
                     SizedBox(
                       width: double.infinity,
                       height: 45,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF850000),
+                          foregroundColor: Colors.white, // FIX TEXT COLOR
                         ),
-                        onPressed: () {},
+                        onPressed: () {
+                          // TODO: Handle booking logic
+                        },
                         child: const Text("Confirm Booking"),
                       ),
                     ),
@@ -102,22 +193,6 @@ class _BookScreenState extends State<BookScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _inputBox(String text) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFD9D9D9),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(color: Colors.grey),
       ),
     );
   }
