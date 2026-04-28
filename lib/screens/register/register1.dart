@@ -2,6 +2,53 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'register2.dart';
 
+/// ================= FORMATTERS =================
+
+class CapitalizeFirstLetterFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue,
+      TextEditingValue newValue) {
+
+    if (newValue.text.isEmpty) return newValue;
+
+    String text = newValue.text.toLowerCase();
+    String result = text[0].toUpperCase() + text.substring(1);
+
+    return TextEditingValue(
+      text: result,
+      selection: newValue.selection,
+    );
+  }
+}
+
+class MiddleInitialFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue,
+      TextEditingValue newValue) {
+
+    if (newValue.text.isEmpty) return newValue;
+
+    String text = newValue.text.replaceAll('.', '');
+
+    // Allow only 1 character
+    if (text.length > 1) {
+      text = text[0];
+    }
+
+    // Capitalize and add period
+    text = text.toUpperCase() + '.';
+
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
+}
+
+/// ================= MAIN SCREEN =================
+
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -33,62 +80,60 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   void goNext() {
-  final firstName = firstNameController.text.trim();
-  final middleInitial = middleInitialController.text.trim();
-  final lastName = lastNameController.text.trim();
-  final suffix = suffixController.text.trim();
-  final email = emailController.text.trim();
-  final phone = phoneController.text.trim();
-  final birthdate = birthdateController.text.trim();
+    final firstName = firstNameController.text.trim();
+    final middleInitial = middleInitialController.text.trim();
+    final lastName = lastNameController.text.trim();
+    final suffix = suffixController.text.trim();
+    final email = emailController.text.trim();
+    final phone = phoneController.text.trim();
+    final birthdate = birthdateController.text.trim();
 
-  if (firstName.isEmpty ||
-      lastName.isEmpty ||
-      email.isEmpty ||
-      phone.isEmpty ||
-      birthdate.isEmpty ||
-      selectedGender == null ||
-      selectedGender!.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Please fill in all required fields.")),
-    );
-    return;
-  }
+    if (firstName.isEmpty ||
+        lastName.isEmpty ||
+        email.isEmpty ||
+        phone.isEmpty ||
+        birthdate.isEmpty ||
+        selectedGender == null ||
+        selectedGender!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please fill in all required fields.")),
+      );
+      return;
+    }
 
-  if (!phone.startsWith('09') || phone.length != 11) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Phone number must be 11 digits and start with 09."),
+    if (!phone.startsWith('09') || phone.length != 11) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Phone number must be 11 digits and start with 09."),
+        ),
+      );
+      return;
+    }
+
+    final fullName = [
+      firstName,
+      if (middleInitial.isNotEmpty) middleInitial,
+      lastName,
+      if (suffix.isNotEmpty) suffix,
+    ].join(' ');
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RegisterStep2(
+          fullName: fullName,
+          firstName: firstName,
+          middleInitial: middleInitial,
+          lastName: lastName,
+          suffix: suffix,
+          email: email,
+          phone: phone,
+          birthdate: birthdate,
+          gender: selectedGender!,
+        ),
       ),
     );
-    return;
   }
-
-  // Create full name for display only
-  final fullName = [
-    firstName,
-    if (middleInitial.isNotEmpty) middleInitial,
-    lastName,
-    if (suffix.isNotEmpty) suffix,
-  ].join(' ');
-
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => RegisterStep2(
-        fullName: fullName,
-        // Add these new fields to pass individual name parts
-        firstName: firstName,
-        middleInitial: middleInitial,
-        lastName: lastName,
-        suffix: suffix,
-        email: email,
-        phone: phone,
-        birthdate: birthdate,
-        gender: selectedGender!,
-      ),
-    ),
-  );
-}
 
   @override
   Widget build(BuildContext context) {
@@ -112,6 +157,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 }
+
+/// ================= UI =================
 
 class Step1 extends StatelessWidget {
   final TextEditingController firstNameController;
@@ -205,29 +252,39 @@ class Step1 extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildFieldLabel('First Name'),
-                    _buildTextField('Juan', firstNameController),
+                    _buildTextField(
+                      'Juan',
+                      firstNameController,
+                      inputFormatters: [CapitalizeFirstLetterFormatter()],
+                    ),
+
                     SizedBox(height: screenHeight * 0.02),
 
                     Row(
                       children: [
                         Expanded(
-                          flex: 2,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildFieldLabel('Middle Initial'),
-                              _buildTextField('D.', middleInitialController),
+                              _buildTextField(
+                                'D.',
+                                middleInitialController,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z.]')),
+                                  MiddleInitialFormatter(),
+                                ],
+                              ),
                             ],
                           ),
                         ),
                         SizedBox(width: screenWidth * 0.04),
                         Expanded(
-                          flex: 2,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildFieldLabel('Suffix'),
-                              _buildTextField('Jr. (optional)', suffixController),
+                              _buildSuffixDropdown(),
                             ],
                           ),
                         ),
@@ -237,7 +294,12 @@ class Step1 extends StatelessWidget {
                     SizedBox(height: screenHeight * 0.02),
 
                     _buildFieldLabel('Last Name'),
-                    _buildTextField('Dela Cruz', lastNameController),
+                    _buildTextField(
+                      'Dela Cruz',
+                      lastNameController,
+                      inputFormatters: [CapitalizeFirstLetterFormatter()],
+                    ),
+
                     SizedBox(height: screenHeight * 0.02),
 
                     _buildFieldLabel('Email Address'),
@@ -246,6 +308,7 @@ class Step1 extends StatelessWidget {
                       emailController,
                       keyboardType: TextInputType.emailAddress,
                     ),
+
                     SizedBox(height: screenHeight * 0.02),
 
                     _buildFieldLabel('Phone Number'),
@@ -258,26 +321,23 @@ class Step1 extends StatelessWidget {
                         LengthLimitingTextInputFormatter(11),
                       ],
                     ),
+
                     const SizedBox(height: 6),
                     const Text(
                       'Note: Enter an 11-digit mobile number that starts with 09.',
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
                     ),
+
                     SizedBox(height: screenHeight * 0.02),
 
                     _buildFieldLabel('Date of Birth'),
-                    _buildDateField(
-                      context,
-                      'Select your birthdate',
-                      birthdateController,
-                    ),
+                    _buildDateField(context, 'Select your birthdate', birthdateController),
+
                     SizedBox(height: screenHeight * 0.02),
 
                     _buildFieldLabel('Gender'),
                     _buildGenderDropdown(),
+
                     SizedBox(height: screenHeight * 0.04),
 
                     Center(
@@ -294,7 +354,6 @@ class Step1 extends StatelessWidget {
                         ),
                       ),
                     ),
-                    SizedBox(height: screenHeight * 0.02),
                   ],
                 ),
               ),
@@ -308,13 +367,8 @@ class Step1 extends StatelessWidget {
   Widget _buildFieldLabel(String label) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 5),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontWeight: FontWeight.w600,
-          fontSize: 14,
-        ),
-      ),
+      child: Text(label,
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
     );
   }
 
@@ -339,11 +393,37 @@ class Step1 extends StatelessWidget {
     );
   }
 
+  Widget _buildSuffixDropdown() {
+    return DropdownButtonFormField<String>(
+      value: suffixController.text.isEmpty ? null : suffixController.text,
+      isExpanded: true,
+      decoration: InputDecoration(
+        hintText: 'Select Suffix (optional)',
+        filled: true,
+        fillColor: const Color(0xFFD9D9D9),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(9),
+        ),
+      ),
+      items: const [
+        DropdownMenuItem(value: 'Jr.', child: Text('Jr.')),
+        DropdownMenuItem(value: 'Sr.', child: Text('Sr.')),
+        DropdownMenuItem(value: 'II', child: Text('II')),
+        DropdownMenuItem(value: 'III', child: Text('III')),
+        DropdownMenuItem(value: 'IV', child: Text('IV')),
+        DropdownMenuItem(value: 'V', child: Text('V')),
+        DropdownMenuItem(value: '1st', child: Text('1st')),
+        DropdownMenuItem(value: '2nd', child: Text('2nd')),
+        DropdownMenuItem(value: '3rd', child: Text('3rd')),
+      ],
+      onChanged: (value) {
+        suffixController.text = value ?? '';
+      },
+    );
+  }
+
   Widget _buildDateField(
-    BuildContext context,
-    String hint,
-    TextEditingController controller,
-  ) {
+      BuildContext context, String hint, TextEditingController controller) {
     return TextField(
       controller: controller,
       readOnly: true,
@@ -373,22 +453,10 @@ class Step1 extends StatelessWidget {
         ),
       ),
       items: const [
-        DropdownMenuItem(
-          value: 'Male',
-          child: Text('Male'),
-        ),
-        DropdownMenuItem(
-          value: 'Female',
-          child: Text('Female'),
-        ),
-        DropdownMenuItem(
-          value: 'Non-binary',
-          child: Text('Non-binary'),
-        ),
-        DropdownMenuItem(
-          value: 'Prefer not to say',
-          child: Text('Prefer not to say'),
-        ),
+        DropdownMenuItem(value: 'Male', child: Text('Male')),
+        DropdownMenuItem(value: 'Female', child: Text('Female')),
+        DropdownMenuItem(value: 'Non-binary', child: Text('Non-binary')),
+        DropdownMenuItem(value: 'Prefer not to say', child: Text('Prefer not to say')),
       ],
       onChanged: onGenderChanged,
     );
