@@ -82,23 +82,23 @@ class _HomeContentState extends State<HomeContent> {
   bool isProfileLoading = true;
   bool isEligibilityLoading = true;
 
+  //appointments state
+  List<Map<String, dynamic>> appointments = [];
+  bool isAppointmentsLoading = true;
+
   @override
   void initState() {
     super.initState();
     loadUserName();
     loadProfileData();
     loadEligibilityData();
+    loadAppointments();
   }
 
   Future<void> loadUserName() async {
     final prefs = await SharedPreferences.getInstance();
     final name = prefs.getString('userName') ?? 'User';
-
-    if (mounted) {
-      setState(() {
-        userName = name;
-      });
-    }
+    if (mounted) setState(() => userName = name);
   }
 
   Future<void> loadProfileData() async {
@@ -125,14 +125,15 @@ class _HomeContentState extends State<HomeContent> {
       debugPrint("Profile body: ${response.body}");
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final decoded = jsonDecode(response.body);
 
-        if (data["status"] == "success") {
+        if (decoded["status"] == "success" && decoded["data"] != null) {
+          final profileData = decoded["data"];
           if (mounted) {
             setState(() {
-              bloodType = (data["blood_type"] ?? "N/A").toString();
+              bloodType = (profileData["blood_type"] ?? "N/A").toString();
               totalDonations =
-                  int.tryParse(data["total_donations"].toString()) ?? 0;
+                  int.tryParse(profileData["total_donations"].toString()) ?? 0;
               isProfileLoading = false;
             });
           }
@@ -156,7 +157,6 @@ class _HomeContentState extends State<HomeContent> {
       }
     } catch (e) {
       debugPrint("Profile error: $e");
-
       if (mounted) {
         setState(() {
           bloodType = "N/A";
@@ -184,7 +184,8 @@ class _HomeContentState extends State<HomeContent> {
 
     try {
       final response = await http.get(
-        Uri.parse("${AppConfig.baseUrl}/get_eligibility.php?donor_id=$donorId"),
+        Uri.parse(
+            "${AppConfig.baseUrl}/get_eligibility.php?donor_id=$donorId"),
       );
 
       debugPrint("Eligibility status: ${response.statusCode}");
@@ -198,7 +199,8 @@ class _HomeContentState extends State<HomeContent> {
             setState(() {
               nextEligibleDate =
                   formatDate(data["next_eligible_date"]?.toString() ?? "");
-              eligibilityStatus = (data["eligibility"] ?? "Unknown").toString();
+              eligibilityStatus =
+                  (data["eligibility"] ?? "Unknown").toString();
               isEligibilityLoading = false;
             });
           }
@@ -222,7 +224,6 @@ class _HomeContentState extends State<HomeContent> {
       }
     } catch (e) {
       debugPrint("Eligibility error: $e");
-
       if (mounted) {
         setState(() {
           nextEligibleDate = "N/A";
@@ -233,29 +234,89 @@ class _HomeContentState extends State<HomeContent> {
     }
   }
 
+  //load appointments from API
+  Future<void> loadAppointments() async {
+    final prefs = await SharedPreferences.getInstance();
+    final donorId = prefs.getString('donorId');
+
+    if (donorId == null || donorId.isEmpty) {
+      if (mounted) setState(() => isAppointmentsLoading = false);
+      return;
+    }
+
+    try {
+      final response = await http.get(
+        Uri.parse(
+            "${AppConfig.baseUrl}/get_appointments.php?donor_id=$donorId"),
+      );
+
+      debugPrint("Appointments status: ${response.statusCode}");
+      debugPrint("Appointments body: ${response.body}");
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded["status"] == "success" && decoded["data"] != null) {
+          if (mounted) {
+            setState(() {
+              final list = List<Map<String, dynamic>>.from(decoded["data"]);
+                    appointments = list.isNotEmpty ? [list.first] : [];
+              isAppointmentsLoading = false;
+            });
+          }
+        } else {
+          if (mounted) setState(() => isAppointmentsLoading = false);
+        }
+      } else {
+        if (mounted) setState(() => isAppointmentsLoading = false);
+      }
+    } catch (e) {
+      debugPrint("Appointments error: $e");
+      if (mounted) setState(() => isAppointmentsLoading = false);
+    }
+  }
+
   String formatDate(String dateString) {
     if (dateString.isEmpty) return "N/A";
-
     try {
       final date = DateTime.parse(dateString);
       const months = [
-        'January',
-        'February',
-        'March',
-        'April',
-        'May',
-        'June',
-        'July',
-        'August',
-        'September',
-        'October',
-        'November',
-        'December',
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December',
       ];
-
       return "${months[date.month - 1]} ${date.day}, ${date.year}";
     } catch (e) {
       return dateString;
+    }
+  }
+
+  //format time from "HH:mm:ss" to "hh:mm AM/PM"
+  String formatTime(String? timeString) {
+    if (timeString == null || timeString.isEmpty) return "N/A";
+    try {
+      final parts = timeString.split(":");
+      int hour = int.parse(parts[0]);
+      int minute = int.parse(parts[1]);
+      final period = hour >= 12 ? "PM" : "AM";
+      if (hour > 12) hour -= 12;
+      if (hour == 0) hour = 12;
+      return "${hour}:${minute.toString().padLeft(2, '0')} $period";
+    } catch (e) {
+      return timeString;
+    }
+  }
+
+  //map status to color
+  Color getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'cancelled':
+        return Colors.red;
+      case 'pending':
+        return Colors.orange;
+      case 'approved':
+      case 'completed':
+        return Colors.green;
+      default:
+        return Colors.grey;
     }
   }
 
@@ -267,12 +328,6 @@ class _HomeContentState extends State<HomeContent> {
           MaterialPageRoute(builder: (context) => const HistoryScreen()),
         );
         break;
-
-      // case 'settings':
-      //   ScaffoldMessenger.of(context).showSnackBar(
-      //     const SnackBar(content: Text('Settings clicked')),
-      //   );
-      //   break;
 
       case 'logout':
         final shouldLogout = await showDialog<bool>(
@@ -362,6 +417,54 @@ class _HomeContentState extends State<HomeContent> {
     );
   }
 
+  //NEW: builds each appointment card
+  Widget _appointmentCard(Map<String, dynamic> appt) {
+    final date = formatDate(appt["appointment_date"] ?? "");
+    final time = formatTime(appt["appointment_time"] ?? "");
+    final center = appt["donation_center"] ?? "N/A";
+    final status = appt["status"] ?? "N/A";
+    final statusColor = getStatusColor(status);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(9),
+        boxShadow: const [
+          BoxShadow(blurRadius: 4, color: Colors.black26),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            date,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            time,
+            style: const TextStyle(color: Colors.grey),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            center,
+            style: const TextStyle(color: Colors.grey),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            'Status: $status',
+            style: TextStyle(
+              color: statusColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -395,10 +498,7 @@ class _HomeContentState extends State<HomeContent> {
                     children: [
                       const Text(
                         'Welcome Back,',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: Colors.white70, fontSize: 12),
                       ),
                       const SizedBox(height: 5),
                       Text(
@@ -413,26 +513,14 @@ class _HomeContentState extends State<HomeContent> {
                   ),
                 ),
                 PopupMenuButton<String>(
-                  icon: const Icon(
-                    Icons.more_vert,
-                    color: Colors.white,
-                  ),
+                  icon: const Icon(Icons.more_vert, color: Colors.white),
                   onSelected: (value) async {
                     await _handleMenuSelection(context, value);
                   },
                   itemBuilder: (context) => const [
-                    PopupMenuItem(
-                      value: 'profile',
-                      child: Text('Profile'),
-                    ),
-                    PopupMenuItem(
-                      value: 'settings',
-                      child: Text('Settings'),
-                    ),
-                    PopupMenuItem(
-                      value: 'logout',
-                      child: Text('Logout'),
-                    ),
+                    PopupMenuItem(value: 'profile', child: Text('Profile')),
+                    PopupMenuItem(value: 'settings', child: Text('Settings')),
+                    PopupMenuItem(value: 'logout', child: Text('Logout')),
                   ],
                 ),
               ],
@@ -583,35 +671,34 @@ class _HomeContentState extends State<HomeContent> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.all(15),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(9),
-                        boxShadow: const [
-                          BoxShadow(blurRadius: 4, color: Colors.black26),
-                        ],
+
+                    //dynamic appointments section
+                    if (isAppointmentsLoading)
+                      const Center(child: CircularProgressIndicator())
+                    else if (appointments.isEmpty)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(15),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(9),
+                          boxShadow: const [
+                            BoxShadow(blurRadius: 4, color: Colors.black26),
+                          ],
+                        ),
+                        child: const Text(
+                          'No upcoming appointments.',
+                          style: TextStyle(color: Colors.grey),
+                          textAlign: TextAlign.center,
+                        ),
+                      )
+                    else
+                      Column(
+                        children: appointments
+                            .map((appt) => _appointmentCard(appt))
+                            .toList(),
                       ),
-                      child: const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'December 20, 2026',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          SizedBox(height: 5),
-                          Text(
-                            '10:00 AM',
-                            style: TextStyle(color: Colors.red),
-                          ),
-                          SizedBox(height: 5),
-                          Text(
-                            'City Blood bank, 123 Health St.',
-                            style: TextStyle(color: Colors.red),
-                          ),
-                        ],
-                      ),
-                    ),
+
                     SizedBox(height: screenHeight * 0.02),
                     Container(
                       width: double.infinity,
