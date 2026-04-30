@@ -124,24 +124,46 @@ class _BookScreenState extends State<BookScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFDDDDDD),
       body: SafeArea(
         child: Column(
           children: [
+            // HEADER WITH GRADIENT
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              color: const Color(0xFF850000),
-              child: const Center(
-                child: Text(
-                  'Book Appointment',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
+              padding: EdgeInsets.only(
+                top: size.height * 0.06,
+                bottom: size.height * 0.025,
+              ),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF750000), Color(0xFFFF4E4E)],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
                 ),
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Positioned(
+                  //   left: 10,
+                  //   child: IconButton(
+                  //     icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  //     onPressed: () => Navigator.pop(context),
+                  //   ),
+                  // ),
+                  const Text(
+                    "Book Appointment",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
             ),
             Expanded(
@@ -151,7 +173,14 @@ class _BookScreenState extends State<BookScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 20),
-
+                    const Text(
+                      "Select Date",
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     SizedBox(
                       width: double.infinity,
                       height: 50,
@@ -169,11 +198,18 @@ class _BookScreenState extends State<BookScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    const Text("Donation Center"),
+                    const Text(
+                      "Donation Center",
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFD9D9D9),
+                        color: Colors.white,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: Colors.grey),
                       ),
@@ -196,11 +232,18 @@ class _BookScreenState extends State<BookScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    const Text("Time Slot"),
+                    const Text(
+                      "Time Slot",
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFD9D9D9),
+                        color: Colors.white,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: Colors.grey),
                       ),

@@ -10,6 +10,7 @@ import 'check.dart';
 import 'config.dart';
 import 'history.dart';
 import 'login.dart';
+import 'donation_history.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,14 +21,46 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  int _donorId = 0;
 
-  final List<Widget> _screens = const [
-    HomeContent(),
-    BookScreen(),
-    CheckScreen(),
-    HistoryScreen(),
-    AlertsScreen(),
-  ];
+  // Make screens dynamic and non-const
+  late List<Widget> _screens;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDonorId();
+    // Initialize screens with placeholder until donorId is loaded
+    _screens = [
+  const HomeContent(),
+  const BookScreen(),
+  const CheckScreen(),
+  DonationHistoryScreen(),
+  const SizedBox(
+    child: Center(child: CircularProgressIndicator()),
+  ),
+];
+  }
+
+  Future<void> _loadDonorId() async {
+    final prefs = await SharedPreferences.getInstance();
+    final donorIdString = prefs.getString('donorId');
+    final id = int.tryParse(donorIdString ?? '0') ?? 0;
+    
+    if (mounted) {
+      setState(() {
+        _donorId = id;
+        // Rebuild screens list with the actual donorId
+        _screens = [
+  const HomeContent(),
+  const BookScreen(),
+  const CheckScreen(),
+  DonationHistoryScreen(),
+  AlertsScreen(donorId: _donorId),
+];
+      });
+    }
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -259,7 +292,7 @@ class _HomeContentState extends State<HomeContent> {
           if (mounted) {
             setState(() {
               final list = List<Map<String, dynamic>>.from(decoded["data"]);
-                    appointments = list.isNotEmpty ? [list.first] : [];
+              appointments = list.isNotEmpty ? [list.first] : [];
               isAppointmentsLoading = false;
             });
           }
@@ -280,8 +313,18 @@ class _HomeContentState extends State<HomeContent> {
     try {
       final date = DateTime.parse(dateString);
       const months = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December',
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December',
       ];
       return "${months[date.month - 1]} ${date.day}, ${date.year}";
     } catch (e) {
@@ -320,48 +363,44 @@ class _HomeContentState extends State<HomeContent> {
     }
   }
 
-  Future<void> _handleMenuSelection(BuildContext context, String value) async {
-    switch (value) {
-      case 'profile':
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const HistoryScreen()),
-        );
-        break;
-
-      case 'logout':
-        final shouldLogout = await showDialog<bool>(
-          context: context,
-          builder: (dialogContext) => AlertDialog(
-            title: const Text('Logout'),
-            content: const Text('Are you sure you want to logout?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('OK'),
-              ),
-            ],
+  Future<void> _handleLogout() async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
           ),
-        );
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
 
-        if (shouldLogout != true) return;
+    if (shouldLogout != true) return;
 
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.clear();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
 
-        if (!context.mounted) return;
+    if (!context.mounted) return;
 
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-          (route) => false,
-        );
-        break;
-    }
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
+      (route) => false,
+    );
+  }
+
+  void _navigateToHistory() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const HistoryScreen()),
+    );
   }
 
   Widget _actionCard({
@@ -512,17 +551,11 @@ class _HomeContentState extends State<HomeContent> {
                     ],
                   ),
                 ),
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert, color: Colors.white),
-                  onSelected: (value) async {
-                    await _handleMenuSelection(context, value);
-                  },
-                  itemBuilder: (context) => const [
-                    PopupMenuItem(value: 'profile', child: Text('Profile')),
-                    PopupMenuItem(value: 'settings', child: Text('Settings')),
-                    PopupMenuItem(value: 'logout', child: Text('Logout')),
-                  ],
-                ),
+                // Profile Icon Button - navigates to HistoryScreen
+                IconButton(
+  icon: const Icon(Icons.account_circle, color: Colors.white, size: 32),
+  onPressed: _navigateToHistory,
+),
               ],
             ),
           ),
