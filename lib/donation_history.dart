@@ -76,66 +76,117 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
     }
   }
 
-  Widget buildCard(Map item) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: const [
-          BoxShadow(color: Colors.black26, blurRadius: 5),
-        ],
+  int getTotalUnits() {
+    int total = 0;
+    for (var d in donations) {
+      total += int.tryParse(d["blood_units"].toString()) ?? 0;
+    }
+    return total;
+  }
+
+  Widget summaryItem(IconData icon, String value, String label) {
+    return Column(
+      children: [
+        Icon(icon, color: Colors.red),
+        const SizedBox(height: 4),
+        Text(value,
+            style: const TextStyle(
+                fontWeight: FontWeight.bold, color: Colors.red)),
+        Text(label,
+            style: const TextStyle(fontSize: 12, color: Colors.grey)),
+      ],
+    );
+  }
+
+  Widget buildCard(Map item, int index) {
+    return Card(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade300, width: 1.5),
       ),
-      child: Row(
-        children: [
-          // Left Accent Bar
-          Container(
-            width: 5,
-            height: 70,
-            decoration: BoxDecoration(
-              color: const Color(0xFF750000),
-              borderRadius: BorderRadius.circular(5),
-            ),
-          ),
-          const SizedBox(width: 12),
-
-          // Content
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  formatDate(item["donation_date"] ?? ""),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: Color(0xFF750000),
-                  ),
+                Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: Colors.red.shade100,
+                      child: const Icon(Icons.water_drop,
+                          color: Colors.red),
+                    ),
+                    const SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Donation #${donations.length - index}",
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          formatDate(item["donation_date"] ?? ""),
+                          style: const TextStyle(
+                              fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 6),
+                Column(
+                  children: [
+                    Text(
+                      "${item["blood_units"] ?? 0} unit(s)",
+                      style: const TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                )
+              ],
+            ),
 
-                Text(
-                  "Blood Units: ${item["blood_units"] ?? 0}",
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.black87,
-                  ),
-                ),
+            const SizedBox(height: 10),
 
-                const SizedBox(height: 4),
-
-                Text(
-                  "Remarks: ${item["remarks"] ?? "N/A"}",
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey,
+            Row(
+              children: [
+                const Icon(Icons.info_outline, size: 14),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    item["remarks"] ?? "No remarks",
+                    style: const TextStyle(fontSize: 12),
                   ),
                 ),
               ],
             ),
-          ),
-        ],
+
+            const Divider(height: 20),
+
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: const [
+                Text(
+                  "Completed",
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.green,
+                      fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  "🎉 Helped save lives!",
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.purple),
+                ),
+              ],
+            )
+          ],
+        ),
       ),
     );
   }
@@ -148,7 +199,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
       backgroundColor: Colors.white,
       body: Column(
         children: [
-          // 🔥 HEADER SAME AS HOME.DART
+          // 🔥 HEADER (IMPROVED)
           Container(
             width: double.infinity,
             padding: EdgeInsets.only(
@@ -158,23 +209,27 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [Color(0xFF750000), Color(0xFFFF4E4E)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
               ),
             ),
-            child: const Center(
-              child: Text(
-                "Donation History",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+            child: Column(
+              children: const [
+                Text(
+                  "Donation History",
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold),
                 ),
-              ),
+                SizedBox(height: 4),
+                Text(
+                  "Your journey of saving lives",
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+              ],
             ),
           ),
 
-          // 🔽 CONTENT WITH REFRESH
+          // 🔥 CONTENT
           Expanded(
             child: RefreshIndicator(
               onRefresh: _refresh,
@@ -186,12 +241,58 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
                         ? const Center(
                             child: Text("No donation history found."),
                           )
-                        : ListView.builder(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            itemCount: donations.length,
-                            itemBuilder: (context, index) {
-                              return buildCard(donations[index]);
-                            },
+                        : Column(
+                            children: [
+                              // 🔥 SUMMARY CARD
+                              Container(
+                                padding: const EdgeInsets.all(14),
+                                margin:
+                                    const EdgeInsets.only(bottom: 15),
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color(0xFFFFEBEE),
+                                      Color(0xFFFFCDD2)
+                                    ],
+                                  ),
+                                  borderRadius:
+                                      BorderRadius.circular(12),
+                                  border: Border.all(
+                                      color: Colors.red.shade200),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceAround,
+                                  children: [
+                                    summaryItem(
+                                        Icons.water_drop,
+                                        donations.length.toString(),
+                                        "Donations"),
+                                    summaryItem(
+                                        Icons.trending_up,
+                                        "${getTotalUnits()}",
+                                        "Units"),
+                                    summaryItem(
+                                        Icons.calendar_today,
+                                        "Active",
+                                        "Status"),
+                                  ],
+                                ),
+                              ),
+
+                              // 🔥 LIST
+                              Expanded(
+                                child: ListView.builder(
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
+                                  itemCount: donations.length,
+                                  itemBuilder: (context, index) {
+                                    return buildCard(
+                                        donations[index], index);
+                                  },
+                                ),
+                              ),
+                            ],
                           ),
               ),
             ),
