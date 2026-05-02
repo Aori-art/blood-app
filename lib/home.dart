@@ -21,83 +21,300 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
-  int _donorId = 0;//user id from shared preferences, used for alerts screen
+  int _donorId = 0;
 
-  // Make screens dynamic and non-const
   late List<Widget> _screens;
 
   @override
   void initState() {
     super.initState();
     _loadDonorId();
-    // Initialize screens with placeholder until donorId is loaded
     _screens = [
-  const HomeContent(),
-  const BookScreen(),
-  const CheckScreen(),
-  DonationHistoryScreen(),
-  const SizedBox(
-    child: Center(child: CircularProgressIndicator()),
-  ),
-];
+      const HomeContent(),
+      const BookScreen(),
+      const CheckScreen(),
+      DonationHistoryScreen(),
+      const SizedBox(child: Center(child: CircularProgressIndicator())),
+    ];
   }
 
   Future<void> _loadDonorId() async {
     final prefs = await SharedPreferences.getInstance();
     final donorIdString = prefs.getString('donorId');
     final id = int.tryParse(donorIdString ?? '0') ?? 0;
-    
+
     if (mounted) {
       setState(() {
         _donorId = id;
-        // Rebuild screens list with the actual donorId
         _screens = [
-  const HomeContent(),
-  const BookScreen(),
-  const CheckScreen(),
-  DonationHistoryScreen(),
-  AlertsScreen(donorId: _donorId),
-];
+          const HomeContent(),
+          const BookScreen(),
+          const CheckScreen(),
+          DonationHistoryScreen(),
+          AlertsScreen(donorId: _donorId),
+        ];
       });
     }
   }
 
   void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+    if (index == 2) return; // handled by FAB
+    setState(() => _selectedIndex = index);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: _screens[_selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        currentIndex: _selectedIndex,
+      floatingActionButton: _CenterFAB(
+        isActive: _selectedIndex == 2,
+        onTap: () => setState(() => _selectedIndex = 2),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      bottomNavigationBar: _CustomNavBar(
+        selectedIndex: _selectedIndex,
         onTap: _onItemTapped,
-        selectedItemColor: const Color(0xFF850000),
-        unselectedItemColor: Colors.black,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_today),
-            label: 'Book',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.check_circle),
-            label: 'Check',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.history), label: 'History'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.notifications),
-            label: 'Alerts',
-          ),
-        ],
       ),
     );
   }
 }
+
+// ── CUSTOM BOTTOM NAV ─────────────────────────────────────────────────────────
+
+class _CustomNavBar extends StatelessWidget {
+  final int selectedIndex;
+  final ValueChanged<int> onTap;
+
+  const _CustomNavBar({required this.selectedIndex, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final isCheckActive = selectedIndex == 2;
+
+    return BottomAppBar(
+      shape: isCheckActive ? null : const CircularNotchedRectangle(),
+      notchMargin: isCheckActive ? 0 : 8,
+      color: Colors.white,
+      elevation: 12,
+      shadowColor: Colors.black26,
+      child: SizedBox(
+        height: 62,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _NavItem(
+              icon: Icons.home_rounded,
+              label: 'Home',
+              index: 0,
+              selectedIndex: selectedIndex,
+              onTap: onTap,
+            ),
+            _NavItem(
+              icon: Icons.calendar_month_rounded,
+              label: 'Book',
+              index: 1,
+              selectedIndex: selectedIndex,
+              onTap: onTap,
+            ),
+            // Center slot: collapses when Check is active (FAB fills that space)
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              width: isCheckActive ? 0 : 56,
+            ),
+            _NavItem(
+              icon: Icons.history_rounded,
+              label: 'History',
+              index: 3,
+              selectedIndex: selectedIndex,
+              onTap: onTap,
+            ),
+            _NavItem(
+              icon: Icons.notifications_rounded,
+              label: 'Alerts',
+              index: 4,
+              selectedIndex: selectedIndex,
+              onTap: onTap,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final int index;
+  final int selectedIndex;
+  final ValueChanged<int> onTap;
+
+  const _NavItem({
+    required this.icon,
+    required this.label,
+    required this.index,
+    required this.selectedIndex,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isSelected = selectedIndex == index;
+    return GestureDetector(
+      onTap: () => onTap(index),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: isSelected
+            ? BoxDecoration(
+                color: const Color(0xFFFFF1F1),
+                borderRadius: BorderRadius.circular(12),
+              )
+            : null,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 22,
+              color: isSelected ? const Color(0xFFDC2626) : const Color(0xFF9CA3AF),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected ? const Color(0xFFDC2626) : const Color(0xFF9CA3AF),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CenterFAB extends StatelessWidget {
+  final bool isActive;
+  final VoidCallback onTap;
+
+  const _CenterFAB({required this.isActive, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSlide(
+      // Slides down into the nav bar when Check is active
+      offset: isActive ? const Offset(0, 0.55) : Offset.zero,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeInOut,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
+          width: isActive ? 72 : 62,
+          height: isActive ? 54 : 62,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(isActive ? 14 : 31),
+            gradient: LinearGradient(
+              colors: isActive
+                  ? [const Color(0xFF750000), const Color(0xFFFF4E4E)]
+                  : [const Color(0xFFDC2626), const Color(0xFFEF4444)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: isActive
+                ? []
+                : [
+                    BoxShadow(
+                      color: const Color(0xFFDC2626).withOpacity(0.45),
+                      blurRadius: 14,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _BloodDropIcon(isActive: isActive),
+              const SizedBox(height: 2),
+              Text(
+                'Check',
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white.withOpacity(0.9),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BloodDropIcon extends StatelessWidget {
+  final bool isActive;
+  const _BloodDropIcon({required this.isActive});
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: const Size(20, 26),
+      painter: _BloodDropPainter(),
+    );
+  }
+}
+
+class _BloodDropPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+
+    final path = Path();
+    final cx = size.width / 2;
+
+    // Teardrop shape: pointed top, round bottom
+    path.moveTo(cx, 0);
+    path.cubicTo(
+      cx + size.width * 0.6, size.height * 0.35,
+      cx + size.width * 0.6, size.height * 0.7,
+      cx, size.height,
+    );
+    path.cubicTo(
+      cx - size.width * 0.6, size.height * 0.7,
+      cx - size.width * 0.6, size.height * 0.35,
+      cx, 0,
+    );
+    path.close();
+
+    canvas.drawPath(path, paint);
+
+    // Shine highlight
+    final shinePaint = Paint()
+      ..color = Colors.white.withOpacity(0.35)
+      ..style = PaintingStyle.fill;
+
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(cx - size.width * 0.12, size.height * 0.42),
+        width: size.width * 0.22,
+        height: size.height * 0.18,
+      ),
+      shinePaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_) => false;
+}
+
+// ── HOME CONTENT ──────────────────────────────────────────────────────────────
 
 class HomeContent extends StatefulWidget {
   const HomeContent({super.key});
@@ -108,14 +325,13 @@ class HomeContent extends StatefulWidget {
 
 class _HomeContentState extends State<HomeContent> {
   String userName = "User";
-  String bloodType = "Loading...";
+  String bloodType = "—";
   int totalDonations = 0;
   String nextEligibleDate = "Loading...";
   String eligibilityStatus = "Loading...";
   bool isProfileLoading = true;
   bool isEligibilityLoading = true;
 
-  //appointments state
   List<Map<String, dynamic>> appointments = [];
   bool isAppointmentsLoading = true;
 
@@ -130,8 +346,7 @@ class _HomeContentState extends State<HomeContent> {
 
   Future<void> loadUserName() async {
     final prefs = await SharedPreferences.getInstance();
-    final name = prefs.getString('userName') ?? 'User';
-    if (mounted) setState(() => userName = name);
+    if (mounted) setState(() => userName = prefs.getString('userName') ?? 'User');
   }
 
   Future<void> loadProfileData() async {
@@ -139,13 +354,7 @@ class _HomeContentState extends State<HomeContent> {
     final donorId = prefs.getString('donorId');
 
     if (donorId == null || donorId.isEmpty) {
-      if (mounted) {
-        setState(() {
-          bloodType = "N/A";
-          totalDonations = 0;
-          isProfileLoading = false;
-        });
-      }
+      if (mounted) setState(() { bloodType = "N/A"; isProfileLoading = false; });
       return;
     }
 
@@ -153,50 +362,23 @@ class _HomeContentState extends State<HomeContent> {
       final response = await http.get(
         Uri.parse("${AppConfig.baseUrl}/get_profile.php?donor_id=$donorId"),
       );
-
-      debugPrint("Profile status: ${response.statusCode}");
-      debugPrint("Profile body: ${response.body}");
-
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
-
         if (decoded["status"] == "success" && decoded["data"] != null) {
-          final profileData = decoded["data"];
+          final d = decoded["data"];
           if (mounted) {
             setState(() {
-              bloodType = (profileData["blood_type"] ?? "N/A").toString();
-              totalDonations =
-                  int.tryParse(profileData["total_donations"].toString()) ?? 0;
+              bloodType = (d["blood_type"] ?? "N/A").toString();
+              totalDonations = int.tryParse(d["total_donations"].toString()) ?? 0;
               isProfileLoading = false;
             });
           }
         } else {
-          if (mounted) {
-            setState(() {
-              bloodType = "N/A";
-              totalDonations = 0;
-              isProfileLoading = false;
-            });
-          }
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            bloodType = "N/A";
-            totalDonations = 0;
-            isProfileLoading = false;
-          });
+          if (mounted) setState(() { bloodType = "N/A"; isProfileLoading = false; });
         }
       }
     } catch (e) {
-      debugPrint("Profile error: $e");
-      if (mounted) {
-        setState(() {
-          bloodType = "N/A";
-          totalDonations = 0;
-          isProfileLoading = false;
-        });
-      }
+      if (mounted) setState(() { bloodType = "N/A"; isProfileLoading = false; });
     }
   }
 
@@ -205,69 +387,33 @@ class _HomeContentState extends State<HomeContent> {
     final donorId = prefs.getString('donorId');
 
     if (donorId == null || donorId.isEmpty) {
-      if (mounted) {
-        setState(() {
-          nextEligibleDate = "N/A";
-          eligibilityStatus = "Unknown";
-          isEligibilityLoading = false;
-        });
-      }
+      if (mounted) setState(() { nextEligibleDate = "N/A"; eligibilityStatus = "Unknown"; isEligibilityLoading = false; });
       return;
     }
 
     try {
       final response = await http.get(
-        Uri.parse(
-            "${AppConfig.baseUrl}/get_eligibility.php?donor_id=$donorId"),
+        Uri.parse("${AppConfig.baseUrl}/get_eligibility.php?donor_id=$donorId"),
       );
-
-      debugPrint("Eligibility status: ${response.statusCode}");
-      debugPrint("Eligibility body: ${response.body}");
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-
         if (data["status"] == "success") {
           if (mounted) {
             setState(() {
-              nextEligibleDate =
-                  formatDate(data["next_eligible_date"]?.toString() ?? "");
-              eligibilityStatus =
-                  (data["eligibility"] ?? "Unknown").toString();
+              nextEligibleDate = formatDate(data["next_eligible_date"]?.toString() ?? "");
+              eligibilityStatus = (data["eligibility"] ?? "Unknown").toString();
               isEligibilityLoading = false;
             });
           }
         } else {
-          if (mounted) {
-            setState(() {
-              nextEligibleDate = "N/A";
-              eligibilityStatus = "Unknown";
-              isEligibilityLoading = false;
-            });
-          }
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            nextEligibleDate = "N/A";
-            eligibilityStatus = "Unknown";
-            isEligibilityLoading = false;
-          });
+          if (mounted) setState(() { nextEligibleDate = "N/A"; eligibilityStatus = "Unknown"; isEligibilityLoading = false; });
         }
       }
     } catch (e) {
-      debugPrint("Eligibility error: $e");
-      if (mounted) {
-        setState(() {
-          nextEligibleDate = "N/A";
-          eligibilityStatus = "Unknown";
-          isEligibilityLoading = false;
-        });
-      }
+      if (mounted) setState(() { nextEligibleDate = "N/A"; eligibilityStatus = "Unknown"; isEligibilityLoading = false; });
     }
   }
 
-  //load appointments from API
   Future<void> loadAppointments() async {
     final prefs = await SharedPreferences.getInstance();
     final donorId = prefs.getString('donorId');
@@ -279,13 +425,8 @@ class _HomeContentState extends State<HomeContent> {
 
     try {
       final response = await http.get(
-        Uri.parse(
-            "${AppConfig.baseUrl}/get_appointments.php?donor_id=$donorId"),
+        Uri.parse("${AppConfig.baseUrl}/get_appointments.php?donor_id=$donorId"),
       );
-
-      debugPrint("Appointments status: ${response.statusCode}");
-      debugPrint("Appointments body: ${response.body}");
-
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
         if (decoded["status"] == "success" && decoded["data"] != null) {
@@ -299,11 +440,8 @@ class _HomeContentState extends State<HomeContent> {
         } else {
           if (mounted) setState(() => isAppointmentsLoading = false);
         }
-      } else {
-        if (mounted) setState(() => isAppointmentsLoading = false);
       }
     } catch (e) {
-      debugPrint("Appointments error: $e");
       if (mounted) setState(() => isAppointmentsLoading = false);
     }
   }
@@ -312,27 +450,11 @@ class _HomeContentState extends State<HomeContent> {
     if (dateString.isEmpty) return "N/A";
     try {
       final date = DateTime.parse(dateString);
-      const months = [
-        'January',
-        'February',
-        'March',
-        'April',
-        'May',
-        'June',
-        'July',
-        'August',
-        'September',
-        'October',
-        'November',
-        'December',
-      ];
+      const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
       return "${months[date.month - 1]} ${date.day}, ${date.year}";
-    } catch (e) {
-      return dateString;
-    }
+    } catch (_) { return dateString; }
   }
 
-  //format time from "HH:mm:ss" to "hh:mm AM/PM"
   String formatTime(String? timeString) {
     if (timeString == null || timeString.isEmpty) return "N/A";
     try {
@@ -342,440 +464,556 @@ class _HomeContentState extends State<HomeContent> {
       final period = hour >= 12 ? "PM" : "AM";
       if (hour > 12) hour -= 12;
       if (hour == 0) hour = 12;
-      return "${hour}:${minute.toString().padLeft(2, '0')} $period";
-    } catch (e) {
-      return timeString;
-    }
+      return "$hour:${minute.toString().padLeft(2, '0')} $period";
+    } catch (_) { return timeString; }
   }
 
-  //map status to color
   Color getStatusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'cancelled':
-        return Colors.red;
-      case 'pending':
-        return Colors.orange;
+      case 'cancelled': return const Color(0xFFDC2626);
+      case 'pending': return const Color(0xFFF59E0B);
       case 'approved':
-      case 'completed':
-        return Colors.green;
-      default:
-        return Colors.grey;
+      case 'completed': return const Color(0xFF16A34A);
+      default: return Colors.grey;
     }
   }
 
-  Future<void> _handleLogout() async {
-    final shouldLogout = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-
-    if (shouldLogout != true) return;
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-
-    if (!context.mounted) return;
-
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
-      (route) => false,
-    );
+  Color getStatusBg(String status) {
+    switch (status.toLowerCase()) {
+      case 'cancelled': return const Color(0xFFFFF1F1);
+      case 'pending': return const Color(0xFFFFFBEB);
+      case 'approved':
+      case 'completed': return const Color(0xFFF0FDF4);
+      default: return const Color(0xFFF3F4F6);
+    }
   }
 
   void _navigateToHistory() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const HistoryScreen()),
-    );
-  }
-
-  Widget _actionCard({
-    required BuildContext context,
-    required String title,
-    required String subtitle,
-    required Widget destination,
-  }) {
-    return SizedBox(
-      height: 115,
-      child: Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(9),
-        elevation: 2,
-        shadowColor: Colors.black26,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(9),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => destination),
-            );
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(15),
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    title,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    subtitle,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  //NEW: builds each appointment card
-  Widget _appointmentCard(Map<String, dynamic> appt) {
-    final date = formatDate(appt["appointment_date"] ?? "");
-    final time = formatTime(appt["appointment_time"] ?? "");
-    final center = appt["donation_center"] ?? "N/A";
-    final status = appt["status"] ?? "N/A";
-    final statusColor = getStatusColor(status);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(9),
-        boxShadow: const [
-          BoxShadow(blurRadius: 4, color: Colors.black26),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            date,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            time,
-            style: const TextStyle(color: Colors.grey),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            center,
-            style: const TextStyle(color: Colors.grey),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            'Status: $status',
-            style: TextStyle(
-              color: statusColor,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const HistoryScreen()));
   }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
+    final firstName = userName.split(' ').first;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF9FAFB),
       body: Column(
         children: [
+          // ── HEADER ──────────────────────────────────────────────
           Container(
             width: double.infinity,
             padding: EdgeInsets.only(
               top: screenHeight * 0.06,
-              left: screenWidth * 0.05,
-              right: screenWidth * 0.05,
-              bottom: screenHeight * 0.02,
+              left: 20,
+              right: 20,
+              bottom: 20,
             ),
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [Color(0xFF750000), Color(0xFFFF4E4E)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
             ),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Welcome Back,',
-                        style: TextStyle(color: Colors.white70, fontSize: 12),
-                      ),
-                      const SizedBox(height: 5),
                       Text(
-                        userName,
+                        _greetingText(),
+                        style: const TextStyle(color: Colors.white70, fontSize: 13),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        firstName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        '❤️  Thank you for saving lives',
+                        style: TextStyle(color: Colors.white60, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+                GestureDetector(
+                  onTap: _navigateToHistory,
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white38, width: 2),
+                    ),
+                    child: CircleAvatar(
+                      radius: 22,
+                      backgroundColor: Colors.white24,
+                      child: Text(
+                        firstName.isNotEmpty ? firstName[0].toUpperCase() : 'U',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
-                // Profile Icon Button - navigates to HistoryScreen
-                IconButton(
-  icon: const Icon(Icons.account_circle, color: Colors.white, size: 32),
-  onPressed: _navigateToHistory,
-),
               ],
             ),
           ),
+
           Expanded(
             child: SingleChildScrollView(
-              child: Padding(
-                padding: EdgeInsets.all(screenWidth * 0.05),
-                child: Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(15),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(9),
-                        boxShadow: const [
-                          BoxShadow(blurRadius: 4, color: Colors.black26),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Your Blood Type'),
-                              const SizedBox(height: 5),
-                              Text(
-                                isProfileLoading ? 'Loading...' : bloodType,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  color: Color(0xFF750000),
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Column(
-                            children: [
-                              const Text('Total Donations'),
-                              const SizedBox(height: 5),
-                              Text(
-                                isProfileLoading
-                                    ? '...'
-                                    : totalDonations.toString(),
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  color: Color(0xFF750000),
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(height: screenHeight * 0.02),
-                    Container(
-                      padding: const EdgeInsets.all(15),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(9),
-                        boxShadow: const [
-                          BoxShadow(blurRadius: 4, color: Colors.black26),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Donation Eligibility',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            'Next Eligible Date: ${isEligibilityLoading ? "Loading..." : nextEligibleDate}',
-                          ),
-                          const SizedBox(height: 5),
-                          Text(
-                            'Status: ${isEligibilityLoading ? "Loading..." : eligibilityStatus}',
-                            style: const TextStyle(
-                              color: Color(0xFF750000),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 40,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF750000),
-                                foregroundColor: Colors.white,
-                                textStyle: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const CheckScreen(),
-                                  ),
-                                );
-                              },
-                              child: const Text(
-                                'Check Eligibility',
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(height: screenHeight * 0.02),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _actionCard(
-                            context: context,
-                            title: 'Book\nAppointment',
-                            subtitle: 'Schedule your donation',
-                            destination: const BookScreen(),
-                          ),
+              padding: EdgeInsets.fromLTRB(screenWidth * 0.05, 20, screenWidth * 0.05, 20),
+              child: Column(
+                children: [
+                  // ── BLOOD TYPE + DONATIONS ─────────────────────
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _statCard(
+                          label: 'Blood Type',
+                          value: isProfileLoading ? '...' : bloodType,
+                          icon: Icons.water_drop_rounded,
+                          iconColor: const Color(0xFFDC2626),
+                          iconBg: const Color(0xFFFFF1F1),
                         ),
-                        SizedBox(width: screenWidth * 0.04),
-                        Expanded(
-                          child: _actionCard(
-                            context: context,
-                            title: 'History',
-                            subtitle: 'View past donations',
-                            destination: const DonationHistoryScreen(),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _statCard(
+                          label: 'Donations',
+                          value: isProfileLoading ? '...' : totalDonations.toString(),
+                          icon: Icons.favorite_rounded,
+                          iconColor: const Color(0xFFEC4899),
+                          iconBg: const Color(0xFFFDF2F8),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _statCard(
+                          label: 'Lives Saved',
+                          value: isProfileLoading ? '...' : '${totalDonations * 3}',
+                          icon: Icons.people_rounded,
+                          iconColor: const Color(0xFF16A34A),
+                          iconBg: const Color(0xFFF0FDF4),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // ── ELIGIBILITY CARD ───────────────────────────
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: const [
+                        BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 3)),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFF1F1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.verified_user_rounded,
+                                  color: Color(0xFFDC2626), size: 20),
+                            ),
+                            const SizedBox(width: 10),
+                            const Text(
+                              'Donation Eligibility',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                                color: Color(0xFF111827),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        _eligibilityRow(
+                          'Next Eligible',
+                          isEligibilityLoading ? 'Loading...' : nextEligibleDate,
+                          Icons.calendar_today_rounded,
+                          const Color(0xFF2563EB),
+                        ),
+                        const SizedBox(height: 8),
+                        _eligibilityRow(
+                          'Status',
+                          isEligibilityLoading ? 'Loading...' : eligibilityStatus,
+                          Icons.circle,
+                          eligibilityStatus.toLowerCase() == 'eligible'
+                              ? const Color(0xFF16A34A)
+                              : const Color(0xFFF59E0B),
+                        ),
+                        const SizedBox(height: 14),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 42,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => const CheckScreen()));
+                            },
+                            icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                            label: const Text('Check Eligibility'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFDC2626),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10)),
+                              textStyle: const TextStyle(fontWeight: FontWeight.w600),
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    SizedBox(height: screenHeight * 0.02),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Upcoming Appointments',
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // ── QUICK ACTIONS ──────────────────────────────
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _actionCard(
+                          context: context,
+                          icon: Icons.calendar_month_rounded,
+                          iconColor: const Color(0xFF2563EB),
+                          iconBg: const Color(0xFFEFF6FF),
+                          title: 'Book Appointment',
+                          subtitle: 'Schedule your donation',
+                          destination: const BookScreen(),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _actionCard(
+                          context: context,
+                          icon: Icons.history_rounded,
+                          iconColor: const Color(0xFF9333EA),
+                          iconBg: const Color(0xFFFAF5FF),
+                          title: 'Donation History',
+                          subtitle: 'View past donations',
+                          destination: DonationHistoryScreen(),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // ── UPCOMING APPOINTMENTS ──────────────────────
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Upcoming Appointment',
                         style: TextStyle(
-                          color: const Color(0xFF750000),
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
+                          color: Color(0xFF111827),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 10),
-
-                    //dynamic appointments section
-                    if (isAppointmentsLoading)
-                      const Center(child: CircularProgressIndicator())
-                    else if (appointments.isEmpty)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(15),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(9),
-                          boxShadow: const [
-                            BoxShadow(blurRadius: 4, color: Colors.black26),
-                          ],
+                      if (!isAppointmentsLoading && appointments.isNotEmpty)
+                        GestureDetector(
+                          onTap: () => Navigator.push(context,
+                              MaterialPageRoute(builder: (_) => DonationHistoryScreen())),
+                          child: const Text('See all',
+                              style: TextStyle(fontSize: 12, color: Color(0xFFDC2626))),
                         ),
-                        child: const Text(
-                          'No upcoming appointments.',
-                          style: TextStyle(color: Colors.grey),
-                          textAlign: TextAlign.center,
-                        ),
-                      )
-                    else
-                      Column(
-                        children: appointments
-                            .map((appt) => _appointmentCard(appt))
-                            .toList(),
-                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
 
-                    SizedBox(height: screenHeight * 0.02),
+                  if (isAppointmentsLoading)
+                    const Center(child: CircularProgressIndicator(color: Color(0xFFDC2626)))
+                  else if (appointments.isEmpty)
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF750000), Color(0xFFFF4E4E)],
-                        ),
-                        borderRadius: BorderRadius.circular(9),
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
+                        ],
                       ),
                       child: Column(
                         children: [
-                          const Text(
-                            'Your Impact',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            'Your $totalDonations donations have potentially saved up to ${totalDonations * 3} lives!',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: Colors.white),
-                          ),
+                          Icon(Icons.calendar_today_outlined,
+                              color: Colors.grey.shade300, size: 36),
+                          const SizedBox(height: 8),
+                          const Text('No upcoming appointments.',
+                              style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13)),
+                          const SizedBox(height: 4),
+                          const Text('Book one to get started!',
+                              style: TextStyle(color: Color(0xFFD1D5DB), fontSize: 11)),
                         ],
                       ),
-                    ),
-                    SizedBox(height: screenHeight * 0.02),
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(6),
+                    )
+                  else
+                    ...appointments.map((appt) => _appointmentCard(appt)),
+
+                  const SizedBox(height: 16),
+
+                  // ── IMPACT BANNER ──────────────────────────────
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF750000), Color(0xFFFF4E4E)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                      child: const Text(
-                        'Thank you for being a hero in your community. Every donation makes a difference.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.green, fontSize: 11),
-                      ),
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                  ],
-                ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Your Impact 🎉',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                '$totalDonations donations · ${totalDonations * 3} lives potentially saved',
+                                style: const TextStyle(color: Colors.white70, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white24,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.emoji_events_rounded,
+                              color: Colors.white, size: 28),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFBBF7D0)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.volunteer_activism_rounded,
+                            color: Color(0xFF16A34A), size: 18),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Thank you for being a hero in your community. Every donation makes a difference.',
+                            style: TextStyle(color: Color(0xFF166534), fontSize: 11, height: 1.4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _greetingText() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning,';
+    if (hour < 17) return 'Good afternoon,';
+    return 'Good evening,';
+  }
+
+  Widget _statCard({
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBg,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 5, offset: Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
+            child: Icon(icon, color: iconColor, size: 18),
+          ),
+          const SizedBox(height: 8),
+          Text(value,
+              style: const TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF111827))),
+          const SizedBox(height: 2),
+          Text(label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 10, color: Color(0xFF9CA3AF))),
+        ],
+      ),
+    );
+  }
+
+  Widget _eligibilityRow(String label, String value, IconData icon, Color color) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 6),
+        Text('$label: ', style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280))),
+        Expanded(
+          child: Text(value,
+              style: TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w600, color: color)),
+        ),
+      ],
+    );
+  }
+
+  Widget _actionCard({
+    required BuildContext context,
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBg,
+    required String title,
+    required String subtitle,
+    required Widget destination,
+  }) {
+    return GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => destination)),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: const [
+            BoxShadow(color: Colors.black12, blurRadius: 5, offset: Offset(0, 2)),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(10)),
+              child: Icon(icon, color: iconColor, size: 22),
+            ),
+            const SizedBox(height: 12),
+            Text(title,
+                style: const TextStyle(
+                    fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF111827))),
+            const SizedBox(height: 3),
+            Text(subtitle,
+                style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _appointmentCard(Map<String, dynamic> appt) {
+    final date = formatDate(appt["appointment_date"] ?? "");
+    final time = formatTime(appt["appointment_time"] ?? "");
+    final center = appt["donation_center"] ?? "N/A";
+    final status = appt["status"] ?? "N/A";
+    final statusColor = getStatusColor(status);
+    final statusBg = getStatusBg(status);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 5, offset: Offset(0, 2)),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF1F1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.calendar_month_rounded,
+                color: Color(0xFFDC2626), size: 24),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(date,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: Color(0xFF111827))),
+                const SizedBox(height: 3),
+                Text(time,
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
+                const SizedBox(height: 3),
+                Text(center,
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: statusBg,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              status,
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: statusColor),
             ),
           ),
         ],
