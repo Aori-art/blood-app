@@ -5,7 +5,7 @@ import 'splash_screen/splash_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final prefs = await SharedPreferences.getInstance();
+  final prefs = await SharedPreferences.getInstance();// Get the instance of SharedPreferences
   final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
 
   runApp(MyApp(isLoggedIn: isLoggedIn));

@@ -21,7 +21,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
-  int _donorId = 0;
+  int _donorId = 0;//user id from shared preferences, used for alerts screen
 
   // Make screens dynamic and non-const
   late List<Widget> _screens;
