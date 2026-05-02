@@ -173,60 +173,47 @@ class _BookScreenState extends State<BookScreen> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+    final screenHeight = size.height;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // HEADER — unchanged
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.only(
-                top: size.height * 0.06,
-                bottom: size.height * 0.025,
-              ),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFF750000), Color(0xFFFF4E4E)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-              ),
-              child: const Stack(
-                alignment: Alignment.center,
-                children: [
-                  Text(
-                    "Book Appointment",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
+      body: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.only(
+              top: screenHeight * 0.06,
+              bottom: screenHeight * 0.03,
+            ),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF750000), Color(0xFFFF4E4E)],
               ),
             ),
+            child: const Column(
+              children: [
+                Text(
+                  "Book Appointment",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  "Schedule your blood donation",
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
 
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
                 child: Column(
                   children: [
-                    // Page title
-                    const Text(
-                      "Book Appointment",
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF111827),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      "Schedule your blood donation",
-                      style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
-                    ),
                     const SizedBox(height: 20),
 
                     // DATE SELECTION CARD
@@ -422,8 +409,7 @@ class _BookScreenState extends State<BookScreen> {
                 ),
               ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }

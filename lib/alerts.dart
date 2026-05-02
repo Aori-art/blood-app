@@ -230,47 +230,44 @@ class _AlertsScreenState extends State<AlertsScreen> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+    final screenHeight = size.height;
 
     return Scaffold(
       backgroundColor: const Color(0xFFDDDDDD),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // HEADER WITH GRADIENT
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.only(
-                top: size.height * 0.04,
-                bottom: size.height * 0.02,
-              ),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFF750000), Color(0xFFFF4E4E)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-              ),
-              child: Column(
-                children: [
-                  const Text(
-                    "Notifications",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    "$_unreadCount unread",
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
+      body: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.only(
+              top: screenHeight * 0.06,
+              bottom: screenHeight * 0.03,
+            ),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF750000), Color(0xFFFF4E4E)],
               ),
             ),
+            child: Column(
+              children: [
+                const Text(
+                  "Notifications",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "$_unreadCount unread",
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
 
             // Content
             Expanded(
@@ -502,8 +499,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
                   ),
                 ),
               ),
-          ],
-        ),
+        ],
       ),
     );
   }

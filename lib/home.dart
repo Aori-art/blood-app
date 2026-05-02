@@ -686,7 +686,7 @@ class _HomeContentState extends State<HomeContent> {
                             context: context,
                             title: 'History',
                             subtitle: 'View past donations',
-                            destination: const HistoryScreen(),
+                            destination: const DonationHistoryScreen(),
                           ),
                         ),
                       ],
