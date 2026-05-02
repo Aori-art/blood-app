@@ -41,10 +41,53 @@ class _CheckScreenState extends State<CheckScreen> {
   List<Question> questions = [];
   bool isLoading = true;
 
+  // ── Eligibility ───────────────────────────────────────────────
+  String? _eligibilityStatus; // 'approved' | 'pending' | 'declined' | null
+  bool _checkingEligibility = true;
+  bool _pendingOverlayDismissed = false; // user tapped "Show Details"
+
   @override
   void initState() {
     super.initState();
+    _fetchEligibilityStatus();
     fetchQuestions();
+  }
+
+  Future<void> _fetchEligibilityStatus() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final donorId = prefs.getString('donorId');
+
+      if (donorId == null || donorId.isEmpty) {
+        setState(() {
+          _eligibilityStatus = 'pending';
+          _checkingEligibility = false;
+        });
+        return;
+      }
+
+      final url = Uri.parse(
+          "${AppConfig.baseUrl}/get_eligibility_status.php?donor_id=$donorId");
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          _eligibilityStatus = data['status'] ?? 'pending';
+          _checkingEligibility = false;
+        });
+      } else {
+        setState(() {
+          _eligibilityStatus = 'pending';
+          _checkingEligibility = false;
+        });
+      }
+    } catch (_) {
+      setState(() {
+        _eligibilityStatus = 'pending';
+        _checkingEligibility = false;
+      });
+    }
   }
 
   Future<void> fetchQuestions() async {
@@ -101,6 +144,12 @@ class _CheckScreenState extends State<CheckScreen> {
   bool get _currentAnswered =>
       questions.isNotEmpty && questions[_currentPage].answer != null;
 
+  // Whether the pending overlay should be shown
+  bool get _showPendingOverlay =>
+      !_checkingEligibility &&
+      _eligibilityStatus == 'pending' &&
+      !_pendingOverlayDismissed;
+
   void _goNext() {
     if (!_currentAnswered) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -114,7 +163,8 @@ class _CheckScreenState extends State<CheckScreen> {
           ),
           backgroundColor: const Color(0xFFDC2626),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           margin: const EdgeInsets.all(12),
         ),
       );
@@ -190,12 +240,12 @@ class _CheckScreenState extends State<CheckScreen> {
           content: Text(data["message"] ?? "Submitted"),
           backgroundColor: Colors.green,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           margin: const EdgeInsets.all(12),
         ),
       );
 
-      // Return to intro screen after submit
       setState(() {
         _started = false;
         _currentPage = 0;
@@ -218,69 +268,85 @@ class _CheckScreenState extends State<CheckScreen> {
     }
   }
 
+  // ── Build ─────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
 
-    if (isLoading) {
+    if (isLoading || _checkingEligibility) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator(color: Color(0xFFDC2626))),
+        body: Center(
+            child: CircularProgressIndicator(color: Color(0xFFDC2626))),
       );
     }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
-      body: Column(
+      body: Stack(
         children: [
-          // HEADER — unchanged
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.only(
-              top: screenHeight * 0.06,
-              bottom: screenHeight * 0.03,
-            ),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF750000), Color(0xFFFF4E4E)],
-              ),
-            ),
-            child: const Column(
-              children: [
-                Text(
-                  "Eligibility Check",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+          // ── Main screen ──────────────────────────────────────
+          Column(
+            children: [
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.only(
+                  top: screenHeight * 0.06,
+                  bottom: screenHeight * 0.03,
+                ),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF750000), Color(0xFFFF4E4E)],
                   ),
                 ),
-                SizedBox(height: 4),
-                Text(
-                  "Answer all questions honestly",
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-
-          Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 400),
-              transitionBuilder: (child, animation) => FadeTransition(
-                opacity: animation,
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(0.05, 0),
-                    end: Offset.zero,
-                  ).animate(animation),
-                  child: child,
+                child: const Column(
+                  children: [
+                    Text(
+                      "Eligibility Check",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      "Answer all questions honestly",
+                      style:
+                          TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                  ],
                 ),
               ),
-              child: _started
-                  ? _buildQuestionnaire(key: const ValueKey('quiz'))
-                  : _buildIntroScreen(key: const ValueKey('intro')),
-            ),
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 400),
+                  transitionBuilder: (child, animation) => FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0.05, 0),
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: child,
+                    ),
+                  ),
+                  child: _started
+                      ? _buildQuestionnaire(key: const ValueKey('quiz'))
+                      : _buildIntroScreen(key: const ValueKey('intro')),
+                ),
+              ),
+            ],
           ),
+
+          // ── Pending overlay (dismissible) ────────────────────
+          if (_showPendingOverlay)
+            Positioned.fill(
+              child: _PendingOverlay(
+                onShowDetails: () {
+                  setState(() => _pendingOverlayDismissed = true);
+                },
+              ),
+            ),
         ],
       ),
     );
@@ -293,7 +359,6 @@ class _CheckScreenState extends State<CheckScreen> {
       padding: const EdgeInsets.fromLTRB(20, 28, 20, 28),
       child: Column(
         children: [
-          // Hero illustration area
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 32),
@@ -350,7 +415,6 @@ class _CheckScreenState extends State<CheckScreen> {
 
           const SizedBox(height: 24),
 
-          // Info cards
           _infoCard(
             icon: Icons.quiz_outlined,
             iconColor: const Color(0xFF2563EB),
@@ -372,12 +436,12 @@ class _CheckScreenState extends State<CheckScreen> {
             iconColor: const Color(0xFF9333EA),
             iconBg: const Color(0xFFFAF5FF),
             title: "Private & Confidential",
-            subtitle: "Your answers are securely recorded for medical use only",
+            subtitle:
+                "Your answers are securely recorded for medical use only",
           ),
 
           const SizedBox(height: 24),
 
-          // Disclaimer box
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -406,7 +470,6 @@ class _CheckScreenState extends State<CheckScreen> {
 
           const SizedBox(height: 28),
 
-          // Start button
           SizedBox(
             width: double.infinity,
             height: 52,
@@ -415,7 +478,8 @@ class _CheckScreenState extends State<CheckScreen> {
               icon: const Icon(Icons.play_arrow_rounded, size: 22),
               label: const Text(
                 "Start Eligibility Check",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                style:
+                    TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFDC2626),
@@ -453,14 +517,16 @@ class _CheckScreenState extends State<CheckScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
+          BoxShadow(
+              color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
         ],
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
+            decoration:
+                BoxDecoration(color: iconBg, shape: BoxShape.circle),
             child: Icon(icon, color: iconColor, size: 20),
           ),
           const SizedBox(width: 14),
@@ -492,7 +558,6 @@ class _CheckScreenState extends State<CheckScreen> {
     return Column(
       key: key,
       children: [
-        // PROGRESS BAR
         Container(
           color: Colors.white,
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -511,7 +576,8 @@ class _CheckScreenState extends State<CheckScreen> {
                   ),
                   Text(
                     "$answeredCount/${questions.length} answered",
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+                    style: const TextStyle(
+                        fontSize: 12, color: Color(0xFF6B7280)),
                   ),
                 ],
               ),
@@ -522,20 +588,20 @@ class _CheckScreenState extends State<CheckScreen> {
                   value: (_currentPage + 1) / questions.length,
                   minHeight: 6,
                   backgroundColor: const Color(0xFFE5E7EB),
-                  valueColor:
-                      const AlwaysStoppedAnimation<Color>(Color(0xFFDC2626)),
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                      Color(0xFFDC2626)),
                 ),
               ),
             ],
           ),
         ),
 
-        // PAGE VIEW
         Expanded(
           child: PageView.builder(
             controller: _pageController,
             physics: const NeverScrollableScrollPhysics(),
-            onPageChanged: (index) => setState(() => _currentPage = index),
+            onPageChanged: (index) =>
+                setState(() => _currentPage = index),
             itemCount: questions.length,
             itemBuilder: (context, index) {
               final q = questions[index];
@@ -547,7 +613,6 @@ class _CheckScreenState extends State<CheckScreen> {
                   children: [
                     const SizedBox(height: 8),
 
-                    // Question card
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
@@ -594,18 +659,20 @@ class _CheckScreenState extends State<CheckScreen> {
                             ),
                           ),
 
-                          if (q.extraData != null && q.extraData!.isNotEmpty)
+                          if (q.extraData != null &&
+                              q.extraData!.isNotEmpty)
                             Container(
                               margin: const EdgeInsets.only(top: 12),
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF9FAFB),
                                 borderRadius: BorderRadius.circular(10),
-                                border:
-                                    Border.all(color: const Color(0xFFE5E7EB)),
+                                border: Border.all(
+                                    color: const Color(0xFFE5E7EB)),
                               ),
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
                                 children: [
                                   const Text("List:",
                                       style: TextStyle(
@@ -616,8 +683,8 @@ class _CheckScreenState extends State<CheckScreen> {
                                         padding: const EdgeInsets.symmetric(
                                             vertical: 2),
                                         child: Text("• $item",
-                                            style:
-                                                const TextStyle(fontSize: 12)),
+                                            style: const TextStyle(
+                                                fontSize: 12)),
                                       )),
                                 ],
                               ),
@@ -634,8 +701,10 @@ class _CheckScreenState extends State<CheckScreen> {
                                   selected: q.answer == 'yes',
                                   selectedColor: const Color(0xFF16A34A),
                                   selectedBg: const Color(0xFFF0FDF4),
-                                  selectedBorder: const Color(0xFFBBF7D0),
-                                  onTap: () => setState(() => q.answer = 'yes'),
+                                  selectedBorder:
+                                      const Color(0xFFBBF7D0),
+                                  onTap: () =>
+                                      setState(() => q.answer = 'yes'),
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -646,7 +715,8 @@ class _CheckScreenState extends State<CheckScreen> {
                                   selected: q.answer == 'no',
                                   selectedColor: const Color(0xFFDC2626),
                                   selectedBg: const Color(0xFFFFF1F1),
-                                  selectedBorder: const Color(0xFFFECACA),
+                                  selectedBorder:
+                                      const Color(0xFFFECACA),
                                   onTap: () {
                                     setState(() {
                                       q.answer = 'no';
@@ -662,7 +732,6 @@ class _CheckScreenState extends State<CheckScreen> {
                       ),
                     ),
 
-                    // Follow-up card
                     AnimatedSize(
                       duration: const Duration(milliseconds: 300),
                       curve: Curves.easeInOut,
@@ -686,12 +755,14 @@ class _CheckScreenState extends State<CheckScreen> {
                                   ],
                                 ),
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
                                   children: [
                                     const Row(
                                       children: [
                                         Icon(Icons.chat_bubble_outline,
-                                            color: Color(0xFF16A34A), size: 18),
+                                            color: Color(0xFF16A34A),
+                                            size: 18),
                                         SizedBox(width: 8),
                                         Text(
                                           "Follow-up Question",
@@ -714,18 +785,24 @@ class _CheckScreenState extends State<CheckScreen> {
                                     ),
                                     const SizedBox(height: 12),
                                     TextField(
-                                      controller: _followUpControllers[index],
-                                      onChanged: (val) => q.followUp = val,
+                                      controller:
+                                          _followUpControllers[index],
+                                      onChanged: (val) =>
+                                          q.followUp = val,
                                       maxLines: 3,
-                                      style: const TextStyle(fontSize: 14),
+                                      style:
+                                          const TextStyle(fontSize: 14),
                                       decoration: InputDecoration(
-                                        hintText: "Type your answer here...",
+                                        hintText:
+                                            "Type your answer here...",
                                         hintStyle: const TextStyle(
                                             color: Color(0xFF9CA3AF),
                                             fontSize: 13),
                                         filled: true,
-                                        fillColor: const Color(0xFFF9FAFB),
-                                        contentPadding: const EdgeInsets.all(14),
+                                        fillColor:
+                                            const Color(0xFFF9FAFB),
+                                        contentPadding:
+                                            const EdgeInsets.all(14),
                                         border: OutlineInputBorder(
                                           borderRadius:
                                               BorderRadius.circular(10),
@@ -762,13 +839,11 @@ class _CheckScreenState extends State<CheckScreen> {
           ),
         ),
 
-        // BOTTOM NAV BUTTONS
         Container(
           color: Colors.white,
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
           child: Row(
             children: [
-              // Back to intro on first page
               if (_currentPage == 0)
                 Expanded(
                   flex: 1,
@@ -861,7 +936,8 @@ class _CheckScreenState extends State<CheckScreen> {
           children: [
             Icon(icon,
                 size: 20,
-                color: selected ? selectedColor : const Color(0xFF9CA3AF)),
+                color:
+                    selected ? selectedColor : const Color(0xFF9CA3AF)),
             const SizedBox(width: 8),
             Text(
               label,
@@ -874,6 +950,234 @@ class _CheckScreenState extends State<CheckScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Pending Overlay Widget
+// ═══════════════════════════════════════════════════════════════
+class _PendingOverlay extends StatelessWidget {
+  final VoidCallback onShowDetails;
+
+  const _PendingOverlay({required this.onShowDetails});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.white.withOpacity(0.97),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: MediaQuery.of(context).size.height * 0.72,
+            ),
+            child: IntrinsicHeight(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // ── Icon ────────────────────────────────────
+                  Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFFFFFBEB),
+                      border: Border.all(
+                          color: const Color(0xFFFDE68A), width: 3),
+                      boxShadow: [
+                        BoxShadow(
+                          color:
+                              const Color(0xFFF59E0B).withOpacity(0.18),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.hourglass_top_rounded,
+                      size: 46,
+                      color: Color(0xFFF59E0B),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // ── Title ───────────────────────────────────
+                  const Text(
+                    "Screening Under Review",
+                    style: TextStyle(
+                      fontSize: 21,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF111827),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // ── Subtitle ────────────────────────────────
+                  const Text(
+                    "Your previous eligibility screening is currently being reviewed. You may view the screening form below, but please wait for your results before submitting again.",
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF6B7280),
+                      height: 1.6,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // ── Status chip ─────────────────────────────
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 18, vertical: 9),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFBEB),
+                      borderRadius: BorderRadius.circular(99),
+                      border:
+                          Border.all(color: const Color(0xFFFDE68A)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.schedule_rounded,
+                            size: 15, color: Color(0xFFD97706)),
+                        SizedBox(width: 7),
+                        Text(
+                          "Status: Pending Review",
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFFD97706),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // ── What happens next ───────────────────────
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFBEB),
+                      borderRadius: BorderRadius.circular(14),
+                      border:
+                          Border.all(color: const Color(0xFFFDE68A)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.info_outline_rounded,
+                                color: Color(0xFFD97706), size: 17),
+                            SizedBox(width: 8),
+                            Text(
+                              "What happens next?",
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF92400E),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        _nextStep(
+                            "1", "Our team reviews your screening answers."),
+                        const SizedBox(height: 6),
+                        _nextStep(
+                            "2", "You'll be notified once a decision is made."),
+                        const SizedBox(height: 6),
+                        _nextStep("3",
+                            "If approved, you can book a donation appointment."),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 28),
+
+                  // ── Show details button ─────────────────────
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton.icon(
+                      onPressed: onShowDetails,
+                      icon: const Icon(Icons.visibility_outlined, size: 19),
+                      label: const Text(
+                        "Show Screening Details",
+                        style: TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w600),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFF59E0B),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  const Text(
+                    "Viewing the form will not affect your pending status.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 11, color: Color(0xFF9CA3AF)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _nextStep(String number, String text) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 22,
+          height: 22,
+          decoration: const BoxDecoration(
+            color: Color(0xFFF59E0B),
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Text(
+              number,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Color(0xFF92400E),
+              height: 1.5,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
