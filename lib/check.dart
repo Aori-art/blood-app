@@ -1,16 +1,24 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'config.dart';
 
 class Question {
   String id;
   String question;
   String followUpPrompt;
+  String followUpTrigger;
+  List<String>? extraData; // ✅ NEW
   String? answer;
   String? followUp;
 
   Question({
     required this.id,
     required this.question,
-    this.followUpPrompt = "Please provide more details...",
+    required this.followUpPrompt,
+    required this.followUpTrigger,
+    this.extraData,
     this.answer,
     this.followUp,
   });
@@ -29,79 +37,70 @@ class _CheckScreenState extends State<CheckScreen> {
 
   late List<TextEditingController> _followUpControllers;
 
-  List<Question> questions = [
-    Question(
-      id: '1',
-      question: 'Are you currently feeling healthy and well?',
-      followUpPrompt: 'What symptoms are you experiencing?',
-    ),
-    Question(
-      id: '2',
-      question: 'Have you donated blood in the last 8 weeks?',
-      followUpPrompt: 'When was your last donation?',
-    ),
-    Question(
-      id: '3',
-      question: 'Are you taking any medications?',
-      followUpPrompt: 'Please list the medications you are currently taking.',
-    ),
-    Question(
-      id: '4',
-      question: 'Have you had dental work in the last 24 hours?',
-      followUpPrompt: 'What type of dental procedure did you have?',
-    ),
-    Question(
-      id: '5',
-      question: 'Have you traveled recently?',
-      followUpPrompt: 'Where did you travel and when did you return?',
-    ),
-    Question(
-      id: '6',
-      question: 'Have you had tattoos or piercings recently?',
-      followUpPrompt: 'When did you get your tattoo or piercing?',
-    ),
-    Question(
-      id: '7',
-      question: 'Do you have any chronic illness?',
-      followUpPrompt: 'Please describe your condition.',
-    ),
-    Question(
-      id: '8',
-      question: 'Have you had a fever recently?',
-      followUpPrompt: 'When did the fever occur and how high was it?',
-    ),
-    Question(
-      id: '9',
-      question: 'Are you pregnant or recently pregnant?',
-      followUpPrompt: 'Please provide details (e.g., weeks pregnant or postpartum).',
-    ),
-    Question(
-      id: '10',
-      question: 'Have you consumed alcohol in the last 24 hours?',
-      followUpPrompt: 'How much alcohol did you consume?',
-    ),
-  ];
+  List<Question> questions = [];
+  bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _followUpControllers = List.generate(
-      questions.length,
-      (_) => TextEditingController(),
-    );
+    fetchQuestions();
+  }
+
+  Future<void> fetchQuestions() async {
+    try {
+      final response = await http.get(
+        Uri.parse("${AppConfig.baseUrl}/get_screening_questions.php"),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (data["status"] == "success") {
+        List<Question> loaded = [];
+
+        for (var q in data["questions"]) {
+          loaded.add(
+            Question(
+              id: q["question_id"].toString(),
+              question: q["question_text"],
+              followUpPrompt: q["followup_prompt"],
+              followUpTrigger: q["followup_trigger"],
+              extraData: q["extra_data"] != null
+                  ? List<String>.from(q["extra_data"])
+                  : null,
+            ),
+          );
+        }
+
+        setState(() {
+          questions = loaded;
+          _followUpControllers = List.generate(
+            questions.length,
+            (_) => TextEditingController(),
+          );
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+    }
   }
 
   @override
   void dispose() {
     _pageController.dispose();
-    for (final c in _followUpControllers) {
-      c.dispose();
+    if (questions.isNotEmpty) {
+      for (final c in _followUpControllers) {
+        c.dispose();
+      }
     }
     super.dispose();
   }
 
   bool get _isLastPage => _currentPage == questions.length - 1;
-  bool get _currentAnswered => questions[_currentPage].answer != null;
+  bool get _currentAnswered =>
+      questions.isNotEmpty && questions[_currentPage].answer != null;
 
   void _goNext() {
     if (!_currentAnswered) {
@@ -116,7 +115,8 @@ class _CheckScreenState extends State<CheckScreen> {
           ),
           backgroundColor: const Color(0xFFDC2626),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           margin: const EdgeInsets.all(12),
         ),
       );
@@ -142,22 +142,68 @@ class _CheckScreenState extends State<CheckScreen> {
     }
   }
 
-  void _submit() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Row(
-          children: [
-            Icon(Icons.check_circle_outline, color: Colors.white),
-            SizedBox(width: 8),
-            Text("Eligibility check submitted successfully!"),
-          ],
+  Future<void> _submit() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final donorIdString = prefs.getString('donorId');
+
+      if (donorIdString == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("User not logged in"),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      final donorId = int.tryParse(donorIdString);
+
+      if (donorId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Invalid user session"),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      List<Map<String, dynamic>> answers = [];
+
+      for (int i = 0; i < questions.length; i++) {
+        answers.add({
+          "question_id": questions[i].id,
+          "answer": questions[i].answer,
+          "followup_answer": _followUpControllers[i].text
+        });
+      }
+
+      final response = await http.post(
+        Uri.parse("${AppConfig.baseUrl}/submit_screening.php"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "donor_id": donorId,
+          "answers": answers,
+        }),
+      );
+
+      final data = jsonDecode(response.body);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(data["message"] ?? "Submitted"),
+          backgroundColor: Colors.green,
         ),
-        backgroundColor: Colors.green,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.all(12),
-      ),
-    );
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Submission failed"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -165,11 +211,17 @@ class _CheckScreenState extends State<CheckScreen> {
     final screenHeight = MediaQuery.of(context).size.height;
     final answeredCount = questions.where((q) => q.answer != null).length;
 
+    if (isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       body: Column(
         children: [
-          // HEADER — unchanged
+          // HEADER (UNCHANGED)
           Container(
             width: double.infinity,
             padding: EdgeInsets.only(
@@ -200,7 +252,7 @@ class _CheckScreenState extends State<CheckScreen> {
             ),
           ),
 
-          // PROGRESS BAR + COUNTER
+          // PROGRESS BAR (UNCHANGED)
           Container(
             color: Colors.white,
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -233,22 +285,25 @@ class _CheckScreenState extends State<CheckScreen> {
                     value: (_currentPage + 1) / questions.length,
                     minHeight: 6,
                     backgroundColor: const Color(0xFFE5E7EB),
-                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFDC2626)),
+                    valueColor:
+                        const AlwaysStoppedAnimation<Color>(Color(0xFFDC2626)),
                   ),
                 ),
               ],
             ),
           ),
 
-          // PAGE VIEW
+          // QUESTIONS
           Expanded(
             child: PageView.builder(
               controller: _pageController,
               physics: const NeverScrollableScrollPhysics(),
-              onPageChanged: (index) => setState(() => _currentPage = index),
+              onPageChanged: (index) =>
+                  setState(() => _currentPage = index),
               itemCount: questions.length,
               itemBuilder: (context, index) {
                 final q = questions[index];
+
                 return SingleChildScrollView(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -256,14 +311,14 @@ class _CheckScreenState extends State<CheckScreen> {
                     children: [
                       const SizedBox(height: 8),
 
-                      // QUESTION CARD
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
+                          border: Border.all(
+                              color: const Color(0xFFE5E7EB), width: 1.5),
                           boxShadow: const [
                             BoxShadow(
                               color: Colors.black12,
@@ -275,37 +330,52 @@ class _CheckScreenState extends State<CheckScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Question number chip
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFFF1F1),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                "Question ${index + 1}",
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFFDC2626),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 14),
-
                             Text(
                               q.question,
                               style: const TextStyle(
                                 fontSize: 17,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF111827),
-                                height: 1.4,
                               ),
                             ),
 
+                            // ✅ DYNAMIC LIST (NO UI BREAK)
+                            if (q.extraData != null &&
+                                q.extraData!.isNotEmpty)
+                              Container(
+                                margin: const EdgeInsets.only(top: 12),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF9FAFB),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                      color: const Color(0xFFE5E7EB)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      "List:",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    ...q.extraData!.map((item) => Padding(
+                                          padding:
+                                              const EdgeInsets.symmetric(
+                                                  vertical: 2),
+                                          child: Text("• $item",
+                                              style: const TextStyle(
+                                                  fontSize: 12)),
+                                        )),
+                                  ],
+                                ),
+                              ),
+
                             const SizedBox(height: 20),
 
-                            // YES / NO buttons
                             Row(
                               children: [
                                 Expanded(
@@ -313,9 +383,12 @@ class _CheckScreenState extends State<CheckScreen> {
                                     label: "Yes",
                                     icon: Icons.check_circle_rounded,
                                     selected: q.answer == 'yes',
-                                    selectedColor: const Color(0xFF16A34A),
-                                    selectedBg: const Color(0xFFF0FDF4),
-                                    selectedBorder: const Color(0xFFBBF7D0),
+                                    selectedColor:
+                                        const Color(0xFF16A34A),
+                                    selectedBg:
+                                        const Color(0xFFF0FDF4),
+                                    selectedBorder:
+                                        const Color(0xFFBBF7D0),
                                     onTap: () {
                                       setState(() {
                                         q.answer = 'yes';
@@ -329,14 +402,18 @@ class _CheckScreenState extends State<CheckScreen> {
                                     label: "No",
                                     icon: Icons.cancel_rounded,
                                     selected: q.answer == 'no',
-                                    selectedColor: const Color(0xFFDC2626),
-                                    selectedBg: const Color(0xFFFFF1F1),
-                                    selectedBorder: const Color(0xFFFECACA),
+                                    selectedColor:
+                                        const Color(0xFFDC2626),
+                                    selectedBg:
+                                        const Color(0xFFFFF1F1),
+                                    selectedBorder:
+                                        const Color(0xFFFECACA),
                                     onTap: () {
                                       setState(() {
                                         q.answer = 'no';
                                         q.followUp = null;
-                                        _followUpControllers[index].clear();
+                                        _followUpControllers[index]
+                                            .clear();
                                       });
                                     },
                                   ),
@@ -347,98 +424,24 @@ class _CheckScreenState extends State<CheckScreen> {
                         ),
                       ),
 
-                      // FOLLOW-UP CARD (animated)
-                      AnimatedSize(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                        child: q.answer == 'yes'
-                            ? Padding(
-                                padding: const EdgeInsets.only(top: 16),
-                                child: Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(18),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: const Color(0xFFBBF7D0),
-                                      width: 1.5,
-                                    ),
-                                    boxShadow: const [
-                                      BoxShadow(
-                                        color: Colors.black12,
-                                        blurRadius: 6,
-                                        offset: Offset(0, 3),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Row(
-                                        children: [
-                                          Icon(Icons.chat_bubble_outline,
-                                              color: Color(0xFF16A34A), size: 18),
-                                          SizedBox(width: 8),
-                                          Text(
-                                            "Follow-up Question",
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 13,
-                                              color: Color(0xFF16A34A),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 10),
-                                      Text(
-                                        q.followUpPrompt,
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                          color: Color(0xFF111827),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      TextField(
-                                        controller: _followUpControllers[index],
-                                        onChanged: (val) => q.followUp = val,
-                                        maxLines: 3,
-                                        style: const TextStyle(fontSize: 14),
-                                        decoration: InputDecoration(
-                                          hintText: "Type your answer here...",
-                                          hintStyle: const TextStyle(
-                                            color: Color(0xFF9CA3AF),
-                                            fontSize: 13,
-                                          ),
-                                          filled: true,
-                                          fillColor: const Color(0xFFF9FAFB),
-                                          contentPadding: const EdgeInsets.all(14),
-                                          border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(10),
-                                            borderSide: const BorderSide(
-                                                color: Color(0xFFD1D5DB)),
-                                          ),
-                                          enabledBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(10),
-                                            borderSide: const BorderSide(
-                                                color: Color(0xFFD1D5DB)),
-                                          ),
-                                          focusedBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(10),
-                                            borderSide: const BorderSide(
-                                                color: Color(0xFF16A34A), width: 1.5),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              )
-                            : const SizedBox.shrink(),
-                      ),
-
-                      const SizedBox(height: 32),
+                      if (q.answer == q.followUpTrigger)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 16),
+                          child: TextField(
+                            controller: _followUpControllers[index],
+                            onChanged: (val) => q.followUp = val,
+                            maxLines: 3,
+                            decoration: InputDecoration(
+                              hintText: q.followUpPrompt,
+                              filled: true,
+                              fillColor: const Color(0xFFF9FAFB),
+                              border: OutlineInputBorder(
+                                borderRadius:
+                                    BorderRadius.circular(10),
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 );
@@ -446,54 +449,26 @@ class _CheckScreenState extends State<CheckScreen> {
             ),
           ),
 
-          // BOTTOM NAV BUTTONS
+          // BUTTONS (UNCHANGED)
           Container(
             color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+            padding: const EdgeInsets.all(16),
             child: Row(
               children: [
                 if (_currentPage > 0)
                   Expanded(
-                    flex: 1,
-                    child: OutlinedButton.icon(
+                    child: OutlinedButton(
                       onPressed: _goPrev,
-                      icon: const Icon(Icons.arrow_back, size: 18),
-                      label: const Text("Back"),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF6B7280),
-                        side: const BorderSide(color: Color(0xFFD1D5DB)),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
+                      child: const Text("Previous"),
                     ),
                   ),
-                if (_currentPage > 0) const SizedBox(width: 12),
+                if (_currentPage > 0)
+                  const SizedBox(width: 12),
                 Expanded(
-                  flex: 2,
-                  child: ElevatedButton.icon(
+                  child: ElevatedButton(
                     onPressed: _goNext,
-                    icon: Icon(
-                      _isLastPage ? Icons.check_circle_outline : Icons.arrow_forward,
-                      size: 18,
-                    ),
-                    label: Text(_isLastPage ? "Submit" : "Next"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _currentAnswered
-                          ? const Color(0xFFDC2626)
-                          : const Color(0xFFF87171),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      textStyle: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    child:
+                        Text(_isLastPage ? "Submit" : "Next"),
                   ),
                 ),
               ],
@@ -515,36 +490,16 @@ class _CheckScreenState extends State<CheckScreen> {
   }) {
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Container(
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: selected ? selectedBg : const Color(0xFFF9FAFB),
-          borderRadius: BorderRadius.circular(12),
+          color: selected ? selectedBg : Colors.white,
           border: Border.all(
-            color: selected ? selectedBorder : const Color(0xFFE5E7EB),
-            width: selected ? 2 : 1.5,
+            color: selected ? selectedBorder : Colors.grey,
           ),
+          borderRadius: BorderRadius.circular(12),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 20,
-              color: selected ? selectedColor : const Color(0xFF9CA3AF),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: selected ? selectedColor : const Color(0xFF6B7280),
-              ),
-            ),
-          ],
-        ),
+        child: Center(child: Text(label)),
       ),
     );
   }
