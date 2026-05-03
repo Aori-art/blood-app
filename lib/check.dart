@@ -31,7 +31,8 @@ class CheckScreen extends StatefulWidget {
   State<CheckScreen> createState() => _CheckScreenState();
 }
 
-class _CheckScreenState extends State<CheckScreen> {
+class _CheckScreenState extends State<CheckScreen>
+    with TickerProviderStateMixin {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   bool _started = false;
@@ -44,11 +45,39 @@ class _CheckScreenState extends State<CheckScreen> {
   // ── Eligibility ───────────────────────────────────────────────
   String? _eligibilityStatus; // 'approved' | 'pending' | 'declined' | null
   bool _checkingEligibility = true;
-  bool _pendingOverlayDismissed = false; // user tapped "Show Details"
+  bool _pendingOverlayDismissed = false;
+
+  // ── Approved overlay animation ────────────────────────────────
+  late AnimationController _approvedAnimController;
+  late Animation<double> _approvedFadeAnim;
+  late Animation<double> _approvedScaleAnim;
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnim;
 
   @override
   void initState() {
     super.initState();
+
+    _approvedAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _approvedFadeAnim = CurvedAnimation(
+      parent: _approvedAnimController,
+      curve: Curves.easeOut,
+    );
+    _approvedScaleAnim = Tween<double>(begin: 0.88, end: 1.0).animate(
+      CurvedAnimation(parent: _approvedAnimController, curve: Curves.easeOutBack),
+    );
+
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    )..repeat(reverse: true);
+    _pulseAnim = Tween<double>(begin: 1.0, end: 1.07).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
     _fetchEligibilityStatus();
     fetchQuestions();
   }
@@ -72,10 +101,14 @@ class _CheckScreenState extends State<CheckScreen> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        final status = data['status'] ?? 'pending';
         setState(() {
-          _eligibilityStatus = data['status'] ?? 'pending';
+          _eligibilityStatus = status;
           _checkingEligibility = false;
         });
+        if (status == 'approved') {
+          _approvedAnimController.forward();
+        }
       } else {
         setState(() {
           _eligibilityStatus = 'pending';
@@ -132,6 +165,8 @@ class _CheckScreenState extends State<CheckScreen> {
   @override
   void dispose() {
     _pageController.dispose();
+    _approvedAnimController.dispose();
+    _pulseController.dispose();
     if (questions.isNotEmpty) {
       for (final c in _followUpControllers) {
         c.dispose();
@@ -144,11 +179,13 @@ class _CheckScreenState extends State<CheckScreen> {
   bool get _currentAnswered =>
       questions.isNotEmpty && questions[_currentPage].answer != null;
 
-  // Whether the pending overlay should be shown
   bool get _showPendingOverlay =>
       !_checkingEligibility &&
       _eligibilityStatus == 'pending' &&
       !_pendingOverlayDismissed;
+
+  bool get _showApprovedOverlay =>
+      !_checkingEligibility && _eligibilityStatus == 'approved';
 
   void _goNext() {
     if (!_currentAnswered) {
@@ -311,8 +348,7 @@ class _CheckScreenState extends State<CheckScreen> {
                     SizedBox(height: 4),
                     Text(
                       "Answer all questions honestly",
-                      style:
-                          TextStyle(color: Colors.white70, fontSize: 12),
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
                     ),
                   ],
                 ),
@@ -338,7 +374,21 @@ class _CheckScreenState extends State<CheckScreen> {
             ],
           ),
 
-          // ── Pending overlay (dismissible) ────────────────────
+          // ── Approved overlay ─────────────────────────────────
+          if (_showApprovedOverlay)
+            Positioned.fill(
+              child: _ApprovedOverlay(
+                fadeAnimation: _approvedFadeAnim,
+                scaleAnimation: _approvedScaleAnim,
+                pulseAnimation: _pulseAnim,
+                onBookAppointment: () {
+                  // Navigate to appointment booking screen
+                  // Navigator.pushNamed(context, '/book-appointment');
+                },
+              ),
+            ),
+
+          // ── Pending overlay ──────────────────────────────────
           if (_showPendingOverlay)
             Positioned.fill(
               child: _PendingOverlay(
@@ -436,8 +486,7 @@ class _CheckScreenState extends State<CheckScreen> {
             iconColor: const Color(0xFF9333EA),
             iconBg: const Color(0xFFFAF5FF),
             title: "Private & Confidential",
-            subtitle:
-                "Your answers are securely recorded for medical use only",
+            subtitle: "Your answers are securely recorded for medical use only",
           ),
 
           const SizedBox(height: 24),
@@ -478,8 +527,7 @@ class _CheckScreenState extends State<CheckScreen> {
               icon: const Icon(Icons.play_arrow_rounded, size: 22),
               label: const Text(
                 "Start Eligibility Check",
-                style:
-                    TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFDC2626),
@@ -517,16 +565,14 @@ class _CheckScreenState extends State<CheckScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: const [
-          BoxShadow(
-              color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
+          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
         ],
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
-            decoration:
-                BoxDecoration(color: iconBg, shape: BoxShape.circle),
+            decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
             child: Icon(icon, color: iconColor, size: 20),
           ),
           const SizedBox(width: 14),
@@ -576,8 +622,8 @@ class _CheckScreenState extends State<CheckScreen> {
                   ),
                   Text(
                     "$answeredCount/${questions.length} answered",
-                    style: const TextStyle(
-                        fontSize: 12, color: Color(0xFF6B7280)),
+                    style:
+                        const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
                   ),
                 ],
               ),
@@ -588,8 +634,8 @@ class _CheckScreenState extends State<CheckScreen> {
                   value: (_currentPage + 1) / questions.length,
                   minHeight: 6,
                   backgroundColor: const Color(0xFFE5E7EB),
-                  valueColor: const AlwaysStoppedAnimation<Color>(
-                      Color(0xFFDC2626)),
+                  valueColor:
+                      const AlwaysStoppedAnimation<Color>(Color(0xFFDC2626)),
                 ),
               ),
             ],
@@ -600,8 +646,7 @@ class _CheckScreenState extends State<CheckScreen> {
           child: PageView.builder(
             controller: _pageController,
             physics: const NeverScrollableScrollPhysics(),
-            onPageChanged: (index) =>
-                setState(() => _currentPage = index),
+            onPageChanged: (index) => setState(() => _currentPage = index),
             itemCount: questions.length,
             itemBuilder: (context, index) {
               final q = questions[index];
@@ -659,20 +704,18 @@ class _CheckScreenState extends State<CheckScreen> {
                             ),
                           ),
 
-                          if (q.extraData != null &&
-                              q.extraData!.isNotEmpty)
+                          if (q.extraData != null && q.extraData!.isNotEmpty)
                             Container(
                               margin: const EdgeInsets.only(top: 12),
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF9FAFB),
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                    color: const Color(0xFFE5E7EB)),
+                                border:
+                                    Border.all(color: const Color(0xFFE5E7EB)),
                               ),
                               child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const Text("List:",
                                       style: TextStyle(
@@ -701,8 +744,7 @@ class _CheckScreenState extends State<CheckScreen> {
                                   selected: q.answer == 'yes',
                                   selectedColor: const Color(0xFF16A34A),
                                   selectedBg: const Color(0xFFF0FDF4),
-                                  selectedBorder:
-                                      const Color(0xFFBBF7D0),
+                                  selectedBorder: const Color(0xFFBBF7D0),
                                   onTap: () =>
                                       setState(() => q.answer = 'yes'),
                                 ),
@@ -715,8 +757,7 @@ class _CheckScreenState extends State<CheckScreen> {
                                   selected: q.answer == 'no',
                                   selectedColor: const Color(0xFFDC2626),
                                   selectedBg: const Color(0xFFFFF1F1),
-                                  selectedBorder:
-                                      const Color(0xFFFECACA),
+                                  selectedBorder: const Color(0xFFFECACA),
                                   onTap: () {
                                     setState(() {
                                       q.answer = 'no';
@@ -755,14 +796,12 @@ class _CheckScreenState extends State<CheckScreen> {
                                   ],
                                 ),
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     const Row(
                                       children: [
                                         Icon(Icons.chat_bubble_outline,
-                                            color: Color(0xFF16A34A),
-                                            size: 18),
+                                            color: Color(0xFF16A34A), size: 18),
                                         SizedBox(width: 8),
                                         Text(
                                           "Follow-up Question",
@@ -785,22 +824,17 @@ class _CheckScreenState extends State<CheckScreen> {
                                     ),
                                     const SizedBox(height: 12),
                                     TextField(
-                                      controller:
-                                          _followUpControllers[index],
-                                      onChanged: (val) =>
-                                          q.followUp = val,
+                                      controller: _followUpControllers[index],
+                                      onChanged: (val) => q.followUp = val,
                                       maxLines: 3,
-                                      style:
-                                          const TextStyle(fontSize: 14),
+                                      style: const TextStyle(fontSize: 14),
                                       decoration: InputDecoration(
-                                        hintText:
-                                            "Type your answer here...",
+                                        hintText: "Type your answer here...",
                                         hintStyle: const TextStyle(
                                             color: Color(0xFF9CA3AF),
                                             fontSize: 13),
                                         filled: true,
-                                        fillColor:
-                                            const Color(0xFFF9FAFB),
+                                        fillColor: const Color(0xFFF9FAFB),
                                         contentPadding:
                                             const EdgeInsets.all(14),
                                         border: OutlineInputBorder(
@@ -936,8 +970,7 @@ class _CheckScreenState extends State<CheckScreen> {
           children: [
             Icon(icon,
                 size: 20,
-                color:
-                    selected ? selectedColor : const Color(0xFF9CA3AF)),
+                color: selected ? selectedColor : const Color(0xFF9CA3AF)),
             const SizedBox(width: 8),
             Text(
               label,
@@ -950,6 +983,416 @@ class _CheckScreenState extends State<CheckScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Approved Overlay Widget
+// ═══════════════════════════════════════════════════════════════
+class _ApprovedOverlay extends StatelessWidget {
+  final Animation<double> fadeAnimation;
+  final Animation<double> scaleAnimation;
+  final Animation<double> pulseAnimation;
+  final VoidCallback onBookAppointment;
+
+  const _ApprovedOverlay({
+    required this.fadeAnimation,
+    required this.scaleAnimation,
+    required this.pulseAnimation,
+    required this.onBookAppointment,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: fadeAnimation,
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFECFDF5),
+              Color(0xFFF0FDF4),
+              Color(0xFFDCFCE7),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: MediaQuery.of(context).size.height * 0.80,
+              ),
+              child: IntrinsicHeight(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 12),
+
+                    // ── Animated shield / badge ──────────────
+                    ScaleTransition(
+                      scale: scaleAnimation,
+                      child: ScaleTransition(
+                        scale: pulseAnimation,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Outer glow ring
+                            Container(
+                              width: 130,
+                              height: 130,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFF16A34A).withOpacity(0.10),
+                              ),
+                            ),
+                            // Mid ring
+                            Container(
+                              width: 108,
+                              height: 108,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFF16A34A).withOpacity(0.16),
+                              ),
+                            ),
+                            // Inner icon container
+                            Container(
+                              width: 86,
+                              height: 86,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: const LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    Color(0xFF22C55E),
+                                    Color(0xFF16A34A),
+                                  ],
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF16A34A)
+                                        .withOpacity(0.40),
+                                    blurRadius: 24,
+                                    offset: const Offset(0, 8),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.verified_rounded,
+                                color: Colors.white,
+                                size: 44,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 26),
+
+                    // ── Approved badge chip ──────────────────
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF16A34A),
+                        borderRadius: BorderRadius.circular(99),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF16A34A).withOpacity(0.30),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.check_circle_rounded,
+                              size: 14, color: Colors.white),
+                          SizedBox(width: 6),
+                          Text(
+                            "APPROVED",
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    // ── Title ────────────────────────────────
+                    const Text(
+                      "You're Eligible\nto Donate!",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF14532D),
+                        height: 1.2,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // ── Subtitle ─────────────────────────────
+                    const Text(
+                      "Your screening has been reviewed and approved.\nYou can now book a blood donation appointment.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        color: Color(0xFF166534),
+                        height: 1.6,
+                      ),
+                    ),
+
+                    const SizedBox(height: 26),
+
+                    // ── Stats row ────────────────────────────
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _statCard(
+                            icon: Icons.bloodtype_rounded,
+                            iconColor: const Color(0xFFDC2626),
+                            iconBg: const Color(0xFFFFF1F1),
+                            value: "1 Life",
+                            label: "per donation",
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _statCard(
+                            icon: Icons.people_alt_rounded,
+                            iconColor: const Color(0xFF2563EB),
+                            iconBg: const Color(0xFFEFF6FF),
+                            value: "3 People",
+                            label: "can be helped",
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _statCard(
+                            icon: Icons.timer_rounded,
+                            iconColor: const Color(0xFF9333EA),
+                            iconBg: const Color(0xFFFAF5FF),
+                            value: "~1 Hour",
+                            label: "total time",
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // ── What to expect card ──────────────────
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                            color: const Color(0xFFBBF7D0), width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF16A34A).withOpacity(0.08),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.checklist_rounded,
+                                  color: Color(0xFF16A34A), size: 18),
+                              SizedBox(width: 8),
+                              Text(
+                                "What to expect at your appointment",
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF14532D),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          _expectStep(
+                              Icons.assignment_ind_outlined,
+                              "Registration & ID verification"),
+                          const SizedBox(height: 8),
+                          _expectStep(
+                              Icons.monitor_heart_outlined,
+                              "Quick mini-physical (BP, hemoglobin)"),
+                          const SizedBox(height: 8),
+                          _expectStep(
+                              Icons.water_drop_outlined,
+                              "Blood draw — takes about 8–10 minutes"),
+                          const SizedBox(height: 8),
+                          _expectStep(
+                              Icons.local_cafe_outlined,
+                              "Rest & refreshments before you go"),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // ── Book appointment CTA ─────────────────
+                    SizedBox(
+                      width: double.infinity,
+                      height: 54,
+                      child: ElevatedButton(
+                        onPressed: onBookAppointment,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF16A34A),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          shadowColor:
+                              const Color(0xFF16A34A).withOpacity(0.40),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.calendar_month_rounded, size: 20),
+                            SizedBox(width: 10),
+                            Text(
+                              "Book an Appointment",
+                              style: TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.w700),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // ── Validity note ─────────────────────────
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 9),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFBBF7D0)),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.info_outline_rounded,
+                              size: 14, color: Color(0xFF16A34A)),
+                          SizedBox(width: 7),
+                          Flexible(
+                            child: Text(
+                              "Approval is valid for your next scheduled donation session.",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF166534),
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _statCard({
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBg,
+    required String value,
+    required String label,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFD1FAE5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
+            child: Icon(icon, color: iconColor, size: 18),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: const TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
+              color: Color(0xFF14532D),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 10,
+              color: Color(0xFF6B7280),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _expectStep(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 17, color: const Color(0xFF16A34A)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontSize: 12.5,
+              color: Color(0xFF374151),
+              height: 1.4,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -968,8 +1411,7 @@ class _PendingOverlay extends StatelessWidget {
       color: Colors.white.withOpacity(0.97),
       child: SafeArea(
         child: SingleChildScrollView(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
           child: ConstrainedBox(
             constraints: BoxConstraints(
               minHeight: MediaQuery.of(context).size.height * 0.72,
@@ -985,12 +1427,11 @@ class _PendingOverlay extends StatelessWidget {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: const Color(0xFFFFFBEB),
-                      border: Border.all(
-                          color: const Color(0xFFFDE68A), width: 3),
+                      border:
+                          Border.all(color: const Color(0xFFFDE68A), width: 3),
                       boxShadow: [
                         BoxShadow(
-                          color:
-                              const Color(0xFFF59E0B).withOpacity(0.18),
+                          color: const Color(0xFFF59E0B).withOpacity(0.18),
                           blurRadius: 24,
                           offset: const Offset(0, 8),
                         ),
@@ -1038,8 +1479,7 @@ class _PendingOverlay extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: const Color(0xFFFFFBEB),
                       borderRadius: BorderRadius.circular(99),
-                      border:
-                          Border.all(color: const Color(0xFFFDE68A)),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
                     ),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
@@ -1068,8 +1508,7 @@ class _PendingOverlay extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: const Color(0xFFFFFBEB),
                       borderRadius: BorderRadius.circular(14),
-                      border:
-                          Border.all(color: const Color(0xFFFDE68A)),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1090,14 +1529,12 @@ class _PendingOverlay extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 10),
-                        _nextStep(
-                            "1", "Our team reviews your screening answers."),
+                        _nextStep("1", "Our team reviews your screening answers."),
+                        const SizedBox(height: 6),
+                        _nextStep("2", "You'll be notified once a decision is made."),
                         const SizedBox(height: 6),
                         _nextStep(
-                            "2", "You'll be notified once a decision is made."),
-                        const SizedBox(height: 6),
-                        _nextStep("3",
-                            "If approved, you can book a donation appointment."),
+                            "3", "If approved, you can book a donation appointment."),
                       ],
                     ),
                   ),
@@ -1132,8 +1569,7 @@ class _PendingOverlay extends StatelessWidget {
                   const Text(
                     "Viewing the form will not affect your pending status.",
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                        fontSize: 11, color: Color(0xFF9CA3AF)),
+                    style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
                   ),
                 ],
               ),
