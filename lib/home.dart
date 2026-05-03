@@ -539,7 +539,7 @@ class _HomeContentState extends State<HomeContent> {
                       ),
                       const SizedBox(height: 6),
                       const Text(
-                        '❤️  Thank you for saving lives',
+                        'Thank you for saving lives',
                         style: TextStyle(color: Colors.white60, fontSize: 11),
                       ),
                     ],

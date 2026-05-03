@@ -202,24 +202,37 @@ class _CheckScreenState extends State<CheckScreen>
   bool get _showApprovedOverlay =>
       !_checkingEligibility && _eligibilityStatus == 'approved';
 
-  void _goNext() {
-    if (!_currentAnswered) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
-            children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.white),
-              SizedBox(width: 8),
-              Text("Please answer this question to continue."),
-            ],
-          ),
-          backgroundColor: const Color(0xFFDC2626),
-          behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          margin: const EdgeInsets.all(12),
+  void _showSnackError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.white),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
         ),
-      );
+        backgroundColor: const Color(0xFFDC2626),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(12),
+      ),
+    );
+  }
+
+  void _goNext() {
+    final q = questions[_currentPage];
+
+    // 1. Must select yes or no
+    if (!_currentAnswered) {
+      _showSnackError("Please answer this question to continue.");
+      return;
+    }
+
+    // 2. Follow-up text is required if the trigger matches the chosen answer
+    if (q.answer == q.followUpTrigger &&
+        _followUpControllers[_currentPage].text.trim().isEmpty) {
+      _showSnackError("Please fill in the follow-up answer to continue.");
       return;
     }
 
@@ -242,7 +255,102 @@ class _CheckScreenState extends State<CheckScreen>
     }
   }
 
+  // ── Pull-to-refresh / manual refresh ─────────────────────────
+  Future<void> _refresh() async {
+    setState(() {
+      _checkingEligibility = true;
+      isLoading = true;
+      _started = false;
+      _currentPage = 0;
+      questions = [];
+      _eligibilityStatus = null;
+      _approvedAnimController.reset();
+    });
+    await Future.wait([_fetchEligibilityStatus(), fetchQuestions()]);
+  }
+
+  // ── Confirmation dialog ────────────────────────────────────────
+  Future<bool> _showSubmitConfirmation() async {
+    return await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18)),
+            contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+            actionsPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF1F1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.send_rounded,
+                      color: Color(0xFFDC2626), size: 30),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  "Submit Your Answers?",
+                  style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF111827)),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  "Please make sure all your answers are accurate and honest. You won't be able to edit them after submission.",
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF6B7280),
+                      height: 1.5),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 4),
+              ],
+            ),
+            actions: [
+              OutlinedButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF6B7280),
+                  side: const BorderSide(color: Color(0xFFD1D5DB)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 20, vertical: 11),
+                ),
+                child: const Text("Go Back"),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFDC2626),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 20, vertical: 11),
+                ),
+                child: const Text("Yes, Submit",
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
   Future<void> _submit() async {
+    // Show confirmation first
+    final confirmed = await _showSubmitConfirmation();
+    if (!confirmed) return;
+
     try {
       final prefs = await SharedPreferences.getInstance();
       final donorIdString = prefs.getString('donorId');
@@ -298,18 +406,8 @@ class _CheckScreenState extends State<CheckScreen>
         ),
       );
 
-      setState(() {
-        _started = false;
-        _currentPage = 0;
-        for (var q in questions) {
-          q.answer = null;
-          q.followUp = null;
-        }
-        for (var c in _followUpControllers) {
-          c.clear();
-        }
-        _pageController.jumpToPage(0);
-      });
+      // Auto-refresh after successful submission
+      await _refresh();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -415,9 +513,13 @@ class _CheckScreenState extends State<CheckScreen>
 
   // ── INTRO SCREEN ──────────────────────────────────────────────
   Widget _buildIntroScreen({Key? key}) {
-    return SingleChildScrollView(
-      key: key,
-      padding: const EdgeInsets.fromLTRB(20, 28, 20, 28),
+    return RefreshIndicator(
+      color: const Color(0xFFDC2626),
+      onRefresh: _refresh,
+      child: SingleChildScrollView(
+        key: key,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 28, 20, 28),
       child: Column(
         children: [
           Container(
@@ -560,7 +662,8 @@ class _CheckScreenState extends State<CheckScreen>
           ),
         ],
       ),
-    );
+    ), // SingleChildScrollView
+    ); // RefreshIndicator
   }
 
   Widget _infoCard({
@@ -809,17 +912,37 @@ class _CheckScreenState extends State<CheckScreen>
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Row(
+                                    Row(
                                       children: [
-                                        Icon(Icons.chat_bubble_outline,
+                                        const Icon(Icons.chat_bubble_outline,
                                             color: Color(0xFF16A34A), size: 18),
-                                        SizedBox(width: 8),
-                                        Text(
+                                        const SizedBox(width: 8),
+                                        const Text(
                                           "Follow-up Question",
                                           style: TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 13,
                                             color: Color(0xFF16A34A),
+                                          ),
+                                        ),
+                                        const Spacer(),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFFF1F1),
+                                            borderRadius:
+                                                BorderRadius.circular(99),
+                                            border: Border.all(
+                                                color: const Color(0xFFFECACA)),
+                                          ),
+                                          child: const Text(
+                                            "Required",
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFFDC2626),
+                                            ),
                                           ),
                                         ),
                                       ],
