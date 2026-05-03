@@ -45,7 +45,6 @@ class _CheckScreenState extends State<CheckScreen>
   // ── Eligibility ───────────────────────────────────────────────
   String? _eligibilityStatus; // 'approved' | 'pending' | 'declined' | null
   bool _checkingEligibility = true;
-  bool _pendingOverlayDismissed = false;
 
   // ── Approved overlay animation ────────────────────────────────
   late AnimationController _approvedAnimController;
@@ -88,8 +87,9 @@ class _CheckScreenState extends State<CheckScreen>
       final donorId = prefs.getString('donorId');
 
       if (donorId == null || donorId.isEmpty) {
+        // No session at all — treat as no record, show form freely
         setState(() {
-          _eligibilityStatus = 'pending';
+          _eligibilityStatus = null;
           _checkingEligibility = false;
         });
         return;
@@ -101,23 +101,34 @@ class _CheckScreenState extends State<CheckScreen>
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final status = data['status'] ?? 'pending';
+
+        // status is null when the PHP returns no row for this donor
+        // (e.g. { "status": null } or { "status": "" } or no "status" key at all)
+        final raw = data['status'];
+        final String? status =
+            (raw != null && raw.toString().trim().isNotEmpty)
+                ? raw.toString().trim()
+                : null;
+
         setState(() {
           _eligibilityStatus = status;
           _checkingEligibility = false;
         });
+
         if (status == 'approved') {
           _approvedAnimController.forward();
         }
       } else {
+        // Network/server error — fail open so the donor isn't blocked
         setState(() {
-          _eligibilityStatus = 'pending';
+          _eligibilityStatus = null;
           _checkingEligibility = false;
         });
       }
     } catch (_) {
+      // Any exception — fail open
       setState(() {
-        _eligibilityStatus = 'pending';
+        _eligibilityStatus = null;
         _checkingEligibility = false;
       });
     }
@@ -179,10 +190,14 @@ class _CheckScreenState extends State<CheckScreen>
   bool get _currentAnswered =>
       questions.isNotEmpty && questions[_currentPage].answer != null;
 
+  // Lock/unlock rules:
+  //  null       → no row in eligibility_status  → UNLOCKED (can submit)
+  //  'pending'  → awaiting admin review          → LOCKED   (pending overlay)
+  //  'approved' → reviewed & approved            → LOCKED   (approved overlay)
+  //  'declined' → reviewed & declined            → UNLOCKED (can re-submit)
+
   bool get _showPendingOverlay =>
-      !_checkingEligibility &&
-      _eligibilityStatus == 'pending' &&
-      !_pendingOverlayDismissed;
+      !_checkingEligibility && _eligibilityStatus == 'pending';
 
   bool get _showApprovedOverlay =>
       !_checkingEligibility && _eligibilityStatus == 'approved';
@@ -391,11 +406,7 @@ class _CheckScreenState extends State<CheckScreen>
           // ── Pending overlay ──────────────────────────────────
           if (_showPendingOverlay)
             Positioned.fill(
-              child: _PendingOverlay(
-                onShowDetails: () {
-                  setState(() => _pendingOverlayDismissed = true);
-                },
-              ),
+              child: const _PendingOverlay(),
             ),
         ],
       ),
@@ -1401,9 +1412,7 @@ class _ApprovedOverlay extends StatelessWidget {
 // Pending Overlay Widget
 // ═══════════════════════════════════════════════════════════════
 class _PendingOverlay extends StatelessWidget {
-  final VoidCallback onShowDetails;
-
-  const _PendingOverlay({required this.onShowDetails});
+  const _PendingOverlay();
 
   @override
   Widget build(BuildContext context) {
@@ -1541,35 +1550,10 @@ class _PendingOverlay extends StatelessWidget {
 
                   const SizedBox(height: 28),
 
-                  // ── Show details button ─────────────────────
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton.icon(
-                      onPressed: onShowDetails,
-                      icon: const Icon(Icons.visibility_outlined, size: 19),
-                      label: const Text(
-                        "Show Screening Details",
-                        style: TextStyle(
-                            fontSize: 15, fontWeight: FontWeight.w600),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFF59E0B),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 10),
-
                   const Text(
-                    "Viewing the form will not affect your pending status.",
+                    "Please check back later. You will be notified once a decision has been made.",
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+                    style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF), height: 1.5),
                   ),
                 ],
               ),
