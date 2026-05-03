@@ -38,6 +38,9 @@ dependencies:
   shared_preferences: ^2.2.3
   fl_chart: ^0.68.0
 
+  firebase_core: ^2.30.0
+  firebase_messaging: ^14.7.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -49,6 +52,14 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
 
+
+  flutter_launcher_icons: ^0.13.1
+
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/eDonateIcon.png"
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
@@ -61,7 +72,7 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/images/logo.png
+    - assets/images/1.png
 
 
   # To add assets to your application, add an assets section, like this:

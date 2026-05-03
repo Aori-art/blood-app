@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "996865137717",
+    "project_id": "edonate-d0336",
+    "storage_bucket": "edonate-d0336.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:996865137717:android:2f52f63289f5630b3b257c",
+        "android_client_info": {
+          "package_name": "com.example.blood"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBoJYVsyiY5xgcZKSQyOPyp37cMGJumfEU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

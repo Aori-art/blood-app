@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'alerts.dart';
 import 'book.dart';
@@ -54,6 +55,35 @@ class _HomeScreenState extends State<HomeScreen> {
           AlertsScreen(donorId: _donorId),
         ];
       });
+    }
+
+    if (id > 0) {
+      await _saveFcmTokenToServer(id);
+    } else {
+      debugPrint("FCM token not saved: donorId is missing.");
+    }
+  }
+
+  Future<void> _saveFcmTokenToServer(int donorId) async {
+    try {
+      final token = await FirebaseMessaging.instance.getToken();
+
+      if (token == null || token.isEmpty) {
+        debugPrint("FCM token is null or empty.");
+        return;
+      }
+
+      final response = await http.post(
+        Uri.parse('${AppConfig.baseUrl}/save_fcm_token.php'),
+        body: {
+          'donor_id': donorId.toString(),
+          'fcm_token': token,
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      debugPrint("Save FCM token response: ${response.body}");
+    } catch (e) {
+      debugPrint("Error saving FCM token: $e");
     }
   }
 
@@ -116,7 +146,6 @@ class _CustomNavBar extends StatelessWidget {
               selectedIndex: selectedIndex,
               onTap: onTap,
             ),
-            // Center slot: collapses when Check is active (FAB fills that space)
             AnimatedContainer(
               duration: const Duration(milliseconds: 250),
               width: isCheckActive ? 0 : 56,
@@ -178,7 +207,9 @@ class _NavItem extends StatelessWidget {
             Icon(
               icon,
               size: 22,
-              color: isSelected ? const Color(0xFFDC2626) : const Color(0xFF9CA3AF),
+              color: isSelected
+                  ? const Color(0xFFDC2626)
+                  : const Color(0xFF9CA3AF),
             ),
             const SizedBox(height: 2),
             Text(
@@ -186,7 +217,9 @@ class _NavItem extends StatelessWidget {
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected ? const Color(0xFFDC2626) : const Color(0xFF9CA3AF),
+                color: isSelected
+                    ? const Color(0xFFDC2626)
+                    : const Color(0xFF9CA3AF),
               ),
             ),
           ],
@@ -205,7 +238,6 @@ class _CenterFAB extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedSlide(
-      // Slides down into the nav bar when Check is active
       offset: isActive ? const Offset(0, 0.55) : Offset.zero,
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeInOut,
@@ -279,23 +311,27 @@ class _BloodDropPainter extends CustomPainter {
     final path = Path();
     final cx = size.width / 2;
 
-    // Teardrop shape: pointed top, round bottom
     path.moveTo(cx, 0);
     path.cubicTo(
-      cx + size.width * 0.6, size.height * 0.35,
-      cx + size.width * 0.6, size.height * 0.7,
-      cx, size.height,
+      cx + size.width * 0.6,
+      size.height * 0.35,
+      cx + size.width * 0.6,
+      size.height * 0.7,
+      cx,
+      size.height,
     );
     path.cubicTo(
-      cx - size.width * 0.6, size.height * 0.7,
-      cx - size.width * 0.6, size.height * 0.35,
-      cx, 0,
+      cx - size.width * 0.6,
+      size.height * 0.7,
+      cx - size.width * 0.6,
+      size.height * 0.35,
+      cx,
+      0,
     );
     path.close();
 
     canvas.drawPath(path, paint);
 
-    // Shine highlight
     final shinePaint = Paint()
       ..color = Colors.white.withOpacity(0.35)
       ..style = PaintingStyle.fill;
@@ -346,7 +382,9 @@ class _HomeContentState extends State<HomeContent> {
 
   Future<void> loadUserName() async {
     final prefs = await SharedPreferences.getInstance();
-    if (mounted) setState(() => userName = prefs.getString('userName') ?? 'User');
+    if (mounted) {
+      setState(() => userName = prefs.getString('userName') ?? 'User');
+    }
   }
 
   Future<void> loadProfileData() async {
@@ -354,7 +392,12 @@ class _HomeContentState extends State<HomeContent> {
     final donorId = prefs.getString('donorId');
 
     if (donorId == null || donorId.isEmpty) {
-      if (mounted) setState(() { bloodType = "N/A"; isProfileLoading = false; });
+      if (mounted) {
+        setState(() {
+          bloodType = "N/A";
+          isProfileLoading = false;
+        });
+      }
       return;
     }
 
@@ -369,16 +412,27 @@ class _HomeContentState extends State<HomeContent> {
           if (mounted) {
             setState(() {
               bloodType = (d["blood_type"] ?? "N/A").toString();
-              totalDonations = int.tryParse(d["total_donations"].toString()) ?? 0;
+              totalDonations =
+                  int.tryParse(d["total_donations"].toString()) ?? 0;
               isProfileLoading = false;
             });
           }
         } else {
-          if (mounted) setState(() { bloodType = "N/A"; isProfileLoading = false; });
+          if (mounted) {
+            setState(() {
+              bloodType = "N/A";
+              isProfileLoading = false;
+            });
+          }
         }
       }
     } catch (e) {
-      if (mounted) setState(() { bloodType = "N/A"; isProfileLoading = false; });
+      if (mounted) {
+        setState(() {
+          bloodType = "N/A";
+          isProfileLoading = false;
+        });
+      }
     }
   }
 
@@ -387,7 +441,13 @@ class _HomeContentState extends State<HomeContent> {
     final donorId = prefs.getString('donorId');
 
     if (donorId == null || donorId.isEmpty) {
-      if (mounted) setState(() { nextEligibleDate = "N/A"; eligibilityStatus = "Unknown"; isEligibilityLoading = false; });
+      if (mounted) {
+        setState(() {
+          nextEligibleDate = "N/A";
+          eligibilityStatus = "Unknown";
+          isEligibilityLoading = false;
+        });
+      }
       return;
     }
 
@@ -400,17 +460,31 @@ class _HomeContentState extends State<HomeContent> {
         if (data["status"] == "success") {
           if (mounted) {
             setState(() {
-              nextEligibleDate = formatDate(data["next_eligible_date"]?.toString() ?? "");
-              eligibilityStatus = (data["eligibility"] ?? "Unknown").toString();
+              nextEligibleDate =
+                  formatDate(data["next_eligible_date"]?.toString() ?? "");
+              eligibilityStatus =
+                  (data["eligibility"] ?? "Unknown").toString();
               isEligibilityLoading = false;
             });
           }
         } else {
-          if (mounted) setState(() { nextEligibleDate = "N/A"; eligibilityStatus = "Unknown"; isEligibilityLoading = false; });
+          if (mounted) {
+            setState(() {
+              nextEligibleDate = "N/A";
+              eligibilityStatus = "Unknown";
+              isEligibilityLoading = false;
+            });
+          }
         }
       }
     } catch (e) {
-      if (mounted) setState(() { nextEligibleDate = "N/A"; eligibilityStatus = "Unknown"; isEligibilityLoading = false; });
+      if (mounted) {
+        setState(() {
+          nextEligibleDate = "N/A";
+          eligibilityStatus = "Unknown";
+          isEligibilityLoading = false;
+        });
+      }
     }
   }
 
@@ -450,9 +524,24 @@ class _HomeContentState extends State<HomeContent> {
     if (dateString.isEmpty) return "N/A";
     try {
       final date = DateTime.parse(dateString);
-      const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+      const months = [
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December'
+      ];
       return "${months[date.month - 1]} ${date.day}, ${date.year}";
-    } catch (_) { return dateString; }
+    } catch (_) {
+      return dateString;
+    }
   }
 
   String formatTime(String? timeString) {
@@ -465,31 +554,55 @@ class _HomeContentState extends State<HomeContent> {
       if (hour > 12) hour -= 12;
       if (hour == 0) hour = 12;
       return "$hour:${minute.toString().padLeft(2, '0')} $period";
-    } catch (_) { return timeString; }
+    } catch (_) {
+      return timeString;
+    }
   }
 
   Color getStatusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'cancelled': return const Color(0xFFDC2626);
-      case 'pending': return const Color(0xFFF59E0B);
+      case 'cancelled':
+        return const Color(0xFFDC2626);
+      case 'pending':
+        return const Color(0xFFF59E0B);
       case 'approved':
-      case 'completed': return const Color(0xFF16A34A);
-      default: return Colors.grey;
+      case 'completed':
+        return const Color(0xFF16A34A);
+      default:
+        return Colors.grey;
     }
   }
 
   Color getStatusBg(String status) {
     switch (status.toLowerCase()) {
-      case 'cancelled': return const Color(0xFFFFF1F1);
-      case 'pending': return const Color(0xFFFFFBEB);
+      case 'cancelled':
+        return const Color(0xFFFFF1F1);
+      case 'pending':
+        return const Color(0xFFFFFBEB);
       case 'approved':
-      case 'completed': return const Color(0xFFF0FDF4);
-      default: return const Color(0xFFF3F4F6);
+      case 'completed':
+        return const Color(0xFFF0FDF4);
+      default:
+        return const Color(0xFFF3F4F6);
+    }
+  }
+
+  Color getEligibilityStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'approved':
+        return const Color(0xFF16A34A);
+      case 'pending':
+        return const Color(0xFFF59E0B);
+      default:
+        return const Color(0xFFDC2626);
     }
   }
 
   void _navigateToHistory() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const HistoryScreen()));
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const HistoryScreen()),
+    );
   }
 
   @override
@@ -502,7 +615,6 @@ class _HomeContentState extends State<HomeContent> {
       backgroundColor: const Color(0xFFF9FAFB),
       body: Column(
         children: [
-          // ── HEADER ──────────────────────────────────────────────
           Container(
             width: double.infinity,
             padding: EdgeInsets.only(
@@ -526,7 +638,10 @@ class _HomeContentState extends State<HomeContent> {
                     children: [
                       Text(
                         _greetingText(),
-                        style: const TextStyle(color: Colors.white70, fontSize: 13),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -540,7 +655,10 @@ class _HomeContentState extends State<HomeContent> {
                       const SizedBox(height: 6),
                       const Text(
                         'Thank you for saving lives',
-                        style: TextStyle(color: Colors.white60, fontSize: 11),
+                        style: TextStyle(
+                          color: Colors.white60,
+                          fontSize: 11,
+                        ),
                       ),
                     ],
                   ),
@@ -557,7 +675,9 @@ class _HomeContentState extends State<HomeContent> {
                       radius: 22,
                       backgroundColor: Colors.white24,
                       child: Text(
-                        firstName.isNotEmpty ? firstName[0].toUpperCase() : 'U',
+                        firstName.isNotEmpty
+                            ? firstName[0].toUpperCase()
+                            : 'U',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 20,
@@ -570,13 +690,16 @@ class _HomeContentState extends State<HomeContent> {
               ],
             ),
           ),
-
           Expanded(
             child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(screenWidth * 0.05, 20, screenWidth * 0.05, 20),
+              padding: EdgeInsets.fromLTRB(
+                screenWidth * 0.05,
+                20,
+                screenWidth * 0.05,
+                20,
+              ),
               child: Column(
                 children: [
-                  // ── BLOOD TYPE + DONATIONS ─────────────────────
                   Row(
                     children: [
                       Expanded(
@@ -592,7 +715,9 @@ class _HomeContentState extends State<HomeContent> {
                       Expanded(
                         child: _statCard(
                           label: 'Donations',
-                          value: isProfileLoading ? '...' : totalDonations.toString(),
+                          value: isProfileLoading
+                              ? '...'
+                              : totalDonations.toString(),
                           icon: Icons.favorite_rounded,
                           iconColor: const Color(0xFFEC4899),
                           iconBg: const Color(0xFFFDF2F8),
@@ -602,7 +727,9 @@ class _HomeContentState extends State<HomeContent> {
                       Expanded(
                         child: _statCard(
                           label: 'Lives Saved',
-                          value: isProfileLoading ? '...' : '${totalDonations * 3}',
+                          value: isProfileLoading
+                              ? '...'
+                              : '${totalDonations * 3}',
                           icon: Icons.people_rounded,
                           iconColor: const Color(0xFF16A34A),
                           iconBg: const Color(0xFFF0FDF4),
@@ -610,10 +737,7 @@ class _HomeContentState extends State<HomeContent> {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 16),
-
-                  // ── ELIGIBILITY CARD ───────────────────────────
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(18),
@@ -621,7 +745,11 @@ class _HomeContentState extends State<HomeContent> {
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: const [
-                        BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 3)),
+                        BoxShadow(
+                          color: Colors.black12,
+                          blurRadius: 6,
+                          offset: Offset(0, 3),
+                        ),
                       ],
                     ),
                     child: Column(
@@ -635,8 +763,11 @@ class _HomeContentState extends State<HomeContent> {
                                 color: const Color(0xFFFFF1F1),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: const Icon(Icons.verified_user_rounded,
-                                  color: Color(0xFFDC2626), size: 20),
+                              child: const Icon(
+                                Icons.verified_user_rounded,
+                                color: Color(0xFFDC2626),
+                                size: 20,
+                              ),
                             ),
                             const SizedBox(width: 10),
                             const Text(
@@ -659,11 +790,11 @@ class _HomeContentState extends State<HomeContent> {
                         const SizedBox(height: 8),
                         _eligibilityRow(
                           'Status',
-                          isEligibilityLoading ? 'Loading...' : eligibilityStatus,
+                          isEligibilityLoading
+                              ? 'Loading...'
+                              : eligibilityStatus,
                           Icons.circle,
-                          eligibilityStatus.toLowerCase() == 'eligible'
-                              ? const Color(0xFF16A34A)
-                              : const Color(0xFFF59E0B),
+                          getEligibilityStatusColor(eligibilityStatus),
                         ),
                         const SizedBox(height: 14),
                         SizedBox(
@@ -671,7 +802,12 @@ class _HomeContentState extends State<HomeContent> {
                           height: 42,
                           child: ElevatedButton.icon(
                             onPressed: () {
-                              Navigator.push(context, MaterialPageRoute(builder: (_) => const CheckScreen()));
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const CheckScreen(),
+                                ),
+                              );
                             },
                             icon: const Icon(Icons.play_arrow_rounded, size: 18),
                             label: const Text('Check Eligibility'),
@@ -680,18 +816,18 @@ class _HomeContentState extends State<HomeContent> {
                               foregroundColor: Colors.white,
                               elevation: 0,
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10)),
-                              textStyle: const TextStyle(fontWeight: FontWeight.w600),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              textStyle: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         ),
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 16),
-
-                  // ── QUICK ACTIONS ──────────────────────────────
                   Row(
                     children: [
                       Expanded(
@@ -719,10 +855,7 @@ class _HomeContentState extends State<HomeContent> {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 16),
-
-                  // ── UPCOMING APPOINTMENTS ──────────────────────
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -736,17 +869,29 @@ class _HomeContentState extends State<HomeContent> {
                       ),
                       if (!isAppointmentsLoading && appointments.isNotEmpty)
                         GestureDetector(
-                          onTap: () => Navigator.push(context,
-                              MaterialPageRoute(builder: (_) => DonationHistoryScreen())),
-                          child: const Text('See all',
-                              style: TextStyle(fontSize: 12, color: Color(0xFFDC2626))),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => DonationHistoryScreen(),
+                            ),
+                          ),
+                          child: const Text(
+                            'See all',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFFDC2626),
+                            ),
+                          ),
                         ),
                     ],
                   ),
                   const SizedBox(height: 10),
-
                   if (isAppointmentsLoading)
-                    const Center(child: CircularProgressIndicator(color: Color(0xFFDC2626)))
+                    const Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFFDC2626),
+                      ),
+                    )
                   else if (appointments.isEmpty)
                     Container(
                       width: double.infinity,
@@ -755,28 +900,42 @@ class _HomeContentState extends State<HomeContent> {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(14),
                         boxShadow: const [
-                          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
+                          BoxShadow(
+                            color: Colors.black12,
+                            blurRadius: 4,
+                            offset: Offset(0, 2),
+                          ),
                         ],
                       ),
                       child: Column(
                         children: [
-                          Icon(Icons.calendar_today_outlined,
-                              color: Colors.grey.shade300, size: 36),
+                          Icon(
+                            Icons.calendar_today_outlined,
+                            color: Colors.grey.shade300,
+                            size: 36,
+                          ),
                           const SizedBox(height: 8),
-                          const Text('No upcoming appointments.',
-                              style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13)),
+                          const Text(
+                            'No upcoming appointments.',
+                            style: TextStyle(
+                              color: Color(0xFF9CA3AF),
+                              fontSize: 13,
+                            ),
+                          ),
                           const SizedBox(height: 4),
-                          const Text('Book one to get started!',
-                              style: TextStyle(color: Color(0xFFD1D5DB), fontSize: 11)),
+                          const Text(
+                            'Book one to get started!',
+                            style: TextStyle(
+                              color: Color(0xFFD1D5DB),
+                              fontSize: 11,
+                            ),
+                          ),
                         ],
                       ),
                     )
                   else
                     ...appointments.map((appt) => _appointmentCard(appt)),
-
                   const SizedBox(height: 16),
-
-                  // ── IMPACT BANNER ──────────────────────────────
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
@@ -795,7 +954,7 @@ class _HomeContentState extends State<HomeContent> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                'Your Impact 🎉',
+                                'Your Impact',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
@@ -805,7 +964,10 @@ class _HomeContentState extends State<HomeContent> {
                               const SizedBox(height: 6),
                               Text(
                                 '$totalDonations donations · ${totalDonations * 3} lives potentially saved',
-                                style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
                               ),
                             ],
                           ),
@@ -816,17 +978,21 @@ class _HomeContentState extends State<HomeContent> {
                             color: Colors.white24,
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Icon(Icons.emoji_events_rounded,
-                              color: Colors.white, size: 28),
+                          child: const Icon(
+                            Icons.emoji_events_rounded,
+                            color: Colors.white,
+                            size: 28,
+                          ),
                         ),
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 12),
-
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFF0FDF4),
                       borderRadius: BorderRadius.circular(12),
@@ -834,13 +1000,20 @@ class _HomeContentState extends State<HomeContent> {
                     ),
                     child: const Row(
                       children: [
-                        Icon(Icons.volunteer_activism_rounded,
-                            color: Color(0xFF16A34A), size: 18),
+                        Icon(
+                          Icons.volunteer_activism_rounded,
+                          color: Color(0xFF16A34A),
+                          size: 18,
+                        ),
                         SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             'Thank you for being a hero in your community. Every donation makes a difference.',
-                            style: TextStyle(color: Color(0xFF166534), fontSize: 11, height: 1.4),
+                            style: TextStyle(
+                              color: Color(0xFF166534),
+                              fontSize: 11,
+                              height: 1.4,
+                            ),
                           ),
                         ),
                       ],
@@ -886,13 +1059,20 @@ class _HomeContentState extends State<HomeContent> {
             child: Icon(icon, color: iconColor, size: 18),
           ),
           const SizedBox(height: 8),
-          Text(value,
-              style: const TextStyle(
-                  fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF111827))),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF111827),
+            ),
+          ),
           const SizedBox(height: 2),
-          Text(label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 10, color: Color(0xFF9CA3AF))),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 10, color: Color(0xFF9CA3AF)),
+          ),
         ],
       ),
     );
@@ -903,11 +1083,19 @@ class _HomeContentState extends State<HomeContent> {
       children: [
         Icon(icon, size: 14, color: color),
         const SizedBox(width: 6),
-        Text('$label: ', style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280))),
+        Text(
+          '$label: ',
+          style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+        ),
         Expanded(
-          child: Text(value,
-              style: TextStyle(
-                  fontSize: 13, fontWeight: FontWeight.w600, color: color)),
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
         ),
       ],
     );
@@ -923,7 +1111,8 @@ class _HomeContentState extends State<HomeContent> {
     required Widget destination,
   }) {
     return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => destination)),
+      onTap: () =>
+          Navigator.push(context, MaterialPageRoute(builder: (_) => destination)),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -938,16 +1127,26 @@ class _HomeContentState extends State<HomeContent> {
           children: [
             Container(
               padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(10)),
+              decoration: BoxDecoration(
+                color: iconBg,
+                borderRadius: BorderRadius.circular(10),
+              ),
               child: Icon(icon, color: iconColor, size: 22),
             ),
             const SizedBox(height: 12),
-            Text(title,
-                style: const TextStyle(
-                    fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF111827))),
+            Text(
+              title,
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                color: Color(0xFF111827),
+              ),
+            ),
             const SizedBox(height: 3),
-            Text(subtitle,
-                style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
+            Text(
+              subtitle,
+              style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+            ),
           ],
         ),
       ),
@@ -980,25 +1179,41 @@ class _HomeContentState extends State<HomeContent> {
               color: const Color(0xFFFFF1F1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.calendar_month_rounded,
-                color: Color(0xFFDC2626), size: 24),
+            child: const Icon(
+              Icons.calendar_month_rounded,
+              color: Color(0xFFDC2626),
+              size: 24,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(date,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: Color(0xFF111827))),
+                Text(
+                  date,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: Color(0xFF111827),
+                  ),
+                ),
                 const SizedBox(height: 3),
-                Text(time,
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
+                Text(
+                  time,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF6B7280),
+                  ),
+                ),
                 const SizedBox(height: 3),
-                Text(center,
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
+                Text(
+                  center,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF6B7280),
+                  ),
+                ),
               ],
             ),
           ),
@@ -1011,9 +1226,10 @@ class _HomeContentState extends State<HomeContent> {
             child: Text(
               status,
               style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: statusColor),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: statusColor,
+              ),
             ),
           ),
         ],

@@ -19,9 +19,11 @@ class _BookScreenState extends State<BookScreen> {
   String? selectedCenter;
   String? selectedTime;
 
-  // ── Eligibility ───────────────────────────────────────────────
-  String? _eligibilityStatus; // 'approved' | 'pending' | 'declined' | null
+  String? _eligibilityStatus;
   bool _checkingEligibility = true;
+
+  String? _appointmentStatus;
+  bool _checkingAppointment = true;
 
   final List<String> centers = ["Lipa City Hall"];
 
@@ -31,15 +33,22 @@ class _BookScreenState extends State<BookScreen> {
     "10:00 AM - 11:00 AM",
     "1:00 PM - 2:00 PM",
     "2:00 PM - 3:00 PM",
+    "3:00 PM - 4:00 PM",
   ];
 
   @override
   void initState() {
     super.initState();
-    _fetchEligibilityStatus();
+    _loadStatuses();
   }
 
-  // ── Fetch eligibility status from backend ─────────────────────
+  Future<void> _loadStatuses() async {
+    await Future.wait([
+      _fetchEligibilityStatus(),
+      _fetchAppointmentStatus(),
+    ]);
+  }
+
   Future<void> _fetchEligibilityStatus() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -54,13 +63,20 @@ class _BookScreenState extends State<BookScreen> {
       }
 
       final url = Uri.parse(
-          "${AppConfig.baseUrl}/get_eligibility_status.php?donor_id=$donorId");
+        "${AppConfig.baseUrl}/get_eligibility_status.php?donor_id=$donorId",
+      );
+
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        final rawStatus = data['status'];
+
         setState(() {
-          _eligibilityStatus = data['status'] ?? 'pending';
+          _eligibilityStatus =
+              rawStatus == null || rawStatus.toString().trim().isEmpty
+                  ? 'pending'
+                  : rawStatus.toString().trim();
           _checkingEligibility = false;
         });
       } else {
@@ -75,6 +91,59 @@ class _BookScreenState extends State<BookScreen> {
         _checkingEligibility = false;
       });
     }
+  }
+
+  Future<void> _fetchAppointmentStatus() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final donorId = prefs.getString('donorId');
+
+      if (donorId == null || donorId.isEmpty) {
+        setState(() {
+          _appointmentStatus = 'approved';
+          _checkingAppointment = false;
+        });
+        return;
+      }
+
+      final url = Uri.parse(
+        "${AppConfig.baseUrl}/get_appointment_status.php?donor_id=$donorId",
+      );
+
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final rawStatus = data['status'];
+
+        setState(() {
+          _appointmentStatus =
+              rawStatus == null || rawStatus.toString().trim().isEmpty
+                  ? 'approved'
+                  : rawStatus.toString().trim();
+          _checkingAppointment = false;
+        });
+      } else {
+        setState(() {
+          _appointmentStatus = 'approved';
+          _checkingAppointment = false;
+        });
+      }
+    } catch (_) {
+      setState(() {
+        _appointmentStatus = 'approved';
+        _checkingAppointment = false;
+      });
+    }
+  }
+
+  Future<void> _refreshStatuses() async {
+    setState(() {
+      _checkingEligibility = true;
+      _checkingAppointment = true;
+    });
+
+    await _loadStatuses();
   }
 
   Future<void> _pickDate() async {
@@ -105,6 +174,50 @@ class _BookScreenState extends State<BookScreen> {
   }
 
   Future<void> _submitBooking() async {
+    if (_eligibilityStatus != 'approved') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.error_outline, color: Colors.white),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text("You need approved eligibility before booking."),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFFDC2626),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (_appointmentStatus == 'pending') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.schedule_rounded, color: Colors.white),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text("You already have a pending appointment."),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFFF59E0B),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+      return;
+    }
+
     if (selectedDate == null || selectedCenter == null || selectedTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -117,8 +230,9 @@ class _BookScreenState extends State<BookScreen> {
           ),
           backgroundColor: const Color(0xFFDC2626),
           behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
       return;
@@ -131,16 +245,16 @@ class _BookScreenState extends State<BookScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text(
-                "Unable to find your account. Please sign in again.")),
+          content: Text("Unable to find your account. Please sign in again."),
+        ),
       );
       return;
     }
 
     final formattedDate =
         "${selectedDate!.year.toString().padLeft(4, '0')}-${selectedDate!.month.toString().padLeft(2, '0')}-${selectedDate!.day.toString().padLeft(2, '0')}";
-    final url =
-        Uri.parse("${AppConfig.baseUrl}/book_appointment.php");
+
+    final url = Uri.parse("${AppConfig.baseUrl}/book_appointment.php");
 
     try {
       final response = await http.post(
@@ -160,13 +274,13 @@ class _BookScreenState extends State<BookScreen> {
       if (response.statusCode != 200) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text("Server error: ${response.statusCode}")),
+          SnackBar(content: Text("Server error: ${response.statusCode}")),
         );
         return;
       }
 
       final data = jsonDecode(response.body);
+
       if (!mounted) return;
 
       if (data["success"] == true) {
@@ -182,20 +296,25 @@ class _BookScreenState extends State<BookScreen> {
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10)),
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
         );
+
         setState(() {
           selectedDate = null;
           selectedCenter = null;
           selectedTime = null;
+          _appointmentStatus = 'pending';
         });
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content:
-                  Text(data["message"] ?? "Unknown error")),
+            content: Text(data["message"] ?? "Unknown error"),
+          ),
         );
+
+        await _refreshStatuses();
       }
     } catch (e) {
       if (!mounted) return;
@@ -206,32 +325,53 @@ class _BookScreenState extends State<BookScreen> {
   }
 
   String _formatDate(DateTime date) {
-    const weekdays = [
-      'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'
-    ];
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
     const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
     ];
+
     final weekday = weekdays[date.weekday - 1];
     final month = months[date.month - 1];
+
     return "$weekday, $month ${date.day}, ${date.year}";
   }
 
   String _formatDateShort(DateTime date) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
     ];
+
     return "${months[date.month - 1]} ${date.day}, ${date.year}";
   }
 
   bool get _allSelected =>
-      selectedDate != null &&
-      selectedCenter != null &&
-      selectedTime != null;
+      selectedDate != null && selectedCenter != null && selectedTime != null;
 
-  // ── Build ─────────────────────────────────────────────────────
+  bool get _isLoading => _checkingEligibility || _checkingAppointment;
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -241,7 +381,6 @@ class _BookScreenState extends State<BookScreen> {
       backgroundColor: const Color(0xFFF9FAFB),
       body: Stack(
         children: [
-          // ── Main booking UI ──────────────────────────────────
           Column(
             children: [
               Container(
@@ -268,247 +407,254 @@ class _BookScreenState extends State<BookScreen> {
                     SizedBox(height: 4),
                     Text(
                       "Schedule your blood donation",
-                      style:
-                          TextStyle(color: Colors.white70, fontSize: 12),
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),
               ),
               Expanded(
-                child: SingleChildScrollView(
-                  padding:
-                      const EdgeInsets.fromLTRB(16, 20, 16, 24),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 20),
-
-                      // DATE SELECTION CARD
-                      _sectionCard(
-                        icon: Icons.calendar_today,
-                        title: "Select Date",
-                        child: InkWell(
-                          onTap: _pickDate,
-                          borderRadius: BorderRadius.circular(10),
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 14),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF9FAFB),
-                              border: Border.all(
-                                  color: const Color(0xFFD1D5DB)),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
+                child: RefreshIndicator(
+                  color: const Color(0xFFDC2626),
+                  onRefresh: _refreshStatuses,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 20),
+                        _sectionCard(
+                          icon: Icons.calendar_today,
+                          title: "Select Date",
+                          child: InkWell(
+                            onTap: _pickDate,
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 14,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF9FAFB),
+                                border: Border.all(
+                                  color: const Color(0xFFD1D5DB),
+                                ),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
                                     Icons.calendar_month_outlined,
                                     color: Color(0xFF9CA3AF),
-                                    size: 18),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    selectedDate == null
-                                        ? "Choose a date"
-                                        : _formatDate(selectedDate!),
-                                    style: TextStyle(
-                                      color: selectedDate == null
-                                          ? const Color(0xFF9CA3AF)
-                                          : const Color(0xFF111827),
-                                      fontSize: 14,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      selectedDate == null
+                                          ? "Choose a date"
+                                          : _formatDate(selectedDate!),
+                                      style: TextStyle(
+                                        color: selectedDate == null
+                                            ? const Color(0xFF9CA3AF)
+                                            : const Color(0xFF111827),
+                                        fontSize: 14,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                const Icon(Icons.expand_more,
+                                  const Icon(
+                                    Icons.expand_more,
                                     color: Color(0xFF9CA3AF),
-                                    size: 20),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // DONATION CENTER CARD
-                      _sectionCard(
-                        icon: Icons.location_on,
-                        title: "Choose Donation Center",
-                        child: Column(
-                          children: [
-                            _styledDropdown<String>(
-                              value: selectedCenter,
-                              hint: "Select a center",
-                              items: centers,
-                              onChanged: (val) =>
-                                  setState(() => selectedCenter = val),
-                            ),
-                            if (selectedCenter != null) ...[
-                              const SizedBox(height: 12),
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFEFF6FF),
-                                  borderRadius:
-                                      BorderRadius.circular(10),
-                                ),
-                                child: const Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                    Text("Address",
-                                        style: TextStyle(
-                                            fontSize: 11,
-                                            color: Color(0xFF6B7280))),
-                                    SizedBox(height: 2),
-                                    Text(
-                                        "123 Health Street, Medical District",
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.w500,
-                                            fontSize: 13)),
-                                    SizedBox(height: 4),
-                                    Text("Open: Mon-Sat, 8 AM - 6 PM",
-                                        style: TextStyle(
-                                            fontSize: 11,
-                                            color: Color(0xFF2563EB))),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // TIME SLOT CARD
-                      _sectionCard(
-                        icon: Icons.access_time,
-                        title: "Choose Time Slot",
-                        child: _styledDropdown<String>(
-                          value: selectedTime,
-                          hint: "Select a time",
-                          items: timeSlots,
-                          onChanged: (val) =>
-                              setState(() => selectedTime = val),
-                        ),
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // BOOKING SUMMARY
-                      if (_allSelected)
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [
-                                Color(0xFFF0FDF4),
-                                Color(0xFFDCFCE7)
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            border: Border.all(
-                                color: const Color(0xFFBBF7D0),
-                                width: 2),
-                            borderRadius: BorderRadius.circular(14),
-                            boxShadow: const [
-                              BoxShadow(
-                                  color: Colors.black12,
-                                  blurRadius: 4,
-                                  offset: Offset(0, 2)),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
-                            children: [
-                              const Row(
-                                children: [
-                                  Icon(Icons.check_circle,
-                                      color: Color(0xFF16A34A),
-                                      size: 20),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    "Booking Summary",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 15,
-                                      color: Color(0xFF111827),
-                                    ),
+                                    size: 20,
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 12),
-                              _summaryRow("Date",
-                                  _formatDateShort(selectedDate!)),
-                              const SizedBox(height: 6),
-                              _summaryRow("Time", selectedTime!),
-                              const SizedBox(height: 6),
-                              _summaryRow("Center", selectedCenter!),
-                            ],
-                          ),
-                        ),
-
-                      const SizedBox(height: 20),
-
-                      // CONFIRM BUTTON
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed:
-                              _allSelected ? _submitBooking : null,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor:
-                                const Color(0xFFDC2626),
-                            disabledBackgroundColor:
-                                const Color(0xFFF87171),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius:
-                                  BorderRadius.circular(12),
                             ),
-                            elevation: 0,
                           ),
-                          child: const Row(
-                            mainAxisAlignment:
-                                MainAxisAlignment.center,
+                        ),
+                        const SizedBox(height: 16),
+                        _sectionCard(
+                          icon: Icons.location_on,
+                          title: "Choose Donation Center",
+                          child: Column(
                             children: [
-                              Text(
-                                "Confirm Booking",
-                                style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600),
+                              _styledDropdown<String>(
+                                value: selectedCenter,
+                                hint: "Select a center",
+                                items: centers,
+                                onChanged: (val) {
+                                  setState(() => selectedCenter = val);
+                                },
                               ),
-                              SizedBox(width: 8),
-                              Icon(Icons.arrow_forward, size: 18),
+                              if (selectedCenter != null) ...[
+                                const SizedBox(height: 12),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEFF6FF),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        "Address",
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Color(0xFF6B7280),
+                                        ),
+                                      ),
+                                      SizedBox(height: 2),
+                                      Text(
+                                        "Areza Estate (Ayala Land), Lipa City",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w500,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                      SizedBox(height: 4),
+                                      Text(
+                                        "Open: Mon-Fri, 8 AM - 6 PM",
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Color(0xFF2563EB),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      const Text(
-                        "You'll receive a confirmation message with all the details once your booking is confirmed.",
-                        style: TextStyle(
+                        const SizedBox(height: 16),
+                        _sectionCard(
+                          icon: Icons.access_time,
+                          title: "Choose Time Slot",
+                          child: _styledDropdown<String>(
+                            value: selectedTime,
+                            hint: "Select a time",
+                            items: timeSlots,
+                            onChanged: (val) {
+                              setState(() => selectedTime = val);
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        if (_allSelected)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [
+                                  Color(0xFFF0FDF4),
+                                  Color(0xFFDCFCE7),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              border: Border.all(
+                                color: const Color(0xFFBBF7D0),
+                                width: 2,
+                              ),
+                              borderRadius: BorderRadius.circular(14),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Colors.black12,
+                                  blurRadius: 4,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Row(
+                                  children: [
+                                    Icon(
+                                      Icons.check_circle,
+                                      color: Color(0xFF16A34A),
+                                      size: 20,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      "Booking Summary",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                        color: Color(0xFF111827),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                _summaryRow(
+                                  "Date",
+                                  _formatDateShort(selectedDate!),
+                                ),
+                                const SizedBox(height: 6),
+                                _summaryRow("Time", selectedTime!),
+                                const SizedBox(height: 6),
+                                _summaryRow("Center", selectedCenter!),
+                              ],
+                            ),
+                          ),
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: _allSelected ? _submitBooking : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFDC2626),
+                              disabledBackgroundColor:
+                                  const Color(0xFFF87171),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  "Confirm Booking",
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                SizedBox(width: 8),
+                                Icon(Icons.arrow_forward, size: 18),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          "You'll receive a confirmation message with all the details once your booking is confirmed.",
+                          style: TextStyle(
                             fontSize: 11,
-                            color: Color(0xFF9CA3AF)),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
+                            color: Color(0xFF9CA3AF),
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ],
           ),
 
-          // ── Eligibility gate overlay ─────────────────────────
-          if (_checkingEligibility)
+          if (_isLoading)
             const Positioned.fill(
               child: ColoredBox(
                 color: Color(0xFFF9FAFB),
@@ -519,13 +665,11 @@ class _BookScreenState extends State<BookScreen> {
                 ),
               ),
             )
-          else if (_eligibilityStatus == 'pending' ||
-              _eligibilityStatus == 'declined')
+          else if (_eligibilityStatus != 'approved')
             Positioned.fill(
               child: _EligibilityGate(
-                status: _eligibilityStatus!,
+                status: _eligibilityStatus ?? 'pending',
                 onGoToCheck: () {
-                  // Navigate to CheckScreen — adjust to your router
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const CheckScreen(),
@@ -533,13 +677,16 @@ class _BookScreenState extends State<BookScreen> {
                   );
                 },
               ),
+            )
+          else if (_appointmentStatus == 'pending')
+            const Positioned.fill(
+              child: _AppointmentPendingGate(),
             ),
         ],
       ),
     );
   }
 
-  // ── Helpers ───────────────────────────────────────────────────
   Widget _sectionCard({
     required IconData icon,
     required String title,
@@ -550,14 +697,17 @@ class _BookScreenState extends State<BookScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        border:
-            Border.all(color: const Color(0xFFE5E7EB), width: 2),
+        border: Border.all(
+          color: const Color(0xFFE5E7EB),
+          width: 2,
+        ),
         borderRadius: BorderRadius.circular(14),
         boxShadow: const [
           BoxShadow(
-              color: Colors.black12,
-              blurRadius: 4,
-              offset: Offset(0, 2)),
+            color: Colors.black12,
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
         ],
       ),
       child: Column(
@@ -565,8 +715,11 @@ class _BookScreenState extends State<BookScreen> {
         children: [
           Row(
             children: [
-              Icon(icon,
-                  color: const Color(0xFFDC2626), size: 20),
+              Icon(
+                icon,
+                color: const Color(0xFFDC2626),
+                size: 20,
+              ),
               const SizedBox(width: 8),
               Text(
                 title,
@@ -602,17 +755,29 @@ class _BookScreenState extends State<BookScreen> {
       child: DropdownButton<T>(
         value: value,
         isExpanded: true,
-        hint: Text(hint,
-            style: const TextStyle(
-                color: Color(0xFF9CA3AF), fontSize: 14)),
+        hint: Text(
+          hint,
+          style: const TextStyle(
+            color: Color(0xFF9CA3AF),
+            fontSize: 14,
+          ),
+        ),
         underline: const SizedBox(),
-        icon: const Icon(Icons.expand_more,
-            color: Color(0xFF9CA3AF)),
+        icon: const Icon(
+          Icons.expand_more,
+          color: Color(0xFF9CA3AF),
+        ),
         style: const TextStyle(
-            color: Color(0xFF111827), fontSize: 14),
+          color: Color(0xFF111827),
+          fontSize: 14,
+        ),
         items: items
-            .map((e) => DropdownMenuItem<T>(
-                value: e, child: Text(e.toString())))
+            .map(
+              (e) => DropdownMenuItem<T>(
+                value: e,
+                child: Text(e.toString()),
+              ),
+            )
             .toList(),
         onChanged: onChanged,
       ),
@@ -623,18 +788,23 @@ class _BookScreenState extends State<BookScreen> {
     return Row(
       children: [
         Expanded(
-          child: Text(label,
-              style: const TextStyle(
-                  fontSize: 13, color: Color(0xFF6B7280))),
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF6B7280),
+            ),
+          ),
         ),
         Expanded(
           child: Text(
             value,
             textAlign: TextAlign.right,
             style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF111827)),
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF111827),
+            ),
           ),
         ),
       ],
@@ -642,9 +812,153 @@ class _BookScreenState extends State<BookScreen> {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Eligibility Gate Widget
-// ═══════════════════════════════════════════════════════════════
+class _AppointmentPendingGate extends StatelessWidget {
+  const _AppointmentPendingGate();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.white.withOpacity(0.97),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: MediaQuery.of(context).size.height * 0.75,
+            ),
+            child: IntrinsicHeight(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFFFFFBEB),
+                      border: Border.all(
+                        color: const Color(0xFFFDE68A),
+                        width: 3,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFF59E0B).withOpacity(0.15),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.hourglass_top_rounded,
+                      size: 46,
+                      color: Color(0xFFF59E0B),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    "Appointment Pending",
+                    style: TextStyle(
+                      fontSize: 21,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF111827),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    "You already have a pending appointment request. Please wait for the admin to review and confirm your booking before creating another one.",
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF6B7280),
+                      height: 1.55,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 9,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFBEB),
+                      borderRadius: BorderRadius.circular(99),
+                      border: Border.all(
+                        color: const Color(0xFFFDE68A),
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.schedule_rounded,
+                          size: 15,
+                          color: Color(0xFFD97706),
+                        ),
+                        SizedBox(width: 7),
+                        Text(
+                          "Status: Pending Approval",
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFFD97706),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: const Color(0xFFBFDBFE),
+                      ),
+                    ),
+                    child: const Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.info_outline_rounded,
+                          color: Color(0xFF2563EB),
+                          size: 18,
+                        ),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            "Once your appointment is approved or declined, this page will open again and you can book another appointment if needed.",
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF1D4ED8),
+                              height: 1.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    "Pull down to refresh this page after your appointment status changes.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF9CA3AF),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _EligibilityGate extends StatelessWidget {
   final String status;
   final VoidCallback onGoToCheck;
@@ -661,7 +975,7 @@ class _EligibilityGate extends StatelessWidget {
     return Container(
       color: Colors.white.withOpacity(0.97),
       child: SafeArea(
-        child: SingleChildScrollView(                          // ← fix
+        child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
           child: ConstrainedBox(
             constraints: BoxConstraints(
@@ -671,7 +985,6 @@ class _EligibilityGate extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // ── Icon badge ──────────────────────────────
                   Container(
                     width: 100,
                     height: 100,
@@ -707,14 +1020,9 @@ class _EligibilityGate extends StatelessWidget {
                           : const Color(0xFFDC2626),
                     ),
                   ),
-
                   const SizedBox(height: 24),
-
-                  // ── Title ───────────────────────────────────
                   Text(
-                    _isPending
-                        ? "Eligibility Pending"
-                        : "Not Eligible to Book",
+                    _isPending ? "Eligibility Pending" : "Not Eligible to Book",
                     style: const TextStyle(
                       fontSize: 21,
                       fontWeight: FontWeight.bold,
@@ -722,10 +1030,7 @@ class _EligibilityGate extends StatelessWidget {
                     ),
                     textAlign: TextAlign.center,
                   ),
-
                   const SizedBox(height: 10),
-
-                  // ── Subtitle ────────────────────────────────
                   Text(
                     _isPending
                         ? "Your eligibility screening hasn't been completed or is still under review. Complete the check before booking."
@@ -737,13 +1042,12 @@ class _EligibilityGate extends StatelessWidget {
                     ),
                     textAlign: TextAlign.center,
                   ),
-
                   const SizedBox(height: 24),
-
-                  // ── Status chip ─────────────────────────────
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 18, vertical: 9),
+                      horizontal: 18,
+                      vertical: 9,
+                    ),
                     decoration: BoxDecoration(
                       color: _isPending
                           ? const Color(0xFFFFFBEB)
@@ -783,24 +1087,25 @@ class _EligibilityGate extends StatelessWidget {
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 24),
-
-                  // ── Info box ────────────────────────────────
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: const Color(0xFFEFF6FF),
                       borderRadius: BorderRadius.circular(14),
-                      border:
-                          Border.all(color: const Color(0xFFBFDBFE)),
+                      border: Border.all(
+                        color: const Color(0xFFBFDBFE),
+                      ),
                     ),
                     child: const Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.info_outline_rounded,
-                            color: Color(0xFF2563EB), size: 18),
+                        Icon(
+                          Icons.info_outline_rounded,
+                          color: Color(0xFF2563EB),
+                          size: 18,
+                        ),
                         SizedBox(width: 10),
                         Expanded(
                           child: Text(
@@ -815,23 +1120,22 @@ class _EligibilityGate extends StatelessWidget {
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 24),
-
-                  // ── CTA button ──────────────────────────────
                   SizedBox(
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton.icon(
                       onPressed: onGoToCheck,
                       icon: const Icon(
-                          Icons.assignment_turned_in_outlined,
-                          size: 19),
+                        Icons.assignment_turned_in_outlined,
+                        size: 19,
+                      ),
                       label: const Text(
                         "Go to Eligibility Check",
                         style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFDC2626),
@@ -843,14 +1147,14 @@ class _EligibilityGate extends StatelessWidget {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 10),
-
                   const Text(
                     "Your eligibility status is checked every time you open this page.",
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                        fontSize: 11, color: Color(0xFF9CA3AF)),
+                      fontSize: 11,
+                      color: Color(0xFF9CA3AF),
+                    ),
                   ),
                 ],
               ),

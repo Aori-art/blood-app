@@ -178,7 +178,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
                       fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  "🎉 Helped save lives!",
+                  "Helped save lives!",
                   style: TextStyle(
                       fontSize: 12,
                       color: Colors.purple),

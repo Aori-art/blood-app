@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'book.dart';
 import 'config.dart';
 
 class Question {
@@ -495,9 +496,12 @@ class _CheckScreenState extends State<CheckScreen>
                 scaleAnimation: _approvedScaleAnim,
                 pulseAnimation: _pulseAnim,
                 onBookAppointment: () {
-                  // Navigate to appointment booking screen
-                  // Navigator.pushNamed(context, '/book-appointment');
-                },
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => const BookScreen(),
+    ),
+  );
+},
               ),
             ),
 

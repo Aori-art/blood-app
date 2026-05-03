@@ -1,14 +1,14 @@
+// register2.dart
+// Place at: lib/screens/register/register2.dart
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-
 import 'package:blood/config.dart';
+import 'package:blood/shared_design.dart';
 import 'register3.dart';
 
 class RegisterStep2 extends StatefulWidget {
   final String fullName;
-  // Add these new fields
   final String firstName;
   final String middleInitial;
   final String lastName;
@@ -36,470 +36,307 @@ class RegisterStep2 extends StatefulWidget {
 }
 
 class _RegisterStep2State extends State<RegisterStep2> {
-  final TextEditingController streetController = TextEditingController();
+  final _streetCtrl = TextEditingController();
 
-  final List<String> bloodTypes = const [
-    'O+',
-    'O-',
-    'A+',
-    'A-',
-    'B+',
-    'B-',
-    'AB+',
-    'AB-',
+  static const _bloodTypes = [
+    'O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'
   ];
 
-  List<dynamic> provinces = [];
-  List<dynamic> cities = [];
-  List<dynamic> barangays = [];
+  List<dynamic> _provinces  = [];
+  List<dynamic> _cities     = [];
+  List<dynamic> _barangays  = [];
 
-  String? selectedBloodType;
+  String? _bloodType;
+  String? _provinceCode, _provinceName;
+  String? _cityCode, _cityName;
+  String? _barangayCode, _barangayName;
 
-  String? selectedProvinceCode;
-  String? selectedProvinceName;
-
-  String? selectedCityCode;
-  String? selectedCityName;
-
-  String? selectedBarangayCode;
-  String? selectedBarangayName;
-
-  bool isLoadingProvinces = true;
-  bool isLoadingCities = false;
-  bool isLoadingBarangays = false;
+  bool _loadingProvinces = true;
+  bool _loadingCities    = false;
+  bool _loadingBarangays = false;
 
   @override
   void initState() {
     super.initState();
-    loadProvinces();
+    _loadProvinces();
   }
 
   @override
   void dispose() {
-    streetController.dispose();
+    _streetCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> loadProvinces() async {
+  Future<void> _loadProvinces() async {
     try {
-      final response = await http.get(
-        Uri.parse("${AppConfig.baseUrl}/get_provinces.php"),
-      );
-
-      final data = jsonDecode(response.body);
-
-      if (data["status"] == "success") {
-        setState(() {
-          provinces = data["data"];
-          isLoadingProvinces = false;
-        });
-      } else {
-        setState(() {
-          isLoadingProvinces = false;
-        });
-      }
-    } catch (e) {
-      debugPrint("Load provinces error: $e");
+      final res = await http
+          .get(Uri.parse('${AppConfig.baseUrl}/get_provinces.php'));
+      final data = jsonDecode(res.body);
       setState(() {
-        isLoadingProvinces = false;
+        if (data['status'] == 'success') _provinces = data['data'];
+        _loadingProvinces = false;
       });
+    } catch (_) {
+      setState(() => _loadingProvinces = false);
     }
   }
 
-  Future<void> loadCities(String provinceCode) async {
+  Future<void> _loadCities(String provinceCode) async {
     setState(() {
-      isLoadingCities = true;
-      cities = [];
-      barangays = [];
-      selectedCityCode = null;
-      selectedCityName = null;
-      selectedBarangayCode = null;
-      selectedBarangayName = null;
+      _loadingCities = true;
+      _cities = _barangays = [];
+      _cityCode = _cityName = _barangayCode = _barangayName = null;
     });
-
     try {
-      final response = await http.get(
-        Uri.parse(
-          "${AppConfig.baseUrl}/get_cities.php?province_code=$provinceCode",
-        ),
-      );
-
-      final data = jsonDecode(response.body);
-
-      if (data["status"] == "success") {
-        setState(() {
-          cities = data["data"];
-          isLoadingCities = false;
-        });
-      } else {
-        setState(() {
-          isLoadingCities = false;
-        });
-      }
-    } catch (e) {
-      debugPrint("Load cities error: $e");
+      final res = await http.get(Uri.parse(
+          '${AppConfig.baseUrl}/get_cities.php?province_code=$provinceCode'));
+      final data = jsonDecode(res.body);
       setState(() {
-        isLoadingCities = false;
+        if (data['status'] == 'success') _cities = data['data'];
+        _loadingCities = false;
       });
+    } catch (_) {
+      setState(() => _loadingCities = false);
     }
   }
 
-  Future<void> loadBarangays(String cityCode) async {
+  Future<void> _loadBarangays(String cityCode) async {
     setState(() {
-      isLoadingBarangays = true;
-      barangays = [];
-      selectedBarangayCode = null;
-      selectedBarangayName = null;
+      _loadingBarangays = true;
+      _barangays = [];
+      _barangayCode = _barangayName = null;
     });
-
     try {
-      final response = await http.get(
-        Uri.parse("${AppConfig.baseUrl}/get_barangays.php?city_code=$cityCode"),
-      );
-
-      final data = jsonDecode(response.body);
-
-      if (data["status"] == "success") {
-        setState(() {
-          barangays = data["data"];
-          isLoadingBarangays = false;
-        });
-      } else {
-        setState(() {
-          isLoadingBarangays = false;
-        });
-      }
-    } catch (e) {
-      debugPrint("Load barangays error: $e");
+      final res = await http.get(Uri.parse(
+          '${AppConfig.baseUrl}/get_barangays.php?city_code=$cityCode'));
+      final data = jsonDecode(res.body);
       setState(() {
-        isLoadingBarangays = false;
+        if (data['status'] == 'success') _barangays = data['data'];
+        _loadingBarangays = false;
       });
+    } catch (_) {
+      setState(() => _loadingBarangays = false);
     }
   }
 
-  void goNext() {
-  if (selectedBloodType == null ||
-      selectedBloodType!.isEmpty ||
-      streetController.text.trim().isEmpty ||
-      selectedProvinceName == null ||
-      selectedCityName == null ||
-      selectedBarangayName == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Please fill in all fields.")),
-    );
-    return;
-  }
-
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => RegisterStep3(
-        fullName: widget.fullName,
-        // Pass individual name parts
-        firstName: widget.firstName,
-        middleInitial: widget.middleInitial,
-        lastName: widget.lastName,
-        suffix: widget.suffix,
-        email: widget.email,
-        phone: widget.phone,
-        birthdate: widget.birthdate,
-        gender: widget.gender,
-        bloodType: selectedBloodType!,
-        streetAddress: streetController.text.trim(),
-        barangay: selectedBarangayName!,
-        municipality: selectedCityName!,
-        province: selectedProvinceName!,
-      ),
-    ),
-  );
-}
-
-  Widget _buildFieldLabel(String label) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 5),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Colors.black,
-          fontWeight: FontWeight.w700,
-          fontSize: 12,
+  void _goNext() {
+    if (_bloodType == null ||
+        _streetCtrl.text.trim().isEmpty ||
+        _provinceName == null ||
+        _cityName == null ||
+        _barangayName == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please fill in all fields.')));
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RegisterStep3(
+          fullName: widget.fullName,
+          firstName: widget.firstName,
+          middleInitial: widget.middleInitial,
+          lastName: widget.lastName,
+          suffix: widget.suffix,
+          email: widget.email,
+          phone: widget.phone,
+          birthdate: widget.birthdate,
+          gender: widget.gender,
+          bloodType: _bloodType!,
+          streetAddress: _streetCtrl.text.trim(),
+          barangay: _barangayName!,
+          municipality: _cityName!,
+          province: _provinceName!,
         ),
       ),
     );
   }
 
-  Widget _buildTextField(String hint, TextEditingController controller) {
-    return TextField(
-      controller: controller,
-      decoration: InputDecoration(
-        hintText: hint,
-        filled: true,
-        fillColor: const Color(0xFFD9D9D9),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(9),
+  Widget _loadingBox() => Container(
+        height: 52,
+        decoration: BoxDecoration(
+            color: kInputFill,
+            borderRadius: BorderRadius.circular(14)),
+        child: const Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+                strokeWidth: 2, color: kCrimson),
+          ),
         ),
-      ),
-    );
-  }
+      );
 
-  Widget _buildDropdown({
+  Widget _locationDropdown({
+    required bool loading,
     required String hint,
     required String? value,
     required List<dynamic> items,
+    required bool enabled,
     required void Function(String?) onChanged,
-    bool isEnabled = true,
   }) {
-    return DropdownButtonFormField<String>(
+    if (loading) return _loadingBox();
+    return AppDropdown<String>(
       value: value,
-      isExpanded: true,
-      decoration: InputDecoration(
-        filled: true,
-        fillColor: const Color(0xFFD9D9D9),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(9),
-        ),
-      ),
-      hint: Text(hint),
+      hint: hint,
+      onChanged: enabled ? onChanged : null,
       items: items.map<DropdownMenuItem<String>>((item) {
         return DropdownMenuItem<String>(
-          value: item["code"].toString(),
-          child: Text(
-            item["name"].toString(),
-            overflow: TextOverflow.ellipsis,
-          ),
+          value: item['code'].toString(),
+          child: Text(item['name'].toString(),
+              overflow: TextOverflow.ellipsis),
         );
       }).toList(),
-      onChanged: isEnabled ? onChanged : null,
-    );
-  }
-
-  Widget _buildBloodTypeDropdown() {
-    return DropdownButtonFormField<String>(
-      value: selectedBloodType,
-      isExpanded: true,
-      decoration: InputDecoration(
-        filled: true,
-        fillColor: const Color(0xFFD9D9D9),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(9),
-        ),
-      ),
-      hint: const Text('Select Blood Type'),
-      items: bloodTypes.map((bloodType) {
-        return DropdownMenuItem<String>(
-          value: bloodType,
-          child: Text(bloodType),
-        );
-      }).toList(),
-      onChanged: (value) {
-        setState(() {
-          selectedBloodType = value;
-        });
-      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-
     return Scaffold(
-      body: Container(
-        color: const Color(0xFFAE0000),
+      backgroundColor: kCrimson,
+      body: SafeArea(
         child: Column(
           children: [
-            SizedBox(height: screenHeight * 0.08),
-            const Text(
-              'eDonate',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-              ),
+            RegisterHeader(
+              step: 2,
+              subtitle: 'Step 2 of 3 · Medical & Address',
             ),
-            SizedBox(height: screenHeight * 0.01),
-            const Text(
-              'Blood Donation App',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            SizedBox(height: screenHeight * 0.02),
-            const Text(
-              'Step 2 of 3: Medical and Address',
-              style: TextStyle(color: Colors.white, fontSize: 14),
-            ),
-            SizedBox(height: screenHeight * 0.03),
             Expanded(
-              child: Container(
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(
-                  horizontal: screenWidth * 0.05,
-                  vertical: screenHeight * 0.03,
-                ),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-                ),
+              child: RegisterCard(
                 child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildFieldLabel('Blood Type'),
-                      _buildBloodTypeDropdown(),
-                      SizedBox(height: screenHeight * 0.02),
+                      SectionTitle('Medical Info'),
+                      const SizedBox(height: 16),
 
-                      _buildFieldLabel('Street Address'),
-                      _buildTextField('123 Main Street', streetController),
-                      SizedBox(height: screenHeight * 0.02),
-
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildFieldLabel('Province'),
-                                isLoadingProvinces
-                                    ? const Center(
-                                        child: Padding(
-                                          padding: EdgeInsets.all(12),
-                                          child: CircularProgressIndicator(),
-                                        ),
-                                      )
-                                    : _buildDropdown(
-                                        hint: 'Select Province',
-                                        value: selectedProvinceCode,
-                                        items: provinces,
-                                        onChanged: (value) {
-                                          if (value == null) return;
-
-                                          final selectedItem = provinces.firstWhere(
-                                            (item) =>
-                                                item["code"].toString() == value,
-                                          );
-
-                                          setState(() {
-                                            selectedProvinceCode = value;
-                                            selectedProvinceName =
-                                                selectedItem["name"].toString();
-                                          });
-
-                                          loadCities(value);
-                                        },
-                                      ),
-                              ],
-                            ),
-                          ),
-                          SizedBox(width: screenWidth * 0.05),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildFieldLabel('Municipality'),
-                                isLoadingCities
-                                    ? const Center(
-                                        child: Padding(
-                                          padding: EdgeInsets.all(12),
-                                          child: CircularProgressIndicator(),
-                                        ),
-                                      )
-                                    : _buildDropdown(
-                                        hint: 'Select Municipality',
-                                        value: selectedCityCode,
-                                        items: cities,
-                                        isEnabled: selectedProvinceCode != null,
-                                        onChanged: (value) {
-                                          if (value == null) return;
-
-                                          final selectedItem = cities.firstWhere(
-                                            (item) =>
-                                                item["code"].toString() == value,
-                                          );
-
-                                          setState(() {
-                                            selectedCityCode = value;
-                                            selectedCityName =
-                                                selectedItem["name"].toString();
-                                          });
-
-                                          loadBarangays(value);
-                                        },
-                                      ),
-                              ],
-                            ),
-                          ),
-                        ],
+                      FieldLabel('Blood Type'),
+                      AppDropdown<String>(
+                        value: _bloodType,
+                        hint: 'Select Blood Type',
+                        onChanged: (v) => setState(() => _bloodType = v),
+                        items: _bloodTypes
+                            .map((t) => DropdownMenuItem(
+                                value: t, child: Text(t)))
+                            .toList(),
                       ),
+                      const SizedBox(height: 24),
 
-                      SizedBox(height: screenHeight * 0.02),
+                      SectionTitle('Address'),
+                      const SizedBox(height: 16),
 
-                      _buildFieldLabel('Barangay'),
-                      isLoadingBarangays
-                          ? const Center(
-                              child: Padding(
-                                padding: EdgeInsets.all(12),
-                                child: CircularProgressIndicator(),
-                              ),
-                            )
-                          : _buildDropdown(
-                              hint: 'Select Barangay',
-                              value: selectedBarangayCode,
-                              items: barangays,
-                              isEnabled: selectedCityCode != null,
-                              onChanged: (value) {
-                                if (value == null) return;
-
-                                final selectedItem = barangays.firstWhere(
-                                  (item) => item["code"].toString() == value,
-                                );
-
-                                setState(() {
-                                  selectedBarangayCode = value;
-                                  selectedBarangayName =
-                                      selectedItem["name"].toString();
-                                });
-                              },
-                            ),
-
-                      SizedBox(height: screenHeight * 0.04),
+                      FieldLabel('Street Address'),
+                      AppTextField(
+                        controller: _streetCtrl,
+                        hint: '123 Main Street',
+                        prefixIcon: Icons.home_outlined,
+                      ),
+                      const SizedBox(height: 14),
 
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          SizedBox(
-                            width: screenWidth * 0.35,
-                            height: 45,
-                            child: OutlinedButton(
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFF850000),
-                                side: const BorderSide(
-                                  color: Color(0xFF850000),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                FieldLabel('Province'),
+                                _loadingProvinces
+                                    ? _loadingBox()
+                                    : _locationDropdown(
+                                        loading: false,
+                                        hint: 'Province',
+                                        value: _provinceCode,
+                                        items: _provinces,
+                                        enabled: true,
+                                        onChanged: (v) {
+                                          if (v == null) return;
+                                          final item =
+                                              _provinces.firstWhere(
+                                                  (e) =>
+                                                      e['code'].toString() ==
+                                                      v);
+                                          setState(() {
+                                            _provinceCode = v;
+                                            _provinceName =
+                                                item['name'].toString();
+                                          });
+                                          _loadCities(v);
+                                        },
+                                      ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                FieldLabel('Municipality'),
+                                _locationDropdown(
+                                  loading: _loadingCities,
+                                  hint: 'Municipality',
+                                  value: _cityCode,
+                                  items: _cities,
+                                  enabled: _provinceCode != null,
+                                  onChanged: (v) {
+                                    if (v == null) return;
+                                    final item = _cities.firstWhere(
+                                        (e) =>
+                                            e['code'].toString() == v);
+                                    setState(() {
+                                      _cityCode = v;
+                                      _cityName = item['name'].toString();
+                                    });
+                                    _loadBarangays(v);
+                                  },
                                 ),
-                              ),
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text('Back'),
-                            ),
-                          ),
-                          SizedBox(
-                            width: screenWidth * 0.35,
-                            height: 45,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF850000),
-                                foregroundColor: Colors.white,
-                              ),
-                              onPressed: goNext,
-                              child: const Text('Next'),
+                              ],
                             ),
                           ),
                         ],
                       ),
+                      const SizedBox(height: 14),
 
-                      SizedBox(height: screenHeight * 0.02),
+                      FieldLabel('Barangay'),
+                      _locationDropdown(
+                        loading: _loadingBarangays,
+                        hint: 'Select Barangay',
+                        value: _barangayCode,
+                        items: _barangays,
+                        enabled: _cityCode != null,
+                        onChanged: (v) {
+                          if (v == null) return;
+                          final item = _barangays.firstWhere(
+                              (e) => e['code'].toString() == v);
+                          setState(() {
+                            _barangayCode = v;
+                            _barangayName = item['name'].toString();
+                          });
+                        },
+                      ),
+
+                      const SizedBox(height: 32),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlineBtn(
+                              label: 'Back',
+                              onTap: () => Navigator.pop(context),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: PrimaryButton(
+                              label: 'Continue',
+                              onTap: _goNext,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
                     ],
                   ),
                 ),

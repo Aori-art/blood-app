@@ -1,24 +1,16 @@
+// register3.dart
+// Place at: lib/screens/register/register3.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:blood/config.dart';
+import 'package:blood/shared_design.dart';
 import 'otp.dart';
 
 class RegisterStep3 extends StatefulWidget {
-  final String fullName;
-  final String firstName;
-  final String middleInitial;
-  final String lastName;
-  final String suffix;
-  final String email;
-  final String phone;
-  final String birthdate;
-  final String gender;
-  final String bloodType;
-  final String streetAddress;
-  final String barangay;
-  final String municipality;
-  final String province;
+  final String fullName, firstName, middleInitial, lastName, suffix;
+  final String email, phone, birthdate, gender;
+  final String bloodType, streetAddress, barangay, municipality, province;
 
   const RegisterStep3({
     super.key,
@@ -43,234 +35,224 @@ class RegisterStep3 extends StatefulWidget {
 }
 
 class _RegisterStep3State extends State<RegisterStep3> {
-  final TextEditingController passwordController = TextEditingController();
-  final TextEditingController confirmPasswordController = TextEditingController();
+  final _passCtrl    = TextEditingController();
+  final _confirmCtrl = TextEditingController();
 
-  bool isLoading = false;
-  bool isPasswordHidden = true;
-  bool isConfirmPasswordHidden = true;
+  bool _loading       = false;
+  bool _passHidden    = true;
+  bool _confirmHidden = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _passCtrl.addListener(() => setState(() {}));
+  }
 
   @override
   void dispose() {
-    passwordController.dispose();
-    confirmPasswordController.dispose();
+    _passCtrl.dispose();
+    _confirmCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> completeRegistration() async {
-    final password = passwordController.text.trim();
-    final confirmPassword = confirmPasswordController.text.trim();
+  bool get _hasLength    => _passCtrl.text.length >= 8;
+  bool get _hasUppercase => _passCtrl.text.contains(RegExp(r'[A-Z]'));
+  bool get _hasNumber    => _passCtrl.text.contains(RegExp(r'[0-9]'));
 
-    if (password.isEmpty || confirmPassword.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please fill in both password fields.")),
-      );
+  Future<void> _submit() async {
+    final pass    = _passCtrl.text.trim();
+    final confirm = _confirmCtrl.text.trim();
+
+    if (pass.isEmpty || confirm.isEmpty) {
+      _snack('Please fill in both password fields.');
+      return;
+    }
+    if (pass != confirm) {
+      _snack('Passwords do not match.');
+      return;
+    }
+    if (!_hasLength) {
+      _snack('Password must be at least 8 characters.');
       return;
     }
 
-    if (password != confirmPassword) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Passwords do not match.")),
-      );
-      return;
-    }
-
-    if (password.length < 8) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Password must be at least 8 characters.")),
-      );
-      return;
-    }
-
-    setState(() {
-      isLoading = true;
-    });
-
+    setState(() => _loading = true);
     try {
-      final response = await http.post(
-  Uri.parse("${AppConfig.baseUrl}/register.php"),
-  body: {
-    // Send individual name parts
-    "first_name": widget.firstName,
-    "middle_initial": widget.middleInitial,
-    "last_name": widget.lastName,
-    "suffix": widget.suffix,
-    "email": widget.email,
-    "phone": widget.phone,
-    "birthdate": widget.birthdate,
-    "gender": widget.gender,
-    "blood_type": widget.bloodType,
-    "street_address": widget.streetAddress,
-    "barangay": widget.barangay,
-    "municipality": widget.municipality,
-    "province": widget.province,
-    "password": password,
-  },
-);
-
-      final data = jsonDecode(response.body);
-
+      final res = await http.post(
+        Uri.parse('${AppConfig.baseUrl}/register.php'),
+        body: {
+          'first_name':     widget.firstName,
+          'middle_initial': widget.middleInitial,
+          'last_name':      widget.lastName,
+          'suffix':         widget.suffix,
+          'email':          widget.email,
+          'phone':          widget.phone,
+          'birthdate':      widget.birthdate,
+          'gender':         widget.gender,
+          'blood_type':     widget.bloodType,
+          'street_address': widget.streetAddress,
+          'barangay':       widget.barangay,
+          'municipality':   widget.municipality,
+          'province':       widget.province,
+          'password':       pass,
+        },
+      );
+      final data = jsonDecode(res.body);
       if (!mounted) return;
-
-      if (data["status"] == "success") {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data["message"] ?? "OTP sent to email.")),
-        );
-
+      if (data['status'] == 'success') {
+        _snack(data['message'] ?? 'OTP sent to email.');
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => OtpScreen(email: widget.email),
-          ),
+              builder: (_) => OtpScreen(email: widget.email)),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data["message"] ?? "Registration failed.")),
-        );
+        _snack(data['message'] ?? 'Registration failed.');
       }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Connection error: $e")),
-      );
+      if (mounted) _snack('Connection error: $e');
     } finally {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _loading = false);
     }
   }
 
+  void _snack(String msg) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-
     return Scaffold(
-      body: Container(
-        color: const Color(0xFFAE0000),
+      backgroundColor: kCrimson,
+      body: SafeArea(
         child: Column(
           children: [
-            SizedBox(height: screenHeight * 0.08),
-            const Text(
-              'eDonate',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-              ),
+            RegisterHeader(
+              step: 3,
+              subtitle: 'Step 3 of 3 · Set Password',
             ),
-            SizedBox(height: screenHeight * 0.01),
-            const Text(
-              'Blood Donation App',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            SizedBox(height: screenHeight * 0.02),
-            const Text(
-              'Step 3 of 3: Set Password',
-              style: TextStyle(color: Colors.white, fontSize: 14),
-            ),
-            SizedBox(height: screenHeight * 0.03),
             Expanded(
-              child: Container(
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(
-                  horizontal: screenWidth * 0.05,
-                  vertical: screenHeight * 0.03,
-                ),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-                ),
+              child: RegisterCard(
                 child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildFieldLabel('Password'),
-                      _buildTextField(
-                        'Create Password',
-                        passwordController,
-                        isPasswordHidden,
-                        () {
-                          setState(() {
-                            isPasswordHidden = !isPasswordHidden;
-                          });
-                        },
-                      ),
-                      SizedBox(height: screenHeight * 0.02),
-                      _buildFieldLabel('Confirm Password'),
-                      _buildTextField(
-                        'Confirm Password',
-                        confirmPasswordController,
-                        isConfirmPasswordHidden,
-                        () {
-                          setState(() {
-                            isConfirmPasswordHidden =
-                                !isConfirmPasswordHidden;
-                          });
-                        },
-                      ),
-                      SizedBox(height: screenHeight * 0.04),
-                      Text(
-                        'Password must contain:',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[700],
-                          fontWeight: FontWeight.w400,
+                      // Info banner
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: kCrimson.withOpacity(0.06),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                              color: kCrimson.withOpacity(0.15), width: 1),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.lock_outlined,
+                                color: kCrimson, size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Almost done! Create a strong password for your account.',
+                                style: TextStyle(
+                                    color: kTextMuted,
+                                    fontSize: 12,
+                                    height: 1.4),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 5),
-                      _buildRequirement('At least 8 characters'),
-                      _buildRequirement('One uppercase letter'),
-                      _buildRequirement('One number'),
-                      SizedBox(height: screenHeight * 0.04),
+                      const SizedBox(height: 28),
+
+                      FieldLabel('Password'),
+                      AppTextField(
+                        controller: _passCtrl,
+                        hint: 'Create a strong password',
+                        obscure: _passHidden,
+                        prefixIcon: Icons.lock_outline_rounded,
+                        suffix: IconButton(
+                          onPressed: () =>
+                              setState(() => _passHidden = !_passHidden),
+                          icon: Icon(
+                              _passHidden
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                              color: kTextMuted,
+                              size: 20),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      FieldLabel('Confirm Password'),
+                      AppTextField(
+                        controller: _confirmCtrl,
+                        hint: 'Re-enter your password',
+                        obscure: _confirmHidden,
+                        prefixIcon: Icons.lock_outline_rounded,
+                        suffix: IconButton(
+                          onPressed: () => setState(
+                              () => _confirmHidden = !_confirmHidden),
+                          icon: Icon(
+                              _confirmHidden
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                              color: kTextMuted,
+                              size: 20),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Live requirements card
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: kInputFill,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Password requirements',
+                                style: TextStyle(
+                                    color: kTextPrimary,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12)),
+                            const SizedBox(height: 10),
+                            _Req(
+                                label: 'At least 8 characters',
+                                met: _hasLength),
+                            const SizedBox(height: 6),
+                            _Req(
+                                label: 'One uppercase letter',
+                                met: _hasUppercase),
+                            const SizedBox(height: 6),
+                            _Req(label: 'One number', met: _hasNumber),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 32),
+
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          SizedBox(
-                            width: screenWidth * 0.35,
-                            height: 45,
-                            child: OutlinedButton(
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFF850000),
-                                side: const BorderSide(color: Color(0xFF850000)),
-                              ),
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text('Back'),
+                          Expanded(
+                            child: OutlineBtn(
+                              label: 'Back',
+                              onTap: () => Navigator.pop(context),
                             ),
                           ),
-                          SizedBox(
-                            width: screenWidth * 0.45,
-                            height: 45,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF850000),
-                                foregroundColor: Colors.white,
-                              ),
-                              onPressed: isLoading ? null : completeRegistration,
-                              child: isLoading
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Text(
-                                      'Confirm',
-                                      style: TextStyle(color: Colors.white),
-                                    ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: PrimaryButton(
+                              label: 'Confirm',
+                              loading: _loading,
+                              onTap: _submit,
                             ),
                           ),
                         ],
                       ),
-                      SizedBox(height: screenHeight * 0.02),
+                      const SizedBox(height: 16),
                     ],
                   ),
                 ),
@@ -281,57 +263,39 @@ class _RegisterStep3State extends State<RegisterStep3> {
       ),
     );
   }
+}
 
-  Widget _buildFieldLabel(String label) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 5),
-      child: Text(
-        label,
-        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-      ),
-    );
-  }
+// ─── Requirement row ──────────────────────────────────────────────────────────
+class _Req extends StatelessWidget {
+  final String label;
+  final bool met;
+  const _Req({required this.label, required this.met});
 
-  Widget _buildTextField(
-    String hint,
-    TextEditingController controller,
-    bool isHidden,
-    VoidCallback onToggleVisibility,
-  ) {
-    return TextField(
-      controller: controller,
-      obscureText: isHidden,
-      decoration: InputDecoration(
-        hintText: hint,
-        filled: true,
-        fillColor: const Color(0xFFD9D9D9),
-        suffixIcon: IconButton(
-          onPressed: onToggleVisibility,
-          icon: Icon(
-            isHidden ? Icons.visibility_off : Icons.visibility,
-            color: const Color(0xFF850000),
-          ),
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(9),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRequirement(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 8, bottom: 3),
-      child: Row(
+  @override
+  Widget build(BuildContext context) => Row(
         children: [
-          const Icon(Icons.check, size: 14, color: Colors.grey),
-          const SizedBox(width: 5),
-          Text(
-            text,
-            style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            width: 18,
+            height: 18,
+            decoration: BoxDecoration(
+              color: met ? kCrimson : Colors.transparent,
+              border: Border.all(
+                  color: met ? kCrimson : kTextMuted.withOpacity(0.4),
+                  width: 1.5),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: met
+                ? const Icon(Icons.check, color: Colors.white, size: 12)
+                : null,
           ),
+          const SizedBox(width: 10),
+          Text(label,
+              style: TextStyle(
+                  color: met ? kTextPrimary : kTextMuted,
+                  fontSize: 12,
+                  fontWeight:
+                      met ? FontWeight.w600 : FontWeight.w400)),
         ],
-      ),
-    );
-  }
+      );
 }
