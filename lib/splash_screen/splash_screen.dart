@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:blood/login.dart';
 import 'package:blood/home.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:blood/newsfeed.dart';
 
 class SplashScreen extends StatefulWidget {
   final bool isLoggedIn;
@@ -148,7 +149,7 @@ class _SplashScreenState extends State<SplashScreen>
         context,
         PageRouteBuilder(
           pageBuilder: (_, animation, __) =>
-              widget.isLoggedIn ? const HomeScreen() : const LoginScreen(),
+              widget.isLoggedIn ? const HomeScreen() : const NewsfeedPage(),
           transitionsBuilder: (_, animation, __, child) {
             return FadeTransition(
               opacity: animation,

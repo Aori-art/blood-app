@@ -4,8 +4,9 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fl_chart/fl_chart.dart';
 
-import '../config.dart';
-import '../login.dart';
+import 'anim.dart';
+import 'config.dart';
+import 'login.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -278,205 +279,223 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 child: Column(
                   children: [
                     // PROFILE HEADER CARD
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFFFF1F1), Color(0xFFFFE4E4)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                    FadeSlideIn(
+                      index: 0,
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFFFF1F1), Color(0xFFFFE4E4)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFFECACA)),
+                          boxShadow: const [
+                            BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
+                          ],
                         ),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFFECACA)),
-                        boxShadow: const [
-                          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          // Avatar
-                          Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 4),
-                              boxShadow: const [
-                                BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4)),
-                              ],
-                            ),
-                            child: CircleAvatar(
-                              radius: 44,
-                              backgroundColor: const Color(0xFFDC2626),
-                              child: Text(
-                                getInitials(name),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
+                        child: Column(
+                          children: [
+                            // Avatar
+                            Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 4),
+                                boxShadow: const [
+                                  BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4)),
+                                ],
+                              ),
+                              child: CircleAvatar(
+                                radius: 44,
+                                backgroundColor: const Color(0xFFDC2626),
+                                child: Text(
+                                  getInitials(name),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            name,
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF111827),
+                            const SizedBox(height: 16),
+                            Text(
+                              name,
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF111827),
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            email,
-                            style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
-                          ),
-                          const SizedBox(height: 16),
-                          // Badges
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              _badge(
-                                label: "$bloodType Blood Type",
-                                backgroundColor: const Color(0xFFDC2626),
-                              ),
-                              const SizedBox(width: 8),
-                              _badge(
-                                label: "🏆 Gold Donor",
-                                backgroundColor: const Color(0xFFF59E0B),
-                              ),
-                            ],
-                          ),
-                        ],
+                            const SizedBox(height: 4),
+                            Text(
+                              email,
+                              style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+                            ),
+                            const SizedBox(height: 16),
+                            // Badges
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                _badge(
+                                  label: "$bloodType Blood Type",
+                                  backgroundColor: const Color(0xFFDC2626),
+                                ),
+                                const SizedBox(width: 8),
+                                _badge(
+                                  label: "🏆 Gold Donor",
+                                  backgroundColor: const Color(0xFFF59E0B),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
 
                     const SizedBox(height: 16),
 
                     // STATS ROW
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _statCard(
-                            icon: Icons.water_drop,
-                            iconColor: const Color(0xFFDC2626),
-                            value: totalDonations.toString(),
-                            label: "Donations",
+                    FadeSlideIn(
+                      index: 1,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _statCard(
+                              icon: Icons.water_drop,
+                              iconColor: const Color(0xFFDC2626),
+                              value: totalDonations.toString(),
+                              label: "Donations",
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _statCard(
-                            icon: Icons.calendar_today,
-                            iconColor: const Color(0xFF2563EB),
-                            value: daysSinceRegistration,
-                            label: "Days Active",
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _statCard(
+                              icon: Icons.calendar_today,
+                              iconColor: const Color(0xFF2563EB),
+                              value: daysSinceRegistration,
+                              label: "Days Active",
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _statCard(
-                            icon: Icons.emoji_events,
-                            iconColor: const Color(0xFFD97706),
-                            value: livesSaved.toString(),
-                            label: "Lives Helped",
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _statCard(
+                              icon: Icons.emoji_events,
+                              iconColor: const Color(0xFFD97706),
+                              value: livesSaved.toString(),
+                              label: "Lives Helped",
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
 
                     const SizedBox(height: 16),
 
                     // PERSONAL INFORMATION CARD
-                    _sectionCard(
-                      title: "Personal Information",
-                      child: Column(
-                        children: [
-                          _infoTile(Icons.phone, "Phone Number", safe(userData?["phone"])),
-                          _divider(),
-                          _infoTile(Icons.location_on, "Address", getFullAddress()),
-                          _divider(),
-                          _infoTile(Icons.cake, "Date of Birth", formatDate(userData?["birthdate"])),
-                          _divider(),
-                          _infoTile(Icons.calendar_today, "Member Since", memberSince),
-                          _divider(),
-                          _infoTile(Icons.timer, "Days Active", daysSinceRegistration),
-                        ],
+                    FadeSlideIn(
+                      index: 2,
+                      child: _sectionCard(
+                        title: "Personal Information",
+                        child: Column(
+                          children: [
+                            _infoTile(Icons.phone, "Phone Number", safe(userData?["phone"])),
+                            _divider(),
+                            _infoTile(Icons.location_on, "Address", getFullAddress()),
+                            _divider(),
+                            _infoTile(Icons.cake, "Date of Birth", formatDate(userData?["birthdate"])),
+                            _divider(),
+                            _infoTile(Icons.calendar_today, "Member Since", memberSince),
+                            _divider(),
+                            _infoTile(Icons.timer, "Days Active", daysSinceRegistration),
+                          ],
+                        ),
                       ),
                     ),
 
                     const SizedBox(height: 16),
 
                     // DONATION STATUS CARD
-                    _sectionCard(
-                      title: "Donation Status",
-                      child: Column(
-                        children: [
-                          _infoTile(Icons.water_drop, "Last Donation",
-                              formatDate(userData?["last_donation"])),
-                          _divider(),
-                          _infoTile(
-                            Icons.event_available,
-                            "Next Eligible",
-                            getNextEligible(userData?["last_donation"]),
-                            valueColor: Colors.green,
-                          ),
-                        ],
+                    FadeSlideIn(
+                      index: 3,
+                      child: _sectionCard(
+                        title: "Donation Status",
+                        child: Column(
+                          children: [
+                            _infoTile(Icons.water_drop, "Last Donation",
+                                formatDate(userData?["last_donation"])),
+                            _divider(),
+                            _infoTile(
+                              Icons.event_available,
+                              "Next Eligible",
+                              getNextEligible(userData?["last_donation"]),
+                              valueColor: Colors.green,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
 
                     const SizedBox(height: 16),
 
                     // DONATION HISTORY CHART
-                    _sectionCard(
-                      title: "Donation History",
-                      child: SizedBox(
-                        height: 180,
-                        child: isChartLoading
-                            ? const Center(child: CircularProgressIndicator(color: Color(0xFFDC2626)))
-                            : chartData.isEmpty
-                                ? const Center(
-                                    child: Text("No donation data available.",
-                                        style: TextStyle(color: Colors.grey)),
-                                  )
-                                : LineChart(
-                                    LineChartData(
-                                      gridData: FlGridData(show: false),
-                                      titlesData: FlTitlesData(show: false),
-                                      borderData: FlBorderData(show: false),
-                                      lineBarsData: [
-                                        LineChartBarData(
-                                          spots: chartData,
-                                          isCurved: true,
-                                          color: const Color(0xFFDC2626),
-                                          barWidth: 3,
-                                          dotData: FlDotData(show: true),
-                                          belowBarData: BarAreaData(
-                                            show: true,
-                                            color: const Color(0xFFDC2626).withOpacity(0.1),
+                    FadeSlideIn(
+                      index: 4,
+                      child: _sectionCard(
+                        title: "Donation History",
+                        child: SizedBox(
+                          height: 180,
+                          child: isChartLoading
+                              ? const Center(child: CircularProgressIndicator(color: Color(0xFFDC2626)))
+                              : chartData.isEmpty
+                                  ? const Center(
+                                      child: Text("No donation data available.",
+                                          style: TextStyle(color: Colors.grey)),
+                                    )
+                                  : LineChart(
+                                      LineChartData(
+                                        gridData: FlGridData(show: false),
+                                        titlesData: FlTitlesData(show: false),
+                                        borderData: FlBorderData(show: false),
+                                        lineBarsData: [
+                                          LineChartBarData(
+                                            spots: chartData,
+                                            isCurved: true,
+                                            color: const Color(0xFFDC2626),
+                                            barWidth: 3,
+                                            dotData: FlDotData(show: true),
+                                            belowBarData: BarAreaData(
+                                              show: true,
+                                              color: const Color(0xFFDC2626).withOpacity(0.1),
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
-                                  ),
+                        ),
                       ),
                     ),
 
                     const SizedBox(height: 16),
 
                     // MENU ITEMS CARD
-                    _sectionCard(
-                      title: null,
-                      child: Column(
-                        children: [
-                          _menuItem(Icons.edit, "Edit Profile"),
-                          _divider(),
-                          _menuItem(Icons.notifications, "Notification Settings"),
-                          _divider(),
-                          _menuItem(Icons.shield, "Privacy & Security"),
-                          _divider(),
-                          _menuItem(Icons.help_outline, "Help & Support"),
-                        ],
+                    FadeSlideIn(
+                      index: 5,
+                      child: _sectionCard(
+                        title: null,
+                        child: Column(
+                          children: [
+                            _menuItem(Icons.edit, "Edit Profile"),
+                            _divider(),
+                            _menuItem(Icons.notifications, "Notification Settings"),
+                            _divider(),
+                            _menuItem(Icons.shield, "Privacy & Security"),
+                            _divider(),
+                            _menuItem(Icons.help_outline, "Help & Support"),
+                          ],
+                        ),
                       ),
                     ),
 

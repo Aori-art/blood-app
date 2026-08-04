@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'anim.dart';
 import 'config.dart';
 
 class NotificationModel {
@@ -480,26 +481,31 @@ class _AlertsScreenState extends State<AlertsScreen> {
         ),
         itemCount: _notifications.length,
         itemBuilder: (context, index) {
-          return _NotificationCard(
-            notification: _notifications[index],
-            isExpanded: _expandedId == _notifications[index].id,
-            typeColor: _getTypeColor(_notifications[index].notificationType),
-            typeBg: _getTypeBg(_notifications[index].notificationType),
-            typeIcon: _getTypeIcon(_notifications[index].notificationType),
-            typeLabel: _getTypeLabel(_notifications[index].notificationType),
-            onTap: () {
-              setState(() {
-                if (_expandedId == _notifications[index].id) {
-                  _expandedId = null;
-                } else {
-                  _expandedId = _notifications[index].id;
-                  if (!_notifications[index].isRead) {
-                    _markAsRead(_notifications[index].id);
+          return FadeSlideIn(
+            index: index,
+            child: _NotificationCard(
+              notification: _notifications[index],
+              isExpanded: _expandedId == _notifications[index].id,
+              typeColor: _getTypeColor(_notifications[index].notificationType),
+              typeBg: _getTypeBg(_notifications[index].notificationType),
+              typeIcon: _getTypeIcon(_notifications[index].notificationType),
+              typeLabel: _getTypeLabel(
+                _notifications[index].notificationType,
+              ),
+              onTap: () {
+                setState(() {
+                  if (_expandedId == _notifications[index].id) {
+                    _expandedId = null;
+                  } else {
+                    _expandedId = _notifications[index].id;
+                    if (!_notifications[index].isRead) {
+                      _markAsRead(_notifications[index].id);
+                    }
                   }
-                }
-              });
-            },
-            onDelete: () => _deleteNotification(_notifications[index].id),
+                });
+              },
+              onDelete: () => _deleteNotification(_notifications[index].id),
+            ),
           );
         },
       ),

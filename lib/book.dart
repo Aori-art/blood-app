@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'anim.dart';
 import 'check.dart';
 import 'config.dart';
 
@@ -14,7 +15,8 @@ class BookScreen extends StatefulWidget {
   State<BookScreen> createState() => _BookScreenState();
 }
 
-class _BookScreenState extends State<BookScreen> {
+class _BookScreenState extends State<BookScreen>
+    with SingleTickerProviderStateMixin {
   DateTime? selectedDate;
   String? selectedCenter;
   String? selectedTime;
@@ -36,10 +38,22 @@ class _BookScreenState extends State<BookScreen> {
     "3:00 PM - 4:00 PM",
   ];
 
+  late final AnimationController _pulseController;
+
   @override
   void initState() {
     super.initState();
     _loadStatuses();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadStatuses() async {
@@ -425,215 +439,242 @@ class _BookScreenState extends State<BookScreen> {
                     child: Column(
                       children: [
                         const SizedBox(height: 20),
-                        _sectionCard(
-                          icon: Icons.calendar_today,
-                          title: "Select Date",
-                          child: InkWell(
-                            onTap: _pickDate,
-                            borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 14,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF9FAFB),
-                                border: Border.all(
-                                  color: const Color(0xFFD1D5DB),
+                        FadeSlideIn(
+                          index: 0,
+                          child: _sectionCard(
+                            icon: Icons.calendar_today,
+                            title: "Select Date",
+                            child: InkWell(
+                              onTap: _pickDate,
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 14,
                                 ),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.calendar_month_outlined,
-                                    color: Color(0xFF9CA3AF),
-                                    size: 18,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF9FAFB),
+                                  border: Border.all(
+                                    color: const Color(0xFFD1D5DB),
                                   ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      selectedDate == null
-                                          ? "Choose a date"
-                                          : _formatDate(selectedDate!),
-                                      style: TextStyle(
-                                        color: selectedDate == null
-                                            ? const Color(0xFF9CA3AF)
-                                            : const Color(0xFF111827),
-                                        fontSize: 14,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.calendar_month_outlined,
+                                      color: Color(0xFF9CA3AF),
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        selectedDate == null
+                                            ? "Choose a date"
+                                            : _formatDate(selectedDate!),
+                                        style: TextStyle(
+                                          color: selectedDate == null
+                                              ? const Color(0xFF9CA3AF)
+                                              : const Color(0xFF111827),
+                                          fontSize: 14,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  const Icon(
-                                    Icons.expand_more,
-                                    color: Color(0xFF9CA3AF),
-                                    size: 20,
-                                  ),
-                                ],
+                                    const Icon(
+                                      Icons.expand_more,
+                                      color: Color(0xFF9CA3AF),
+                                      size: 20,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
                         ),
                         const SizedBox(height: 16),
-                        _sectionCard(
-                          icon: Icons.location_on,
-                          title: "Choose Donation Center",
-                          child: Column(
-                            children: [
-                              _styledDropdown<String>(
-                                value: selectedCenter,
-                                hint: "Select a center",
-                                items: centers,
-                                onChanged: (val) {
-                                  setState(() => selectedCenter = val);
-                                },
-                              ),
-                              if (selectedCenter != null) ...[
-                                const SizedBox(height: 12),
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFEFF6FF),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: const Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        "Address",
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: Color(0xFF6B7280),
-                                        ),
-                                      ),
-                                      SizedBox(height: 2),
-                                      Text(
-                                        "Areza Estate (Ayala Land), Lipa City",
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w500,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                      SizedBox(height: 4),
-                                      Text(
-                                        "Open: Mon-Fri, 8 AM - 6 PM",
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: Color(0xFF2563EB),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                        FadeSlideIn(
+                          index: 1,
+                          child: _sectionCard(
+                            icon: Icons.location_on,
+                            title: "Choose Donation Center",
+                            child: Column(
+                              children: [
+                                _styledDropdown<String>(
+                                  value: selectedCenter,
+                                  hint: "Select a center",
+                                  items: centers,
+                                  onChanged: (val) {
+                                    setState(() => selectedCenter = val);
+                                  },
                                 ),
+                                if (selectedCenter != null) ...[
+                                  const SizedBox(height: 12),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFEFF6FF),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          "Address",
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Color(0xFF6B7280),
+                                          ),
+                                        ),
+                                        SizedBox(height: 2),
+                                        Text(
+                                          "Areza Estate (Ayala Land), Lipa City",
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w500,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                        SizedBox(height: 4),
+                                        Text(
+                                          "Open: Mon-Fri, 8 AM - 6 PM",
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Color(0xFF2563EB),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ],
-                            ],
+                            ),
                           ),
                         ),
                         const SizedBox(height: 16),
-                        _sectionCard(
-                          icon: Icons.access_time,
-                          title: "Choose Time Slot",
-                          child: _styledDropdown<String>(
-                            value: selectedTime,
-                            hint: "Select a time",
-                            items: timeSlots,
-                            onChanged: (val) {
-                              setState(() => selectedTime = val);
-                            },
+                        FadeSlideIn(
+                          index: 2,
+                          child: _sectionCard(
+                            icon: Icons.access_time,
+                            title: "Choose Time Slot",
+                            child: _styledDropdown<String>(
+                              value: selectedTime,
+                              hint: "Select a time",
+                              items: timeSlots,
+                              onChanged: (val) {
+                                setState(() => selectedTime = val);
+                              },
+                            ),
                           ),
                         ),
                         const SizedBox(height: 16),
                         if (_allSelected)
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [
-                                  Color(0xFFF0FDF4),
-                                  Color(0xFFDCFCE7),
-                                ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              border: Border.all(
-                                color: const Color(0xFFBBF7D0),
-                                width: 2,
-                              ),
-                              borderRadius: BorderRadius.circular(14),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Colors.black12,
-                                  blurRadius: 4,
-                                  offset: Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Row(
-                                  children: [
-                                    Icon(
-                                      Icons.check_circle,
-                                      color: Color(0xFF16A34A),
-                                      size: 20,
-                                    ),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      "Booking Summary",
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 15,
-                                        color: Color(0xFF111827),
-                                      ),
-                                    ),
+                          TweenAnimationBuilder<double>(
+                            key: const ValueKey('booking_summary'),
+                            tween: Tween(begin: 0.9, end: 1.0),
+                            duration: const Duration(milliseconds: 350),
+                            curve: Curves.easeOutBack,
+                            builder: (_, scale, child) =>
+                                Transform.scale(scale: scale, child: child),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xFFF0FDF4),
+                                    Color(0xFFDCFCE7),
                                   ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
                                 ),
-                                const SizedBox(height: 12),
-                                _summaryRow(
-                                  "Date",
-                                  _formatDateShort(selectedDate!),
+                                border: Border.all(
+                                  color: const Color(0xFFBBF7D0),
+                                  width: 2,
                                 ),
-                                const SizedBox(height: 6),
-                                _summaryRow("Time", selectedTime!),
-                                const SizedBox(height: 6),
-                                _summaryRow("Center", selectedCenter!),
-                              ],
+                                borderRadius: BorderRadius.circular(14),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Colors.black12,
+                                    blurRadius: 4,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Row(
+                                    children: [
+                                      Icon(
+                                        Icons.check_circle,
+                                        color: Color(0xFF16A34A),
+                                        size: 20,
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        "Booking Summary",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15,
+                                          color: Color(0xFF111827),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _summaryRow(
+                                    "Date",
+                                    _formatDateShort(selectedDate!),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  _summaryRow("Time", selectedTime!),
+                                  const SizedBox(height: 6),
+                                  _summaryRow("Center", selectedCenter!),
+                                ],
+                              ),
                             ),
                           ),
                         const SizedBox(height: 20),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: ElevatedButton(
-                            onPressed: _allSelected ? _submitBooking : null,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFDC2626),
-                              disabledBackgroundColor:
-                                  const Color(0xFFF87171),
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              elevation: 0,
-                            ),
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  "Confirm Booking",
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                        AnimatedBuilder(
+                          animation: _pulseController,
+                          builder: (_, child) {
+                            final scale = _allSelected
+                                ? 1.0 +
+                                    (_pulseController.value * 0.03)
+                                : 1.0;
+                            return Transform.scale(scale: scale, child: child);
+                          },
+                          child: SizedBox(
+                            width: double.infinity,
+                            height: 50,
+                            child: ElevatedButton(
+                              onPressed: _allSelected ? _submitBooking : null,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFDC2626),
+                                disabledBackgroundColor:
+                                    const Color(0xFFF87171),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                                SizedBox(width: 8),
-                                Icon(Icons.arrow_forward, size: 18),
-                              ],
+                                elevation: 0,
+                              ),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    "Confirm Booking",
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  SizedBox(width: 8),
+                                  Icon(Icons.arrow_forward, size: 18),
+                                ],
+                              ),
                             ),
                           ),
                         ),

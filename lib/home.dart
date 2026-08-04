@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -6,11 +7,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'alerts.dart';
+import 'anim.dart';
 import 'book.dart';
 import 'check.dart';
 import 'config.dart';
 import 'history.dart';
 import 'login.dart';
+import 'newsfeed.dart';
 import 'donation_history.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -73,13 +76,12 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
 
-      final response = await http.post(
-        Uri.parse('${AppConfig.baseUrl}/save_fcm_token.php'),
-        body: {
-          'donor_id': donorId.toString(),
-          'fcm_token': token,
-        },
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.baseUrl}/save_fcm_token.php'),
+            body: {'donor_id': donorId.toString(), 'fcm_token': token},
+          )
+          .timeout(const Duration(seconds: 10));
 
       debugPrint("Save FCM token response: ${response.body}");
     } catch (e) {
@@ -294,10 +296,7 @@ class _BloodDropIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      size: const Size(20, 26),
-      painter: _BloodDropPainter(),
-    );
+    return CustomPaint(size: const Size(20, 26), painter: _BloodDropPainter());
   }
 }
 
@@ -380,6 +379,23 @@ class _HomeContentState extends State<HomeContent> {
     loadAppointments();
   }
 
+  Future<void> _refreshHomeData() async {
+    if (mounted) {
+      setState(() {
+        isProfileLoading = true;
+        isEligibilityLoading = true;
+        isAppointmentsLoading = true;
+      });
+    }
+
+    await Future.wait([
+      loadUserName(),
+      loadProfileData(),
+      loadEligibilityData(),
+      loadAppointments(),
+    ]);
+  }
+
   Future<void> loadUserName() async {
     final prefs = await SharedPreferences.getInstance();
     if (mounted) {
@@ -460,10 +476,10 @@ class _HomeContentState extends State<HomeContent> {
         if (data["status"] == "success") {
           if (mounted) {
             setState(() {
-              nextEligibleDate =
-                  formatDate(data["next_eligible_date"]?.toString() ?? "");
-              eligibilityStatus =
-                  (data["eligibility"] ?? "Unknown").toString();
+              nextEligibleDate = formatDate(
+                data["next_eligible_date"]?.toString() ?? "",
+              );
+              eligibilityStatus = (data["eligibility"] ?? "Unknown").toString();
               isEligibilityLoading = false;
             });
           }
@@ -499,7 +515,9 @@ class _HomeContentState extends State<HomeContent> {
 
     try {
       final response = await http.get(
-        Uri.parse("${AppConfig.baseUrl}/get_appointments.php?donor_id=$donorId"),
+        Uri.parse(
+          "${AppConfig.baseUrl}/get_appointments.php?donor_id=$donorId",
+        ),
       );
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
@@ -536,7 +554,7 @@ class _HomeContentState extends State<HomeContent> {
         'September',
         'October',
         'November',
-        'December'
+        'December',
       ];
       return "${months[date.month - 1]} ${date.day}, ${date.year}";
     } catch (_) {
@@ -630,396 +648,449 @@ class _HomeContentState extends State<HomeContent> {
                 end: Alignment.bottomRight,
               ),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _greetingText(),
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 13,
-                        ),
+                Row(
+                  children: [
+                    _FeedBackButton(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const NewsfeedPage()),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        firstName,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'Thank you for saving lives',
-                        style: TextStyle(
-                          color: Colors.white60,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                GestureDetector(
-                  onTap: _navigateToHistory,
-                  child: Container(
-                    padding: const EdgeInsets.all(3),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white38, width: 2),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _greetingText(),
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            firstName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Thank you for saving lives',
+                            style: TextStyle(
+                              color: Colors.white60,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    child: CircleAvatar(
-                      radius: 22,
-                      backgroundColor: Colors.white24,
-                      child: Text(
-                        firstName.isNotEmpty
-                            ? firstName[0].toUpperCase()
-                            : 'U',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
+                    PressableScale(
+                      onTap: _navigateToHistory,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white38, width: 2),
+                        ),
+                        child: CircleAvatar(
+                          radius: 22,
+                          backgroundColor: Colors.white24,
+                          child: Text(
+                            firstName.isNotEmpty
+                                ? firstName[0].toUpperCase()
+                                : 'U',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
           ),
           Expanded(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                screenWidth * 0.05,
-                20,
-                screenWidth * 0.05,
-                20,
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _statCard(
-                          label: 'Blood Type',
-                          value: isProfileLoading ? '...' : bloodType,
-                          icon: Icons.water_drop_rounded,
-                          iconColor: const Color(0xFFDC2626),
-                          iconBg: const Color(0xFFFFF1F1),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _statCard(
-                          label: 'Donations',
-                          value: isProfileLoading
-                              ? '...'
-                              : totalDonations.toString(),
-                          icon: Icons.favorite_rounded,
-                          iconColor: const Color(0xFFEC4899),
-                          iconBg: const Color(0xFFFDF2F8),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _statCard(
-                          label: 'Lives Saved',
-                          value: isProfileLoading
-                              ? '...'
-                              : '${totalDonations * 3}',
-                          icon: Icons.people_rounded,
-                          iconColor: const Color(0xFF16A34A),
-                          iconBg: const Color(0xFFF0FDF4),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Colors.black12,
-                          blurRadius: 6,
-                          offset: Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFFF1F1),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(
-                                Icons.verified_user_rounded,
-                                color: Color(0xFFDC2626),
-                                size: 20,
-                              ),
+            child: RefreshIndicator(
+              color: const Color(0xFFDC2626),
+              onRefresh: _refreshHomeData,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(
+                  screenWidth * 0.05,
+                  20,
+                  screenWidth * 0.05,
+                  20,
+                ),
+                child: Column(
+                  children: [
+                    FadeSlideIn(
+                      index: 0,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _statCard(
+                              label: 'Blood Type',
+                              value: isProfileLoading ? '...' : bloodType,
+                              icon: Icons.water_drop_rounded,
+                              iconColor: const Color(0xFFDC2626),
+                              iconBg: const Color(0xFFFFF1F1),
                             ),
-                            const SizedBox(width: 10),
-                            const Text(
-                              'Donation Eligibility',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                                color: Color(0xFF111827),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _statCard(
+                              label: 'Donations',
+                              value: isProfileLoading
+                                  ? '...'
+                                  : totalDonations.toString(),
+                              icon: Icons.favorite_rounded,
+                              iconColor: const Color(0xFFEC4899),
+                              iconBg: const Color(0xFFFDF2F8),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _statCard(
+                              label: 'Lives Saved',
+                              value: isProfileLoading
+                                  ? '...'
+                                  : '${totalDonations * 3}',
+                              icon: Icons.people_rounded,
+                              iconColor: const Color(0xFF16A34A),
+                              iconBg: const Color(0xFFF0FDF4),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    FadeSlideIn(
+                      index: 1,
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Colors.black12,
+                              blurRadius: 6,
+                              offset: Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFF1F1),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(
+                                    Icons.verified_user_rounded,
+                                    color: Color(0xFFDC2626),
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                const Text(
+                                  'Donation Eligibility',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                    color: Color(0xFF111827),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            _eligibilityRow(
+                              'Next Eligible',
+                              isEligibilityLoading
+                                  ? 'Loading...'
+                                  : nextEligibleDate,
+                              Icons.calendar_today_rounded,
+                              const Color(0xFF2563EB),
+                            ),
+                            const SizedBox(height: 8),
+                            _eligibilityRow(
+                              'Status',
+                              isEligibilityLoading
+                                  ? 'Loading...'
+                                  : eligibilityStatus,
+                              Icons.circle,
+                              getEligibilityStatusColor(eligibilityStatus),
+                            ),
+                            const SizedBox(height: 14),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 42,
+                              child: ElevatedButton.icon(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const CheckScreen(),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(
+                                  Icons.play_arrow_rounded,
+                                  size: 18,
+                                ),
+                                label: const Text('Check Eligibility'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFDC2626),
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  textStyle: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 14),
-                        _eligibilityRow(
-                          'Next Eligible',
-                          isEligibilityLoading ? 'Loading...' : nextEligibleDate,
-                          Icons.calendar_today_rounded,
-                          const Color(0xFF2563EB),
-                        ),
-                        const SizedBox(height: 8),
-                        _eligibilityRow(
-                          'Status',
-                          isEligibilityLoading
-                              ? 'Loading...'
-                              : eligibilityStatus,
-                          Icons.circle,
-                          getEligibilityStatusColor(eligibilityStatus),
-                        ),
-                        const SizedBox(height: 14),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 42,
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              Navigator.push(
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    FadeSlideIn(
+                      index: 2,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _actionCard(
+                              context: context,
+                              icon: Icons.calendar_month_rounded,
+                              iconColor: const Color(0xFF2563EB),
+                              iconBg: const Color(0xFFEFF6FF),
+                              title: 'Book Appointment',
+                              subtitle: 'Schedule your donation',
+                              destination: const BookScreen(),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _actionCard(
+                              context: context,
+                              icon: Icons.history_rounded,
+                              iconColor: const Color(0xFF9333EA),
+                              iconBg: const Color(0xFFFAF5FF),
+                              title: 'Donation History',
+                              subtitle: 'View past donations',
+                              destination: DonationHistoryScreen(),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    FadeSlideIn(
+                      index: 3,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Upcoming Appointment',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: Color(0xFF111827),
+                            ),
+                          ),
+                          if (!isAppointmentsLoading &&
+                              appointments.isNotEmpty)
+                            GestureDetector(
+                              onTap: () => Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => const CheckScreen(),
+                                  builder: (_) => DonationHistoryScreen(),
                                 ),
-                              );
-                            },
-                            icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                            label: const Text('Check Eligibility'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFDC2626),
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
                               ),
-                              textStyle: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _actionCard(
-                          context: context,
-                          icon: Icons.calendar_month_rounded,
-                          iconColor: const Color(0xFF2563EB),
-                          iconBg: const Color(0xFFEFF6FF),
-                          title: 'Book Appointment',
-                          subtitle: 'Schedule your donation',
-                          destination: const BookScreen(),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _actionCard(
-                          context: context,
-                          icon: Icons.history_rounded,
-                          iconColor: const Color(0xFF9333EA),
-                          iconBg: const Color(0xFFFAF5FF),
-                          title: 'Donation History',
-                          subtitle: 'View past donations',
-                          destination: DonationHistoryScreen(),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Upcoming Appointment',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          color: Color(0xFF111827),
-                        ),
-                      ),
-                      if (!isAppointmentsLoading && appointments.isNotEmpty)
-                        GestureDetector(
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => DonationHistoryScreen(),
-                            ),
-                          ),
-                          child: const Text(
-                            'See all',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFFDC2626),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  if (isAppointmentsLoading)
-                    const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFFDC2626),
-                      ),
-                    )
-                  else if (appointments.isEmpty)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Colors.black12,
-                            blurRadius: 4,
-                            offset: Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          Icon(
-                            Icons.calendar_today_outlined,
-                            color: Colors.grey.shade300,
-                            size: 36,
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'No upcoming appointments.',
-                            style: TextStyle(
-                              color: Color(0xFF9CA3AF),
-                              fontSize: 13,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            'Book one to get started!',
-                            style: TextStyle(
-                              color: Color(0xFFD1D5DB),
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  else
-                    ...appointments.map((appt) => _appointmentCard(appt)),
-                  const SizedBox(height: 16),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF750000), Color(0xFFFF4E4E)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Your Impact',
+                              child: const Text(
+                                'See all',
                                 style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
+                                  fontSize: 12,
+                                  color: Color(0xFFDC2626),
                                 ),
                               ),
-                              const SizedBox(height: 6),
-                              Text(
-                                '$totalDonations donations · ${totalDonations * 3} lives potentially saved',
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 12,
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    if (isAppointmentsLoading)
+                      const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFFDC2626),
+                        ),
+                      )
+                    else if (appointments.isEmpty)
+                      FadeSlideIn(
+                        index: 4,
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.black12,
+                                blurRadius: 4,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.calendar_today_outlined,
+                                color: Colors.grey.shade300,
+                                size: 36,
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                'No upcoming appointments.',
+                                style: TextStyle(
+                                  color: Color(0xFF9CA3AF),
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              const Text(
+                                'Book one to get started!',
+                                style: TextStyle(
+                                  color: Color(0xFFD1D5DB),
+                                  fontSize: 11,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white24,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.emoji_events_rounded,
-                            color: Colors.white,
-                            size: 28,
-                          ),
+                      )
+                    else
+                      ...appointments.map(
+                        (appt) => FadeSlideIn(
+                          index: 4,
+                          child: _appointmentCard(appt),
                         ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF0FDF4),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFBBF7D0)),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(
-                          Icons.volunteer_activism_rounded,
-                          color: Color(0xFF16A34A),
-                          size: 18,
+                      ),
+                    const SizedBox(height: 16),
+                    FadeSlideIn(
+                      index: 5,
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF750000), Color(0xFFFF4E4E)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
                         ),
-                        SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Thank you for being a hero in your community. Every donation makes a difference.',
-                            style: TextStyle(
-                              color: Color(0xFF166534),
-                              fontSize: 11,
-                              height: 1.4,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Your Impact',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    '$totalDonations donations · ${totalDonations * 3} lives potentially saved',
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white24,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(
+                                Icons.emoji_events_rounded,
+                                color: Colors.white,
+                                size: 28,
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 12),
+                    FadeSlideIn(
+                      index: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFBBF7D0)),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(
+                              Icons.volunteer_activism_rounded,
+                              color: Color(0xFF16A34A),
+                              size: 18,
+                            ),
+                            SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Thank you for being a hero in your community. Every donation makes a difference.',
+                                style: TextStyle(
+                                  color: Color(0xFF166534),
+                                  fontSize: 11,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -1078,7 +1149,12 @@ class _HomeContentState extends State<HomeContent> {
     );
   }
 
-  Widget _eligibilityRow(String label, String value, IconData icon, Color color) {
+  Widget _eligibilityRow(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Row(
       children: [
         Icon(icon, size: 14, color: color),
@@ -1110,16 +1186,22 @@ class _HomeContentState extends State<HomeContent> {
     required String subtitle,
     required Widget destination,
   }) {
-    return GestureDetector(
-      onTap: () =>
-          Navigator.push(context, MaterialPageRoute(builder: (_) => destination)),
+    return PressableScale(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => destination),
+      ),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
           boxShadow: const [
-            BoxShadow(color: Colors.black12, blurRadius: 5, offset: Offset(0, 2)),
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 5,
+              offset: Offset(0, 2),
+            ),
           ],
         ),
         child: Column(
@@ -1233,6 +1315,63 @@ class _HomeContentState extends State<HomeContent> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Frosted-glass "back to feed" button ─────────────────────────────────────
+class _FeedBackButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _FeedBackButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Material(
+          color: Colors.white.withOpacity(0.16),
+          child: InkWell(
+            onTap: onTap,
+            splashColor: Colors.white24,
+            highlightColor: Colors.white10,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.35),
+                  width: 1.2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.12),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.arrow_back_rounded, color: Colors.white, size: 16),
+                  SizedBox(width: 6),
+                  Text(
+                    'Feed',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

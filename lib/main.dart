@@ -5,6 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'splash_screen/splash_screen.dart';
 
+
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   debugPrint("Background message: ${message.notification?.title}");
@@ -51,6 +52,20 @@ class MyApp extends StatelessWidget {
       title: 'Blood Donation App',
       theme: ThemeData(
         primarySwatch: Colors.red,
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFDC2626)),
+        splashFactory: InkSparkle.splashFactory,
+        visualDensity: VisualDensity.adaptivePlatformDensity,
+        // Consistent, smooth slide+fade transition on every push/pop across
+        // the whole app instead of the platform-default abrupt swaps.
+        pageTransitionsTheme: const PageTransitionsTheme(
+          builders: {
+            TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+            TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+            TargetPlatform.windows: CupertinoPageTransitionsBuilder(),
+            TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+            TargetPlatform.linux: CupertinoPageTransitionsBuilder(),
+          },
+        ),
       ),
       home: SplashScreen(isLoggedIn: isLoggedIn),
     );

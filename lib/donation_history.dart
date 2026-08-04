@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'anim.dart';
 import 'config.dart';
 
 class DonationHistoryScreen extends StatefulWidget {
@@ -236,47 +237,80 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(15),
                 child: isLoading
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFFDC2626),
+                        ),
+                      )
                     : donations.isEmpty
-                        ? const Center(
-                            child: Text("No donation history found."),
+                        ? Center(
+                            child: TweenAnimationBuilder<double>(
+                              tween: Tween(begin: 0.0, end: 1.0),
+                              duration: const Duration(milliseconds: 450),
+                              curve: Curves.easeOut,
+                              builder: (_, v, child) => Opacity(
+                                opacity: v,
+                                child: Transform.translate(
+                                  offset: Offset(0, (1 - v) * 12),
+                                  child: child,
+                                ),
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.water_drop_outlined,
+                                    size: 48,
+                                    color: Colors.grey.shade300,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  const Text(
+                                    "No donation history found.",
+                                    style: TextStyle(color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            ),
                           )
                         : Column(
                             children: [
                               // 🔥 SUMMARY CARD
-                              Container(
-                                padding: const EdgeInsets.all(14),
-                                margin:
-                                    const EdgeInsets.only(bottom: 15),
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [
-                                      Color(0xFFFFEBEE),
-                                      Color(0xFFFFCDD2)
+                              FadeSlideIn(
+                                index: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.all(14),
+                                  margin:
+                                      const EdgeInsets.only(bottom: 15),
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [
+                                        Color(0xFFFFEBEE),
+                                        Color(0xFFFFCDD2)
+                                      ],
+                                    ),
+                                    borderRadius:
+                                        BorderRadius.circular(12),
+                                    border: Border.all(
+                                        color: Colors.red.shade200),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceAround,
+                                    children: [
+                                      summaryItem(
+                                          Icons.water_drop,
+                                          donations.length.toString(),
+                                          "Donations"),
+                                      summaryItem(
+                                          Icons.trending_up,
+                                          "${getTotalUnits()}",
+                                          "Units"),
+                                      summaryItem(
+                                          Icons.calendar_today,
+                                          "Active",
+                                          "Status"),
                                     ],
                                   ),
-                                  borderRadius:
-                                      BorderRadius.circular(12),
-                                  border: Border.all(
-                                      color: Colors.red.shade200),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceAround,
-                                  children: [
-                                    summaryItem(
-                                        Icons.water_drop,
-                                        donations.length.toString(),
-                                        "Donations"),
-                                    summaryItem(
-                                        Icons.trending_up,
-                                        "${getTotalUnits()}",
-                                        "Units"),
-                                    summaryItem(
-                                        Icons.calendar_today,
-                                        "Active",
-                                        "Status"),
-                                  ],
                                 ),
                               ),
 
@@ -287,8 +321,11 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
                                       const AlwaysScrollableScrollPhysics(),
                                   itemCount: donations.length,
                                   itemBuilder: (context, index) {
-                                    return buildCard(
-                                        donations[index], index);
+                                    return FadeSlideIn(
+                                      index: index + 1,
+                                      child: buildCard(
+                                          donations[index], index),
+                                    );
                                   },
                                 ),
                               ),
