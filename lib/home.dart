@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -123,50 +124,76 @@ class _CustomNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final isCheckActive = selectedIndex == 2;
 
-    return BottomAppBar(
-      shape: isCheckActive ? null : const CircularNotchedRectangle(),
-      notchMargin: isCheckActive ? 0 : 8,
-      color: Colors.white,
-      elevation: 12,
-      shadowColor: Colors.black26,
-      child: SizedBox(
-        height: 62,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _NavItem(
-              icon: Icons.home_rounded,
-              label: 'Home',
-              index: 0,
-              selectedIndex: selectedIndex,
-              onTap: onTap,
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(28),
+          topRight: Radius.circular(28),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFDC2626).withOpacity(0.16),
+            blurRadius: 28,
+            offset: const Offset(0, -6),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 12,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(28),
+          topRight: Radius.circular(28),
+        ),
+        child: BottomAppBar(
+          shape: isCheckActive ? null : const CircularNotchedRectangle(),
+          notchMargin: isCheckActive ? 0 : 8,
+          color: Colors.white,
+          elevation: 0,
+          padding: EdgeInsets.zero,
+          child: SizedBox(
+            height: 68,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _NavItem(
+                  icon: Icons.home_rounded,
+                  label: 'Home',
+                  index: 0,
+                  selectedIndex: selectedIndex,
+                  onTap: onTap,
+                ),
+                _NavItem(
+                  icon: Icons.calendar_month_rounded,
+                  label: 'Book',
+                  index: 1,
+                  selectedIndex: selectedIndex,
+                  onTap: onTap,
+                ),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  width: isCheckActive ? 0 : 56,
+                ),
+                _NavItem(
+                  icon: Icons.history_rounded,
+                  label: 'History',
+                  index: 3,
+                  selectedIndex: selectedIndex,
+                  onTap: onTap,
+                ),
+                _NavItem(
+                  icon: Icons.notifications_rounded,
+                  label: 'Alerts',
+                  index: 4,
+                  selectedIndex: selectedIndex,
+                  onTap: onTap,
+                ),
+              ],
             ),
-            _NavItem(
-              icon: Icons.calendar_month_rounded,
-              label: 'Book',
-              index: 1,
-              selectedIndex: selectedIndex,
-              onTap: onTap,
-            ),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              width: isCheckActive ? 0 : 56,
-            ),
-            _NavItem(
-              icon: Icons.history_rounded,
-              label: 'History',
-              index: 3,
-              selectedIndex: selectedIndex,
-              onTap: onTap,
-            ),
-            _NavItem(
-              icon: Icons.notifications_rounded,
-              label: 'Alerts',
-              index: 4,
-              selectedIndex: selectedIndex,
-              onTap: onTap,
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -191,60 +218,134 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isSelected = selectedIndex == index;
-    return GestureDetector(
-      onTap: () => onTap(index),
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: isSelected
-            ? BoxDecoration(
-                color: const Color(0xFFFFF1F1),
-                borderRadius: BorderRadius.circular(12),
-              )
-            : null,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 22,
-              color: isSelected
-                  ? const Color(0xFFDC2626)
-                  : const Color(0xFF9CA3AF),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap(index);
+        },
+        borderRadius: BorderRadius.circular(14),
+        splashColor: const Color(0xFFDC2626).withOpacity(0.12),
+        highlightColor: const Color(0xFFDC2626).withOpacity(0.06),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutBack,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              gradient: isSelected
+                  ? const LinearGradient(
+                      colors: [Color(0xFFFFE4E4), Color(0xFFFFF1F1)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : null,
+              borderRadius: BorderRadius.circular(14),
             ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected
-                    ? const Color(0xFFDC2626)
-                    : const Color(0xFF9CA3AF),
-              ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 1.0, end: isSelected ? 1.18 : 1.0),
+                  duration: const Duration(milliseconds: 380),
+                  curve: Curves.elasticOut,
+                  builder: (context, scale, child) =>
+                      Transform.scale(scale: scale, child: child),
+                  child: Icon(
+                    icon,
+                    size: 22,
+                    color: isSelected
+                        ? const Color(0xFFDC2626)
+                        : const Color(0xFF9CA3AF),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 200),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected
+                        ? const Color(0xFFDC2626)
+                        : const Color(0xFF9CA3AF),
+                  ),
+                  child: Text(label),
+                ),
+                const SizedBox(height: 3),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOut,
+                  height: 3,
+                  width: isSelected ? 14 : 0,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDC2626),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _CenterFAB extends StatelessWidget {
+class _CenterFAB extends StatefulWidget {
   final bool isActive;
   final VoidCallback onTap;
 
   const _CenterFAB({required this.isActive, required this.onTap});
 
   @override
+  State<_CenterFAB> createState() => _CenterFABState();
+}
+
+class _CenterFABState extends State<_CenterFAB>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulseController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+    if (widget.isActive) _pulseController.repeat(reverse: true);
+  }
+
+  @override
+  void didUpdateWidget(covariant _CenterFAB oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive && !oldWidget.isActive) {
+      _pulseController.repeat(reverse: true);
+    } else if (!widget.isActive && oldWidget.isActive) {
+      _pulseController.stop();
+      _pulseController.animateTo(0, duration: const Duration(milliseconds: 200));
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final isActive = widget.isActive;
     return AnimatedSlide(
       offset: isActive ? const Offset(0, 0.55) : Offset.zero,
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeInOut,
       child: GestureDetector(
-        onTap: onTap,
+        onTap: () {
+          HapticFeedback.mediumImpact();
+          widget.onTap();
+        },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeInOut,
@@ -272,7 +373,26 @@ class _CenterFAB extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _BloodDropIcon(isActive: isActive),
+              AnimatedBuilder(
+                animation: _pulseController,
+                builder: (context, child) {
+                  // While active, the drop bobs up/down and squashes &
+                  // stretches like it's beating/dripping in place.
+                  final t = isActive ? _pulseController.value : 0.0;
+                  final bob = -4.0 * t;
+                  final stretch = 1.0 + 0.14 * t;
+                  final squash = 1.0 - 0.10 * t;
+                  return Transform.translate(
+                    offset: Offset(0, bob),
+                    child: Transform(
+                      alignment: Alignment.bottomCenter,
+                      transform: Matrix4.diagonal3Values(squash, stretch, 1),
+                      child: child,
+                    ),
+                  );
+                },
+                child: const _BloodDropIcon(),
+              ),
               const SizedBox(height: 2),
               Text(
                 'Check',
@@ -291,8 +411,7 @@ class _CenterFAB extends StatelessWidget {
 }
 
 class _BloodDropIcon extends StatelessWidget {
-  final bool isActive;
-  const _BloodDropIcon({required this.isActive});
+  const _BloodDropIcon();
 
   @override
   Widget build(BuildContext context) {
@@ -307,27 +426,18 @@ class _BloodDropPainter extends CustomPainter {
       ..color = Colors.white
       ..style = PaintingStyle.fill;
 
-    final path = Path();
-    final cx = size.width / 2;
+    final w = size.width;
+    final h = size.height;
 
-    path.moveTo(cx, 0);
-    path.cubicTo(
-      cx + size.width * 0.6,
-      size.height * 0.35,
-      cx + size.width * 0.6,
-      size.height * 0.7,
-      cx,
-      size.height,
-    );
-    path.cubicTo(
-      cx - size.width * 0.6,
-      size.height * 0.7,
-      cx - size.width * 0.6,
-      size.height * 0.35,
-      cx,
-      0,
-    );
-    path.close();
+    // Classic droplet: sharp point at the top, flaring out into a
+    // fully rounded bulb at the bottom (not a symmetric oval).
+    final path = Path()
+      ..moveTo(w * 0.5, 0)
+      ..cubicTo(w * 0.5, 0, w * 0.12, h * 0.42, w * 0.12, h * 0.66)
+      ..cubicTo(w * 0.12, h * 0.87, w * 0.28, h, w * 0.5, h)
+      ..cubicTo(w * 0.72, h, w * 0.88, h * 0.87, w * 0.88, h * 0.66)
+      ..cubicTo(w * 0.88, h * 0.42, w * 0.5, 0, w * 0.5, 0)
+      ..close();
 
     canvas.drawPath(path, paint);
 
@@ -337,9 +447,9 @@ class _BloodDropPainter extends CustomPainter {
 
     canvas.drawOval(
       Rect.fromCenter(
-        center: Offset(cx - size.width * 0.12, size.height * 0.42),
-        width: size.width * 0.22,
-        height: size.height * 0.18,
+        center: Offset(w * 0.38, h * 0.62),
+        width: w * 0.2,
+        height: h * 0.16,
       ),
       shinePaint,
     );
