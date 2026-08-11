@@ -10,10 +10,12 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
-        <!-- ADD THIS -->
+        <!-- Must match the channel id created in notification_service.dart so
+             background/terminated FCM messages post to a real, high-importance
+             channel instead of silently falling back to a default one. -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="high_importance_channel" />
+            android:value="edonate_notifications" />
 
         <activity
             android:name=".MainActivity"

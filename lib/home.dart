@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
 
@@ -16,6 +17,7 @@ import 'history.dart';
 import 'login.dart';
 import 'newsfeed.dart';
 import 'donation_history.dart';
+import 'notification_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -29,6 +31,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _donorId = 0;
 
   late List<Widget> _screens;
+  StreamSubscription<void>? _alertsTapSub;
 
   @override
   void initState() {
@@ -41,6 +44,21 @@ class _HomeScreenState extends State<HomeScreen> {
       DonationHistoryScreen(),
       const SizedBox(child: Center(child: CircularProgressIndicator())),
     ];
+
+    if (NotificationService.instance.openAlertsOnStart) {
+      _selectedIndex = 4;
+      NotificationService.instance.consumeOpenAlertsOnStart();
+    }
+
+    _alertsTapSub = NotificationService.instance.onAlertsTapped.listen((_) {
+      if (mounted) setState(() => _selectedIndex = 4);
+    });
+  }
+
+  @override
+  void dispose() {
+    _alertsTapSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadDonorId() async {

@@ -120,6 +120,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
     if (shouldLogout != true) return;
 
     final prefs = await SharedPreferences.getInstance();
+    final donorId = prefs.getString('donorId');
+
+    // A shared device must not keep receiving the previous donor's push
+    // notifications, so disassociate the FCM token before clearing session.
+    if (donorId != null && donorId.isNotEmpty) {
+      try {
+        await http.post(
+          Uri.parse('${AppConfig.baseUrl}/delete_fcm_token.php'),
+          body: {'donor_id': donorId},
+        ).timeout(const Duration(seconds: 5));
+      } catch (e) {
+        debugPrint('Error removing FCM token on logout: $e');
+      }
+    }
+
     await prefs.clear();
 
     if (!mounted) return;

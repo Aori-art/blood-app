@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'anim.dart';
 import 'config.dart';
+import 'notification_service.dart';
 
 class NotificationModel {
   final int id;
@@ -69,10 +71,23 @@ class _AlertsScreenState extends State<AlertsScreen> {
   // Tracks which notification card is expanded
   int? _expandedId;
 
+  StreamSubscription<void>? _newNotificationSub;
+
   @override
   void initState() {
     super.initState();
     _fetchNotifications();
+    // FCM only tells us something changed — MySQL (via get_notifications.php)
+    // remains the authoritative source for the inbox list.
+    _newNotificationSub = NotificationService.instance.onNotificationReceived.listen((_) {
+      if (mounted) _fetchNotifications();
+    });
+  }
+
+  @override
+  void dispose() {
+    _newNotificationSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _fetchNotifications() async {
@@ -244,40 +259,68 @@ class _AlertsScreenState extends State<AlertsScreen> {
 
   Color _getTypeColor(String type) {
     switch (type) {
-      case 'appointment': return const Color(0xFF2563EB);
+      case 'appointment':
+      case 'appointment_approved':
+      case 'appointment_rescheduled':
+      case 'appointment_cancelled':
+      case 'appointment_completed':
+        return const Color(0xFF2563EB);
       case 'reminder':   return const Color(0xFFF59E0B);
       case 'thank_you':  return const Color(0xFF16A34A);
-      case 'eligibility': return const Color(0xFF9333EA);
+      case 'eligibility':
+      case 'eligibility_reviewed':
+        return const Color(0xFF9333EA);
       default:           return const Color(0xFF6B7280);
     }
   }
 
   Color _getTypeBg(String type) {
     switch (type) {
-      case 'appointment': return const Color(0xFFEFF6FF);
+      case 'appointment':
+      case 'appointment_approved':
+      case 'appointment_rescheduled':
+      case 'appointment_cancelled':
+      case 'appointment_completed':
+        return const Color(0xFFEFF6FF);
       case 'reminder':   return const Color(0xFFFFFBEB);
       case 'thank_you':  return const Color(0xFFF0FDF4);
-      case 'eligibility': return const Color(0xFFFAF5FF);
+      case 'eligibility':
+      case 'eligibility_reviewed':
+        return const Color(0xFFFAF5FF);
       default:           return const Color(0xFFF3F4F6);
     }
   }
 
   IconData _getTypeIcon(String type) {
     switch (type) {
-      case 'appointment': return Icons.calendar_month_rounded;
+      case 'appointment':
+      case 'appointment_rescheduled':
+        return Icons.calendar_month_rounded;
+      case 'appointment_approved':  return Icons.event_available_rounded;
+      case 'appointment_cancelled': return Icons.event_busy_rounded;
+      case 'appointment_completed': return Icons.check_circle_rounded;
       case 'reminder':   return Icons.alarm_rounded;
       case 'thank_you':  return Icons.favorite_rounded;
-      case 'eligibility': return Icons.water_drop_rounded;
+      case 'eligibility':
+      case 'eligibility_reviewed':
+        return Icons.water_drop_rounded;
       default:           return Icons.notifications_rounded;
     }
   }
 
   String _getTypeLabel(String type) {
     switch (type) {
-      case 'appointment': return 'Appointment';
+      case 'appointment':
+      case 'appointment_approved':
+      case 'appointment_rescheduled':
+      case 'appointment_cancelled':
+      case 'appointment_completed':
+        return 'Appointment';
       case 'reminder':   return 'Reminder';
       case 'thank_you':  return 'Thank You';
-      case 'eligibility': return 'Eligibility';
+      case 'eligibility':
+      case 'eligibility_reviewed':
+        return 'Eligibility';
       default:           return 'General';
     }
   }
