@@ -658,11 +658,39 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
   bool _loadingPosts = true;
   String? _postsError;
 
+  final ScrollController _scrollController = ScrollController();
+  bool _fabVisible = true;
+  double _lastScrollOffset = 0;
+
   @override
   void initState() {
     super.initState();
     _checkLoginStatus();
     _loadPosts();
+    _scrollController.addListener(_handleScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_handleScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _handleScroll() {
+    final offset = _scrollController.offset;
+    final delta = offset - _lastScrollOffset;
+    _lastScrollOffset = offset;
+
+    if (offset <= 0) {
+      if (!_fabVisible) setState(() => _fabVisible = true);
+      return;
+    }
+    if (delta > 6 && _fabVisible) {
+      setState(() => _fabVisible = false);
+    } else if (delta < -6 && !_fabVisible) {
+      setState(() => _fabVisible = true);
+    }
   }
 
   Future<void> _checkLoginStatus() async {
@@ -710,11 +738,12 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
               child: RefreshIndicator(
                 onRefresh: _loadPosts,
                 child: ListView(
-                  padding: const EdgeInsets.only(bottom: 24),
+                  controller: _scrollController,
+                  padding: const EdgeInsets.only(bottom: 110),
                   children: [
                     FadeSlideIn(index: 0, child: _buildSignInCta(context)),
                     FadeSlideIn(index: 1, child: _buildTrendingAlert(context)),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: _buildPostsList(),
@@ -724,6 +753,75 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
               ),
             ),
           ],
+        ),
+      ),
+      floatingActionButton: _buildHomeFab(context),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+    );
+  }
+
+  // ── Floating "Go to Home" / "Sign In" button ────────────────────────────
+  Widget _buildHomeFab(BuildContext context) {
+    final label = _isLoggedIn ? "Go to Home" : "Sign In to Donate";
+
+    return AnimatedSlide(
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+      offset: _fabVisible ? Offset.zero : const Offset(0, 2),
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+        opacity: _fabVisible ? 1 : 0,
+        child: IgnorePointer(
+          ignoring: !_fabVisible,
+          child: GestureDetector(
+            onTap: () {
+              if (_isLoggedIn) {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const HomeScreen()),
+                );
+              } else {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                );
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(999),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [AppColors.primary, AppColors.primaryDark],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.35),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.water_drop, size: 16, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  const Icon(Icons.chevron_right, size: 18, color: Colors.white),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -786,10 +884,16 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
 
   Widget _buildHeader(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      decoration: const BoxDecoration(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+      decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: AppColors.border)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         children: [
@@ -949,46 +1053,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
                 size: 40, color: Colors.white.withOpacity(0.3)),
           ],
         ),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: () {
-              if (_isLoggedIn) {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const HomeScreen()),
-                );
-              } else {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: AppColors.primary,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.water_drop, size: 16, color: AppColors.primary),
-                const SizedBox(width: 8),
-                Text(
-                  _isLoggedIn ? "Go to Home" : "Sign In to Donate",
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                ),
-                const Spacer(),
-                const Icon(Icons.chevron_right, size: 16, color: AppColors.primary),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 14),
         FittedBox(
           fit: BoxFit.scaleDown,
           child: Row(
@@ -1036,8 +1101,15 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         children: [

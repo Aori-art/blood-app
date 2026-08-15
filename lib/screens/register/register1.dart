@@ -140,8 +140,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kCrimson,
-      body: SafeArea(
+      body: GradientScreen(
         child: Column(
           children: [
             RegisterHeader(

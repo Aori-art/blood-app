@@ -122,8 +122,7 @@ class _RegisterStep3State extends State<RegisterStep3> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kCrimson,
-      body: SafeArea(
+      body: GradientScreen(
         child: Column(
           children: [
             RegisterHeader(

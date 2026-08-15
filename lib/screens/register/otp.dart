@@ -151,8 +151,7 @@ class _OtpScreenState extends State<OtpScreen>
     final filledCount = _controllers.where((c) => c.text.isNotEmpty).length;
 
     return Scaffold(
-      backgroundColor: kCrimson,
-      body: SafeArea(
+      body: GradientScreen(
         child: Column(
           children: [
             // ── Header ─────────────────────────────────────────────────

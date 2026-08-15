@@ -234,6 +234,80 @@ class _AlertsScreenState extends State<AlertsScreen> {
     }
   }
 
+  Future<void> _confirmAndDeleteAll() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Delete All Notifications',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        content: const Text(
+          'Are you sure you want to delete all notifications? This cannot be undone.',
+          style: TextStyle(fontSize: 13, color: Color(0xFF6B7280), height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF6B7280))),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Delete All'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await _deleteAllNotifications();
+    }
+  }
+
+  Future<void> _deleteAllNotifications() async {
+    final removed = List<NotificationModel>.from(_notifications);
+    if (removed.isEmpty) return;
+
+    // Optimistically clear the UI
+    setState(() {
+      _notifications = [];
+      _unreadCount = 0;
+      _expandedId = null;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse('${AppConfig.baseUrl}/delete_all_notifications.php'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'donor_id': widget.donorId}),
+      );
+
+      final succeeded = response.statusCode == 200 &&
+          json.decode(response.body)['success'] == true;
+
+      if (!mounted) return;
+      if (succeeded) {
+        _showSnack('All notifications deleted', isSuccess: true);
+      } else {
+        _showSnack('Failed to delete all notifications.');
+        _fetchNotifications();
+      }
+    } catch (e) {
+      debugPrint('Error deleting all notifications: $e');
+      if (mounted) {
+        _showSnack('Failed to delete all. Please try again.');
+        _fetchNotifications();
+      }
+    }
+  }
+
   void _showSnack(String message, {bool isSuccess = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -329,6 +403,8 @@ class _AlertsScreenState extends State<AlertsScreen> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
 
+    final showDeleteAll = !_isLoading && _errorMessage == null && _notifications.isNotEmpty;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
       body: Column(
@@ -349,6 +425,34 @@ class _AlertsScreenState extends State<AlertsScreen> {
                         : _buildList(size),
           ),
         ],
+      ),
+      floatingActionButton: showDeleteAll ? _buildDeleteAllButton() : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+    );
+  }
+
+  // ── FLOATING DELETE-ALL BUTTON ───────────────────────────────
+  Widget _buildDeleteAllButton() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8, right: 4),
+      child: GestureDetector(
+        onTap: _confirmAndDeleteAll,
+        child: Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: const Color(0xFFDC2626),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFDC2626).withOpacity(0.35),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: const Icon(Icons.delete_sweep_rounded, color: Colors.white, size: 26),
+        ),
       ),
     );
   }

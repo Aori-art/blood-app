@@ -4,11 +4,71 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
-const Color kCrimson     = Color(0xFFAE0000);
-const Color kSurface     = Color(0xFFFAF7F7);
-const Color kInputFill   = Color(0xFFF0E8E8);
-const Color kTextPrimary = Color(0xFF1A0A0A);
-const Color kTextMuted   = Color(0xFF7A5C5C);
+// Mirrors the palette used across home.dart / alerts.dart / book.dart / check.dart
+// so the auth flow (login, register, OTP) reads as part of the same app.
+const Color kCrimson     = Color(0xFFDC2626);
+const Color kCrimsonDark = Color(0xFF750000);
+const Color kSurface     = Colors.white;
+const Color kInputFill   = Color(0xFFF9FAFB);
+const Color kBorder      = Color(0xFFD1D5DB);
+const Color kTextPrimary = Color(0xFF111827);
+const Color kTextMuted   = Color(0xFF6B7280);
+
+const List<Color> kHeaderGradient = [kCrimsonDark, Color(0xFFFF4E4E)];
+
+// ─── Full-bleed gradient background for auth screens ──────────────────────────
+// Wraps a screen's content so the crimson gradient fills the whole Scaffold
+// (matching the hero-header gradient used elsewhere), while RegisterCard's
+// opaque white surface covers everything below the header.
+class GradientScreen extends StatelessWidget {
+  final Widget child;
+  const GradientScreen({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: kHeaderGradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: SafeArea(child: child),
+      );
+}
+
+// ─── Circular icon button for gradient headers (back / feed shortcuts) ───────
+class HeaderIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final String? tooltip;
+  const HeaderIconButton({
+    super.key,
+    required this.icon,
+    required this.onTap,
+    this.tooltip,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final button = Material(
+      color: Colors.white.withOpacity(0.16),
+      shape: const CircleBorder(
+        side: BorderSide(color: Colors.white30, width: 1.2),
+      ),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          width: 38,
+          height: 38,
+          child: Icon(icon, color: Colors.white, size: 18),
+        ),
+      ),
+    );
+    return tooltip != null ? Tooltip(message: tooltip!, child: button) : button;
+  }
+}
 
 // ─── Step progress indicator ──────────────────────────────────────────────────
 class StepIndicator extends StatelessWidget {
@@ -167,10 +227,10 @@ class AppTextField extends StatelessWidget {
           suffixIcon: suffix,
           border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide.none),
+              borderSide: const BorderSide(color: kBorder)),
           enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide.none),
+              borderSide: const BorderSide(color: kBorder)),
           focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: const BorderSide(color: kCrimson, width: 1.5)),
@@ -206,10 +266,10 @@ class AppDropdown<T> extends StatelessWidget {
           fillColor: kInputFill,
           border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide.none),
+              borderSide: const BorderSide(color: kBorder)),
           enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide.none),
+              borderSide: const BorderSide(color: kBorder)),
           focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: const BorderSide(color: kCrimson, width: 1.5)),

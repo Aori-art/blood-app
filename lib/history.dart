@@ -7,6 +7,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'anim.dart';
 import 'config.dart';
 import 'login.dart';
+import 'shared_design.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -262,35 +263,66 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final memberSince = getMemberSince(userData?["date_registered"]);
     final daysSinceRegistration = getDaysSinceRegistration(userData?["date_registered"]);
 
+    final size = MediaQuery.of(context).size;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // HEADER
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-              decoration: const BoxDecoration(
-                color: Color(0xFFF9FAFB),
-              ),
-              child: Row(
-                children: [
-                  TextButton.icon(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.arrow_back, color: Color(0xFFDC2626), size: 18),
-                    label: const Text(
-                      'Back',
-                      style: TextStyle(color: Color(0xFFDC2626), fontWeight: FontWeight.w500),
-                    ),
-                  ),
-                ],
+      body: Column(
+        children: [
+          // HEADER
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.only(
+              top: size.height * 0.06,
+              left: 20,
+              right: 20,
+              bottom: 20,
+            ),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: kHeaderGradient,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
             ),
+            child: Row(
+              children: [
+                HeaderIconButton(
+                  icon: Icons.arrow_back_rounded,
+                  tooltip: 'Back',
+                  onTap: () => Navigator.pop(context),
+                ),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'My Profile',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Manage your account & donations',
+                        style: TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
 
-            Expanded(
+          Expanded(
+            child: SafeArea(
+              top: false,
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                 child: Column(
                   children: [
                     // PROFILE HEADER CARD
@@ -307,8 +339,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           ),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(color: const Color(0xFFFECACA)),
-                          boxShadow: const [
-                            BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
                           ],
                         ),
                         child: Column(
@@ -318,8 +354,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 border: Border.all(color: Colors.white, width: 4),
-                                boxShadow: const [
-                                  BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4)),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFFDC2626).withOpacity(0.2),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
                                 ],
                               ),
                               child: CircleAvatar(
@@ -552,8 +592,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -582,9 +622,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
         ],
       ),
       child: Column(
@@ -614,9 +658,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
       width: double.infinity,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
         ],
       ),
       child: Column(

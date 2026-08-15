@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -14,10 +13,10 @@ import 'book.dart';
 import 'check.dart';
 import 'config.dart';
 import 'history.dart';
-import 'login.dart';
 import 'newsfeed.dart';
 import 'donation_history.dart';
 import 'notification_service.dart';
+import 'shared_design.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -117,14 +116,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _screens[_selectedIndex],
-      floatingActionButton: _CenterFAB(
-        isActive: _selectedIndex == 2,
-        onTap: () => setState(() => _selectedIndex = 2),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: _CustomNavBar(
         selectedIndex: _selectedIndex,
         onTap: _onItemTapped,
+        onCheckTap: () => setState(() => _selectedIndex = 2),
       ),
     );
   }
@@ -135,82 +130,106 @@ class _HomeScreenState extends State<HomeScreen> {
 class _CustomNavBar extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onTap;
+  final VoidCallback onCheckTap;
 
-  const _CustomNavBar({required this.selectedIndex, required this.onTap});
+  const _CustomNavBar({
+    required this.selectedIndex,
+    required this.onTap,
+    required this.onCheckTap,
+  });
+
+  // Fixed, device-independent sizing — no hardcoded `bottom:` offsets or
+  // Transform.translate; SafeArea handles the system nav-bar/gesture inset.
+  // 72px comfortably fits _NavItem's icon+label+indicator column without
+  // overflowing (icon 22 + label ~13 + indicator 3 + spacing + padding ≈ 68).
+  static const double _barHeight = 72;
+  static const double _checkSize = 62;
+  static const double _stackHeight = _barHeight + (_checkSize / 2) + 8;
 
   @override
   Widget build(BuildContext context) {
     final isCheckActive = selectedIndex == 2;
 
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(28),
-          topRight: Radius.circular(28),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFDC2626).withOpacity(0.16),
-            blurRadius: 28,
-            offset: const Offset(0, -6),
-          ),
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 12,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(28),
-          topRight: Radius.circular(28),
-        ),
-        child: BottomAppBar(
-          shape: isCheckActive ? null : const CircularNotchedRectangle(),
-          notchMargin: isCheckActive ? 0 : 8,
-          color: Colors.white,
-          elevation: 0,
-          padding: EdgeInsets.zero,
-          child: SizedBox(
-            height: 68,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _NavItem(
-                  icon: Icons.home_rounded,
-                  label: 'Home',
-                  index: 0,
-                  selectedIndex: selectedIndex,
-                  onTap: onTap,
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.only(bottom: 10),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+        child: SizedBox(
+          height: _stackHeight,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.bottomCenter,
+            children: [
+              // Rounded floating pill
+              Container(
+                height: _barHeight,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(_barHeight / 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFDC2626).withOpacity(0.16),
+                      blurRadius: 24,
+                      offset: const Offset(0, 10),
+                    ),
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                _NavItem(
-                  icon: Icons.calendar_month_rounded,
-                  label: 'Book',
-                  index: 1,
-                  selectedIndex: selectedIndex,
-                  onTap: onTap,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(_barHeight / 2),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _NavItem(
+                        icon: Icons.home_rounded,
+                        label: 'Home',
+                        index: 0,
+                        selectedIndex: selectedIndex,
+                        onTap: onTap,
+                      ),
+                      _NavItem(
+                        icon: Icons.calendar_month_rounded,
+                        label: 'Book',
+                        index: 1,
+                        selectedIndex: selectedIndex,
+                        onTap: onTap,
+                      ),
+                      _NavItem(
+                        icon: Icons.history_rounded,
+                        label: 'History',
+                        index: 3,
+                        selectedIndex: selectedIndex,
+                        onTap: onTap,
+                      ),
+                      _NavItem(
+                        icon: Icons.notifications_rounded,
+                        label: 'Alerts',
+                        index: 4,
+                        selectedIndex: selectedIndex,
+                        onTap: onTap,
+                      ),
+                    ],
+                  ),
                 ),
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  width: isCheckActive ? 0 : 56,
+              ),
+
+              // Floating Check button — overlaps the top edge of the pill
+              // (its own vertical center sits on the pill's top edge, same
+              // ratio the old FloatingActionButtonLocation.centerDocked used).
+              Positioned(
+                bottom: _barHeight - (_checkSize / 2),
+                child: _CenterFAB(
+                  isActive: isCheckActive,
+                  onTap: onCheckTap,
                 ),
-                _NavItem(
-                  icon: Icons.history_rounded,
-                  label: 'History',
-                  index: 3,
-                  selectedIndex: selectedIndex,
-                  onTap: onTap,
-                ),
-                _NavItem(
-                  icon: Icons.notifications_rounded,
-                  label: 'Alerts',
-                  index: 4,
-                  selectedIndex: selectedIndex,
-                  onTap: onTap,
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -247,11 +266,11 @@ class _NavItem extends StatelessWidget {
         splashColor: const Color(0xFFDC2626).withOpacity(0.12),
         highlightColor: const Color(0xFFDC2626).withOpacity(0.06),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 260),
             curve: Curves.easeOutBack,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
             decoration: BoxDecoration(
               gradient: isSelected
                   ? const LinearGradient(
@@ -355,73 +374,68 @@ class _CenterFABState extends State<_CenterFAB>
   @override
   Widget build(BuildContext context) {
     final isActive = widget.isActive;
-    return AnimatedSlide(
-      offset: isActive ? const Offset(0, 0.55) : Offset.zero,
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeInOut,
-      child: GestureDetector(
-        onTap: () {
-          HapticFeedback.mediumImpact();
-          widget.onTap();
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeInOut,
-          width: isActive ? 72 : 62,
-          height: isActive ? 54 : 62,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(isActive ? 14 : 31),
-            gradient: LinearGradient(
-              colors: isActive
-                  ? [const Color(0xFF750000), const Color(0xFFFF4E4E)]
-                  : [const Color(0xFFDC2626), const Color(0xFFEF4444)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.mediumImpact();
+        widget.onTap();
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOut,
+        width: isActive ? 72 : 62,
+        height: isActive ? 54 : 62,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(isActive ? 14 : 31),
+          gradient: LinearGradient(
+            colors: isActive
+                ? [const Color(0xFF750000), const Color(0xFFFF4E4E)]
+                : [const Color(0xFFDC2626), const Color(0xFFEF4444)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          boxShadow: isActive
+              ? []
+              : [
+                  BoxShadow(
+                    color: const Color(0xFFDC2626).withOpacity(0.45),
+                    blurRadius: 14,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedBuilder(
+              animation: _pulseController,
+              builder: (context, child) {
+                // While active, the drop bobs up/down and squashes &
+                // stretches like it's beating/dripping in place.
+                final t = isActive ? _pulseController.value : 0.0;
+                final bob = -4.0 * t;
+                final stretch = 1.0 + 0.14 * t;
+                final squash = 1.0 - 0.10 * t;
+                return Transform.translate(
+                  offset: Offset(0, bob),
+                  child: Transform(
+                    alignment: Alignment.bottomCenter,
+                    transform: Matrix4.diagonal3Values(squash, stretch, 1),
+                    child: child,
+                  ),
+                );
+              },
+              child: const _BloodDropIcon(),
             ),
-            boxShadow: isActive
-                ? []
-                : [
-                    BoxShadow(
-                      color: const Color(0xFFDC2626).withOpacity(0.45),
-                      blurRadius: 14,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              AnimatedBuilder(
-                animation: _pulseController,
-                builder: (context, child) {
-                  // While active, the drop bobs up/down and squashes &
-                  // stretches like it's beating/dripping in place.
-                  final t = isActive ? _pulseController.value : 0.0;
-                  final bob = -4.0 * t;
-                  final stretch = 1.0 + 0.14 * t;
-                  final squash = 1.0 - 0.10 * t;
-                  return Transform.translate(
-                    offset: Offset(0, bob),
-                    child: Transform(
-                      alignment: Alignment.bottomCenter,
-                      transform: Matrix4.diagonal3Values(squash, stretch, 1),
-                      child: child,
-                    ),
-                  );
-                },
-                child: const _BloodDropIcon(),
+            const SizedBox(height: 2),
+            Text(
+              'Check',
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                color: Colors.white.withOpacity(0.9),
               ),
-              const SizedBox(height: 2),
-              Text(
-                'Check',
-                style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white.withOpacity(0.9),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -781,17 +795,6 @@ class _HomeContentState extends State<HomeContent> {
               children: [
                 Row(
                   children: [
-                    _FeedBackButton(
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const NewsfeedPage()),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -823,6 +826,15 @@ class _HomeContentState extends State<HomeContent> {
                         ],
                       ),
                     ),
+                    HeaderIconButton(
+                      icon: Icons.dynamic_feed_rounded,
+                      tooltip: 'Newsfeed',
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const NewsfeedPage()),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
                     PressableScale(
                       onTap: _navigateToHistory,
                       child: Container(
@@ -1448,59 +1460,3 @@ class _HomeContentState extends State<HomeContent> {
   }
 }
 
-// ── Frosted-glass "back to feed" button ─────────────────────────────────────
-class _FeedBackButton extends StatelessWidget {
-  final VoidCallback onTap;
-  const _FeedBackButton({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(999),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Material(
-          color: Colors.white.withOpacity(0.16),
-          child: InkWell(
-            onTap: onTap,
-            splashColor: Colors.white24,
-            highlightColor: Colors.white10,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.35),
-                  width: 1.2,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.12),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.arrow_back_rounded, color: Colors.white, size: 16),
-                  SizedBox(width: 6),
-                  Text(
-                    'Feed',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}

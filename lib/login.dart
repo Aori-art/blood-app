@@ -1,7 +1,6 @@
 // login.dart
 // Place at: lib/login.dart
 import 'dart:convert';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -9,14 +8,16 @@ import 'config.dart';
 import 'home.dart';
 import 'newsfeed.dart';
 import 'screens/register/register1.dart';
+import 'shared_design.dart';
 import 'forgot_password.dart';
 
-// ─── Design tokens (inline so no cross-lib import needed) ─────────────────────
-const Color _kCrimson = Color(0xFFAE0000);
-const Color _kSurface = Color(0xFFFAF7F7);
-const Color _kInputFill = Color(0xFFF0E8E8);
-const Color _kTextPrimary = Color(0xFF1A0A0A);
-const Color _kTextMuted = Color(0xFF7A5C5C);
+// Design tokens now come from shared_design.dart (kCrimson, kSurface, etc.)
+// so this screen matches the rest of the app instead of its own palette.
+const Color _kCrimson = kCrimson;
+const Color _kSurface = kSurface;
+const Color _kInputFill = kInputFill;
+const Color _kTextPrimary = kTextPrimary;
+const Color _kTextMuted = kTextMuted;
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -98,9 +99,10 @@ class _LoginScreenState extends State<LoginScreen>
           await prefs.setString('userName', data['user_name']);
         if (data['donor_id'] != null)
           await prefs.setString('donorId', data['donor_id'].toString());
-        Navigator.pushReplacement(
+        Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
+          (route) => false,
         );
       } else {
         _snack(data['message'] ?? 'Login failed.');
@@ -127,11 +129,11 @@ class _LoginScreenState extends State<LoginScreen>
         suffixIcon: suffix,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide.none,
+          borderSide: const BorderSide(color: kBorder),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide.none,
+          borderSide: const BorderSide(color: kBorder),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -148,65 +150,50 @@ class _LoginScreenState extends State<LoginScreen>
     final h = MediaQuery.of(context).size.height;
 
     return Scaffold(
-      backgroundColor: _kCrimson,
-      body: SafeArea(
+      body: GradientScreen(
         child: Column(
           children: [
             // ── Hero ───────────────────────────────────────────────────
             SizedBox(
               height: h * 0.30,
-              child: Stack(
-                children: [
-                  Positioned(
-                    top: 4,
-                    left: 4,
-                    child: _FeedBackButton(
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const NewsfeedPage()),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Icon(
+                        Icons.bloodtype_rounded,
+                        color: Colors.white,
+                        size: 36,
                       ),
                     ),
-                  ),
-                  Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 64,
-                          height: 64,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Icon(
-                            Icons.bloodtype_rounded,
-                            color: Colors.white,
-                            size: 36,
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        const Text(
-                          'eDonate',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 30,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Blood Donation App',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.65),
-                            fontSize: 13,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                      ],
+                    const SizedBox(height: 14),
+                    const Text(
+                      'eDonate',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 30,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 4),
+                    Text(
+                      'Blood Donation App',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.65),
+                        fontSize: 13,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
 
@@ -229,6 +216,30 @@ class _LoginScreenState extends State<LoginScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          GestureDetector(
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const NewsfeedPage()),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.arrow_back_rounded,
+                                    size: 14, color: _kTextMuted),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Back to Feed',
+                                  style: TextStyle(
+                                    color: _kTextMuted,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
                           const Text(
                             'Welcome back!',
                             style: TextStyle(
@@ -400,59 +411,3 @@ class _LoginScreenState extends State<LoginScreen>
   }
 }
 
-// ── Frosted-glass "back to feed" button ─────────────────────────────────────
-class _FeedBackButton extends StatelessWidget {
-  final VoidCallback onTap;
-  const _FeedBackButton({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(999),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Material(
-          color: Colors.white.withOpacity(0.16),
-          child: InkWell(
-            onTap: onTap,
-            splashColor: Colors.white24,
-            highlightColor: Colors.white10,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.35),
-                  width: 1.2,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.12),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.arrow_back_rounded, color: Colors.white, size: 16),
-                  SizedBox(width: 6),
-                  Text(
-                    'Feed',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
