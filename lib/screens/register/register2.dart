@@ -7,6 +7,23 @@ import 'package:blood/config.dart';
 import 'package:blood/shared_design.dart';
 import 'register3.dart';
 
+class _LocationOption {
+  final String code;
+  final String name;
+
+  const _LocationOption({
+    required this.code,
+    required this.name,
+  });
+
+  factory _LocationOption.fromJson(Map<String, dynamic> json) {
+    return _LocationOption(
+      code: json['code']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+    );
+  }
+}
+
 class RegisterStep2 extends StatefulWidget {
   final String fullName;
   final String firstName;
@@ -42,9 +59,9 @@ class _RegisterStep2State extends State<RegisterStep2> {
     'O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'
   ];
 
-  List<dynamic> _provinces  = [];
-  List<dynamic> _cities     = [];
-  List<dynamic> _barangays  = [];
+  List<_LocationOption> _provinces = [];
+  List<_LocationOption> _cities = [];
+  List<_LocationOption> _barangays = [];
 
   String? _bloodType;
   String? _provinceCode, _provinceName;
@@ -67,66 +84,139 @@ class _RegisterStep2State extends State<RegisterStep2> {
     super.dispose();
   }
 
+  void _snack(String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _resetCitiesAndBarangays() {
+    _cities = [];
+    _barangays = [];
+    _cityCode = null;
+    _cityName = null;
+    _barangayCode = null;
+    _barangayName = null;
+  }
+
+  void _resetBarangays() {
+    _barangays = [];
+    _barangayCode = null;
+    _barangayName = null;
+  }
+
+  List<_LocationOption> _parseLocationItems(dynamic rawData) {
+    if (rawData is! List) return const [];
+    return rawData
+        .whereType<Map>()
+        .map((item) => _LocationOption.fromJson(Map<String, dynamic>.from(item)))
+        .where((item) => item.code.isNotEmpty && item.name.isNotEmpty)
+        .toList();
+  }
+
   Future<void> _loadProvinces() async {
+    if (mounted) {
+      setState(() => _loadingProvinces = true);
+    }
     try {
-      final res = await http
-          .get(Uri.parse('${AppConfig.baseUrl}/get_provinces.php'));
-      final data = jsonDecode(res.body);
+      final res =
+          await http.get(Uri.parse('${AppConfig.baseUrl}/get_provinces.php'));
+      if (res.statusCode != 200) {
+        throw Exception('HTTP ${res.statusCode}');
+      }
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      if (!mounted) return;
       setState(() {
-        if (data['status'] == 'success') _provinces = data['data'];
+        _provinces = data['status'] == 'success'
+            ? _parseLocationItems(data['data'])
+            : [];
         _loadingProvinces = false;
       });
     } catch (_) {
-      setState(() => _loadingProvinces = false);
+      if (!mounted) return;
+      setState(() {
+        _provinces = [];
+        _loadingProvinces = false;
+      });
+      _snack('Unable to load provinces.');
     }
   }
 
   Future<void> _loadCities(String provinceCode) async {
     setState(() {
       _loadingCities = true;
-      _cities = _barangays = [];
-      _cityCode = _cityName = _barangayCode = _barangayName = null;
+      _loadingBarangays = false;
+      _resetCitiesAndBarangays();
     });
     try {
-      final res = await http.get(Uri.parse(
-          '${AppConfig.baseUrl}/get_cities.php?province_code=$provinceCode'));
-      final data = jsonDecode(res.body);
+      final uri = Uri.parse('${AppConfig.baseUrl}/get_cities.php').replace(
+        queryParameters: {'province_code': provinceCode},
+      );
+      final res = await http.get(uri);
+      if (res.statusCode != 200) {
+        throw Exception('HTTP ${res.statusCode}');
+      }
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      if (!mounted) return;
       setState(() {
-        if (data['status'] == 'success') _cities = data['data'];
+        _cities = data['status'] == 'success'
+            ? _parseLocationItems(data['data'])
+            : [];
         _loadingCities = false;
       });
     } catch (_) {
-      setState(() => _loadingCities = false);
+      if (!mounted) return;
+      setState(() {
+        _cities = [];
+        _loadingCities = false;
+      });
+      _snack('Unable to load cities and municipalities.');
     }
   }
 
-  Future<void> _loadBarangays(String cityCode) async {
+  Future<void> _loadBarangays(String cityCode, String cityName) async {
     setState(() {
       _loadingBarangays = true;
-      _barangays = [];
-      _barangayCode = _barangayName = null;
+      _resetBarangays();
     });
     try {
-      final res = await http.get(Uri.parse(
-          '${AppConfig.baseUrl}/get_barangays.php?city_code=$cityCode'));
-      final data = jsonDecode(res.body);
+      final uri = Uri.parse('${AppConfig.baseUrl}/get_barangays.php').replace(
+        queryParameters: {
+          'city_code': cityCode,
+          'city_name': cityName,
+        },
+      );
+      final res = await http.get(uri);
+      if (res.statusCode != 200) {
+        throw Exception('HTTP ${res.statusCode}');
+      }
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      if (!mounted) return;
       setState(() {
-        if (data['status'] == 'success') _barangays = data['data'];
+        _barangays = data['status'] == 'success'
+            ? _parseLocationItems(data['data'])
+            : [];
         _loadingBarangays = false;
       });
     } catch (_) {
-      setState(() => _loadingBarangays = false);
+      if (!mounted) return;
+      setState(() {
+        _barangays = [];
+        _loadingBarangays = false;
+      });
+      _snack('Unable to load barangays.');
     }
   }
 
   void _goNext() {
     if (_bloodType == null ||
         _streetCtrl.text.trim().isEmpty ||
+        _provinceCode == null ||
         _provinceName == null ||
+        _cityCode == null ||
         _cityName == null ||
+        _barangayCode == null ||
         _barangayName == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please fill in all fields.')));
+      _snack('Please fill in all fields.');
       return;
     }
     Navigator.push(
@@ -144,9 +234,12 @@ class _RegisterStep2State extends State<RegisterStep2> {
           gender: widget.gender,
           bloodType: _bloodType!,
           streetAddress: _streetCtrl.text.trim(),
-          barangay: _barangayName!,
-          municipality: _cityName!,
           province: _provinceName!,
+          provinceCode: _provinceCode!,
+          municipality: _cityName!,
+          cityCode: _cityCode!,
+          barangay: _barangayName!,
+          barangayCode: _barangayCode!,
         ),
       ),
     );
@@ -171,7 +264,7 @@ class _RegisterStep2State extends State<RegisterStep2> {
     required bool loading,
     required String hint,
     required String? value,
-    required List<dynamic> items,
+    required List<_LocationOption> items,
     required bool enabled,
     required void Function(String?) onChanged,
   }) {
@@ -182,9 +275,8 @@ class _RegisterStep2State extends State<RegisterStep2> {
       onChanged: enabled ? onChanged : null,
       items: items.map<DropdownMenuItem<String>>((item) {
         return DropdownMenuItem<String>(
-          value: item['code'].toString(),
-          child: Text(item['name'].toString(),
-              overflow: TextOverflow.ellipsis),
+          value: item.code,
+          child: Text(item.name, overflow: TextOverflow.ellipsis),
         );
       }).toList(),
     );
@@ -251,15 +343,12 @@ class _RegisterStep2State extends State<RegisterStep2> {
                                         enabled: true,
                                         onChanged: (v) {
                                           if (v == null) return;
-                                          final item =
-                                              _provinces.firstWhere(
-                                                  (e) =>
-                                                      e['code'].toString() ==
-                                                      v);
+                                          final item = _provinces.firstWhere(
+                                            (e) => e.code == v,
+                                          );
                                           setState(() {
                                             _provinceCode = v;
-                                            _provinceName =
-                                                item['name'].toString();
+                                            _provinceName = item.name;
                                           });
                                           _loadCities(v);
                                         },
@@ -272,23 +361,23 @@ class _RegisterStep2State extends State<RegisterStep2> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                FieldLabel('Municipality'),
+                                FieldLabel('City / Municipality'),
                                 _locationDropdown(
                                   loading: _loadingCities,
-                                  hint: 'Municipality',
+                                  hint: 'City / Municipality',
                                   value: _cityCode,
                                   items: _cities,
                                   enabled: _provinceCode != null,
                                   onChanged: (v) {
                                     if (v == null) return;
                                     final item = _cities.firstWhere(
-                                        (e) =>
-                                            e['code'].toString() == v);
+                                      (e) => e.code == v,
+                                    );
                                     setState(() {
                                       _cityCode = v;
-                                      _cityName = item['name'].toString();
+                                      _cityName = item.name;
                                     });
-                                    _loadBarangays(v);
+                                    _loadBarangays(item.code, item.name);
                                   },
                                 ),
                               ],
@@ -308,10 +397,11 @@ class _RegisterStep2State extends State<RegisterStep2> {
                         onChanged: (v) {
                           if (v == null) return;
                           final item = _barangays.firstWhere(
-                              (e) => e['code'].toString() == v);
+                            (e) => e.code == v,
+                          );
                           setState(() {
                             _barangayCode = v;
-                            _barangayName = item['name'].toString();
+                            _barangayName = item.name;
                           });
                         },
                       ),

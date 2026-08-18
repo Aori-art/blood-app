@@ -10,7 +10,14 @@ import 'otp.dart';
 class RegisterStep3 extends StatefulWidget {
   final String fullName, firstName, middleInitial, lastName, suffix;
   final String email, phone, birthdate, gender;
-  final String bloodType, streetAddress, barangay, municipality, province;
+  final String bloodType;
+  final String streetAddress;
+  final String province;
+  final String provinceCode;
+  final String municipality;
+  final String cityCode;
+  final String barangay;
+  final String barangayCode;
 
   const RegisterStep3({
     super.key,
@@ -25,9 +32,12 @@ class RegisterStep3 extends StatefulWidget {
     required this.gender,
     required this.bloodType,
     required this.streetAddress,
-    required this.barangay,
-    required this.municipality,
     required this.province,
+    required this.provinceCode,
+    required this.municipality,
+    required this.cityCode,
+    required this.barangay,
+    required this.barangayCode,
   });
 
   @override
@@ -91,9 +101,12 @@ class _RegisterStep3State extends State<RegisterStep3> {
           'gender':         widget.gender,
           'blood_type':     widget.bloodType,
           'street_address': widget.streetAddress,
-          'barangay':       widget.barangay,
-          'municipality':   widget.municipality,
           'province':       widget.province,
+          'province_code':  widget.provinceCode,
+          'municipality':   widget.municipality,
+          'city_code':      widget.cityCode,
+          'barangay':       widget.barangay,
+          'barangay_code':  widget.barangayCode,
           'password':       pass,
         },
       );

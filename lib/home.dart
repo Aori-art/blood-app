@@ -224,10 +224,7 @@ class _CustomNavBar extends StatelessWidget {
               // ratio the old FloatingActionButtonLocation.centerDocked used).
               Positioned(
                 bottom: _barHeight - (_checkSize / 2),
-                child: _CenterFAB(
-                  isActive: isCheckActive,
-                  onTap: onCheckTap,
-                ),
+                child: _CenterFAB(isActive: isCheckActive, onTap: onCheckTap),
               ),
             ],
           ),
@@ -361,7 +358,10 @@ class _CenterFABState extends State<_CenterFAB>
       _pulseController.repeat(reverse: true);
     } else if (!widget.isActive && oldWidget.isActive) {
       _pulseController.stop();
-      _pulseController.animateTo(0, duration: const Duration(milliseconds: 200));
+      _pulseController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 200),
+      );
     }
   }
 
@@ -382,10 +382,10 @@ class _CenterFABState extends State<_CenterFAB>
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
         curve: Curves.easeInOut,
-        width: isActive ? 72 : 62,
-        height: isActive ? 54 : 62,
+        width: 62,
+        height: 62,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(isActive ? 14 : 31),
+          borderRadius: BorderRadius.circular(31),
           gradient: LinearGradient(
             colors: isActive
                 ? [const Color(0xFF750000), const Color(0xFFFF4E4E)]
@@ -610,17 +610,23 @@ class _HomeContentState extends State<HomeContent> {
     }
 
     try {
-      final response = await http.get(
-        Uri.parse("${AppConfig.baseUrl}/get_eligibility.php?donor_id=$donorId"),
-      );
+      final response = await http
+          .get(
+            Uri.parse(
+              "${AppConfig.baseUrl}/get_eligibility.php?donor_id=$donorId",
+            ),
+          )
+          .timeout(const Duration(seconds: 12));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data["status"] == "success") {
           if (mounted) {
             setState(() {
-              nextEligibleDate = formatDate(
-                data["next_eligible_date"]?.toString() ?? "",
-              );
+              nextEligibleDate =
+                  data["next_eligible_date"] == null ||
+                      data["next_eligible_date"].toString().trim().isEmpty
+                  ? "N/A"
+                  : formatDate(data["next_eligible_date"].toString());
               eligibilityStatus = (data["eligibility"] ?? "Unknown").toString();
               isEligibilityLoading = false;
             });
@@ -749,12 +755,42 @@ class _HomeContentState extends State<HomeContent> {
 
   Color getEligibilityStatusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'approved':
+      case 'eligible':
         return const Color(0xFF16A34A);
       case 'pending':
+      case 'for_review':
+      case 'temporary_deferred':
+      case 'not_checked':
         return const Color(0xFFF59E0B);
+      case 'not_eligible':
       default:
         return const Color(0xFFDC2626);
+    }
+  }
+
+  // Maps raw backend eligibility_status.status values to donor-facing text
+  // so the UI never shows a raw snake_case value like "not_eligible".
+  String formatEligibilityStatus(String status) {
+    switch (status.toLowerCase()) {
+      case 'eligible':
+        return 'Eligible';
+      case 'not_eligible':
+        return 'Not Eligible';
+      case 'pending':
+      case 'for_review':
+        return 'Pending Review';
+      case 'temporary_deferred':
+        return 'Temporarily Deferred';
+      case 'not_checked':
+        return 'Not Checked';
+      case 'unknown':
+        return 'Unknown';
+      default:
+        return status
+            .split('_')
+            .where((w) => w.isNotEmpty)
+            .map((w) => w[0].toUpperCase() + w.substring(1))
+            .join(' ');
     }
   }
 
@@ -977,7 +1013,7 @@ class _HomeContentState extends State<HomeContent> {
                               'Status',
                               isEligibilityLoading
                                   ? 'Loading...'
-                                  : eligibilityStatus,
+                                  : formatEligibilityStatus(eligibilityStatus),
                               Icons.circle,
                               getEligibilityStatusColor(eligibilityStatus),
                             ),
@@ -1061,8 +1097,7 @@ class _HomeContentState extends State<HomeContent> {
                               color: Color(0xFF111827),
                             ),
                           ),
-                          if (!isAppointmentsLoading &&
-                              appointments.isNotEmpty)
+                          if (!isAppointmentsLoading && appointments.isNotEmpty)
                             GestureDetector(
                               onTap: () => Navigator.push(
                                 context,
@@ -1459,4 +1494,3 @@ class _HomeContentState extends State<HomeContent> {
     );
   }
 }
-
