@@ -37,7 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadDonorId();
     _screens = [
-      const HomeContent(),
+      HomeContent(onNavigateToTab: _selectTab),
       const BookScreen(),
       const CheckScreen(),
       DonationHistoryScreen(),
@@ -50,7 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     _alertsTapSub = NotificationService.instance.onAlertsTapped.listen((_) {
-      if (mounted) setState(() => _selectedIndex = 4);
+      if (mounted) _selectTab(4);
     });
   }
 
@@ -69,7 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _donorId = id;
         _screens = [
-          const HomeContent(),
+          HomeContent(onNavigateToTab: _selectTab),
           const BookScreen(),
           const CheckScreen(),
           DonationHistoryScreen(),
@@ -107,8 +107,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _onItemTapped(int index) {
-    if (index == 2) return; // handled by FAB
+  void _selectTab(int index) {
+    if (index < 0 || index >= _screens.length) return;
     setState(() => _selectedIndex = index);
   }
 
@@ -118,8 +118,8 @@ class _HomeScreenState extends State<HomeScreen> {
       body: _screens[_selectedIndex],
       bottomNavigationBar: _CustomNavBar(
         selectedIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        onCheckTap: () => setState(() => _selectedIndex = 2),
+        onTap: _selectTab,
+        onCheckTap: () => _selectTab(2),
       ),
     );
   }
@@ -494,7 +494,9 @@ class _BloodDropPainter extends CustomPainter {
 // ── HOME CONTENT ──────────────────────────────────────────────────────────────
 
 class HomeContent extends StatefulWidget {
-  const HomeContent({super.key});
+  final ValueChanged<int> onNavigateToTab;
+
+  const HomeContent({super.key, required this.onNavigateToTab});
 
   @override
   State<HomeContent> createState() => _HomeContentState();
@@ -1022,14 +1024,7 @@ class _HomeContentState extends State<HomeContent> {
                               width: double.infinity,
                               height: 42,
                               child: ElevatedButton.icon(
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => const CheckScreen(),
-                                    ),
-                                  );
-                                },
+                                onPressed: () => widget.onNavigateToTab(2),
                                 icon: const Icon(
                                   Icons.play_arrow_rounded,
                                   size: 18,
@@ -1059,25 +1054,23 @@ class _HomeContentState extends State<HomeContent> {
                         children: [
                           Expanded(
                             child: _actionCard(
-                              context: context,
                               icon: Icons.calendar_month_rounded,
                               iconColor: const Color(0xFF2563EB),
                               iconBg: const Color(0xFFEFF6FF),
                               title: 'Book Appointment',
                               subtitle: 'Schedule your donation',
-                              destination: const BookScreen(),
+                              onTap: () => widget.onNavigateToTab(1),
                             ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: _actionCard(
-                              context: context,
                               icon: Icons.history_rounded,
                               iconColor: const Color(0xFF9333EA),
                               iconBg: const Color(0xFFFAF5FF),
                               title: 'Donation History',
                               subtitle: 'View past donations',
-                              destination: DonationHistoryScreen(),
+                              onTap: () => widget.onNavigateToTab(3),
                             ),
                           ),
                         ],
@@ -1099,12 +1092,7 @@ class _HomeContentState extends State<HomeContent> {
                           ),
                           if (!isAppointmentsLoading && appointments.isNotEmpty)
                             GestureDetector(
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => DonationHistoryScreen(),
-                                ),
-                              ),
+                              onTap: () => widget.onNavigateToTab(3),
                               child: const Text(
                                 'See all',
                                 style: TextStyle(
@@ -1353,19 +1341,15 @@ class _HomeContentState extends State<HomeContent> {
   }
 
   Widget _actionCard({
-    required BuildContext context,
     required IconData icon,
     required Color iconColor,
     required Color iconBg,
     required String title,
     required String subtitle,
-    required Widget destination,
+    required VoidCallback onTap,
   }) {
     return PressableScale(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => destination),
-      ),
+      onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(

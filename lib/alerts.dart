@@ -53,10 +53,7 @@ class NotificationModel {
 class AlertsScreen extends StatefulWidget {
   final int donorId;
 
-  const AlertsScreen({
-    super.key,
-    required this.donorId,
-  });
+  const AlertsScreen({super.key, required this.donorId});
 
   @override
   State<AlertsScreen> createState() => _AlertsScreenState();
@@ -79,9 +76,10 @@ class _AlertsScreenState extends State<AlertsScreen> {
     _fetchNotifications();
     // FCM only tells us something changed — MySQL (via get_notifications.php)
     // remains the authoritative source for the inbox list.
-    _newNotificationSub = NotificationService.instance.onNotificationReceived.listen((_) {
-      if (mounted) _fetchNotifications();
-    });
+    _newNotificationSub = NotificationService.instance.onNotificationReceived
+        .listen((_) {
+          if (mounted) _fetchNotifications();
+        });
   }
 
   @override
@@ -97,9 +95,13 @@ class _AlertsScreenState extends State<AlertsScreen> {
     });
 
     try {
-      final response = await http.get(
-        Uri.parse('${AppConfig.baseUrl}/get_notifications.php?donor_id=${widget.donorId}'),
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .get(
+            Uri.parse(
+              '${AppConfig.baseUrl}/get_notifications.php?donor_id=${widget.donorId}',
+            ),
+          )
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -125,7 +127,8 @@ class _AlertsScreenState extends State<AlertsScreen> {
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Connection error. Please check your connection and try again.';
+        _errorMessage =
+            'Connection error. Please check your connection and try again.';
         _isLoading = false;
       });
       debugPrint('Error fetching notifications: $e');
@@ -147,9 +150,13 @@ class _AlertsScreenState extends State<AlertsScreen> {
         final data = json.decode(response.body);
         if (data['success'] == true) {
           setState(() {
-            final index = _notifications.indexWhere((n) => n.id == notificationId);
+            final index = _notifications.indexWhere(
+              (n) => n.id == notificationId,
+            );
             if (index != -1 && !_notifications[index].isRead) {
-              _notifications[index] = _notifications[index].copyWith(isRead: true);
+              _notifications[index] = _notifications[index].copyWith(
+                isRead: true,
+              );
               if (_unreadCount > 0) _unreadCount--;
             }
           });
@@ -165,17 +172,16 @@ class _AlertsScreenState extends State<AlertsScreen> {
       final response = await http.post(
         Uri.parse('${AppConfig.baseUrl}/mark_notification_read.php'),
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'mark_all': true,
-          'donor_id': widget.donorId,
-        }),
+        body: json.encode({'mark_all': true, 'donor_id': widget.donorId}),
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true) {
           setState(() {
-            _notifications = _notifications.map((n) => n.copyWith(isRead: true)).toList();
+            _notifications = _notifications
+                .map((n) => n.copyWith(isRead: true))
+                .toList();
             _unreadCount = 0;
           });
           if (mounted) {
@@ -250,7 +256,10 @@ class _AlertsScreenState extends State<AlertsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF6B7280))),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Color(0xFF6B7280)),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -258,7 +267,9 @@ class _AlertsScreenState extends State<AlertsScreen> {
               backgroundColor: const Color(0xFFDC2626),
               foregroundColor: Colors.white,
               elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
             child: const Text('Delete All'),
           ),
@@ -289,7 +300,8 @@ class _AlertsScreenState extends State<AlertsScreen> {
         body: json.encode({'donor_id': widget.donorId}),
       );
 
-      final succeeded = response.statusCode == 200 &&
+      final succeeded =
+          response.statusCode == 200 &&
           json.decode(response.body)['success'] == true;
 
       if (!mounted) return;
@@ -322,7 +334,9 @@ class _AlertsScreenState extends State<AlertsScreen> {
             Text(message, style: const TextStyle(fontSize: 13)),
           ],
         ),
-        backgroundColor: isSuccess ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+        backgroundColor: isSuccess
+            ? const Color(0xFF16A34A)
+            : const Color(0xFFDC2626),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         margin: const EdgeInsets.all(12),
@@ -339,12 +353,21 @@ class _AlertsScreenState extends State<AlertsScreen> {
       case 'appointment_cancelled':
       case 'appointment_completed':
         return const Color(0xFF2563EB);
-      case 'reminder':   return const Color(0xFFF59E0B);
-      case 'thank_you':  return const Color(0xFF16A34A);
+      case 'reminder':
+        return const Color(0xFFF59E0B);
+      case 'thank_you':
+        return const Color(0xFF16A34A);
       case 'eligibility':
       case 'eligibility_reviewed':
         return const Color(0xFF9333EA);
-      default:           return const Color(0xFF6B7280);
+      case 'screening_passed':
+        return const Color(0xFF16A34A);
+      case 'screening_failed':
+        return const Color(0xFFDC2626);
+      case 'screening_deferred':
+        return const Color(0xFFF59E0B);
+      default:
+        return const Color(0xFF6B7280);
     }
   }
 
@@ -356,12 +379,21 @@ class _AlertsScreenState extends State<AlertsScreen> {
       case 'appointment_cancelled':
       case 'appointment_completed':
         return const Color(0xFFEFF6FF);
-      case 'reminder':   return const Color(0xFFFFFBEB);
-      case 'thank_you':  return const Color(0xFFF0FDF4);
+      case 'reminder':
+        return const Color(0xFFFFFBEB);
+      case 'thank_you':
+        return const Color(0xFFF0FDF4);
       case 'eligibility':
       case 'eligibility_reviewed':
         return const Color(0xFFFAF5FF);
-      default:           return const Color(0xFFF3F4F6);
+      case 'screening_passed':
+        return const Color(0xFFF0FDF4);
+      case 'screening_failed':
+        return const Color(0xFFFEF2F2);
+      case 'screening_deferred':
+        return const Color(0xFFFFFBEB);
+      default:
+        return const Color(0xFFF3F4F6);
     }
   }
 
@@ -370,15 +402,26 @@ class _AlertsScreenState extends State<AlertsScreen> {
       case 'appointment':
       case 'appointment_rescheduled':
         return Icons.calendar_month_rounded;
-      case 'appointment_approved':  return Icons.event_available_rounded;
-      case 'appointment_cancelled': return Icons.event_busy_rounded;
-      case 'appointment_completed': return Icons.check_circle_rounded;
-      case 'reminder':   return Icons.alarm_rounded;
-      case 'thank_you':  return Icons.favorite_rounded;
+      case 'appointment_approved':
+        return Icons.event_available_rounded;
+      case 'appointment_cancelled':
+        return Icons.event_busy_rounded;
+      case 'appointment_completed':
+        return Icons.check_circle_rounded;
+      case 'reminder':
+        return Icons.alarm_rounded;
+      case 'thank_you':
+        return Icons.favorite_rounded;
       case 'eligibility':
       case 'eligibility_reviewed':
         return Icons.water_drop_rounded;
-      default:           return Icons.notifications_rounded;
+      case 'screening_passed':
+      case 'screening_failed':
+        return Icons.fact_check_rounded;
+      case 'screening_deferred':
+        return Icons.schedule_rounded;
+      default:
+        return Icons.notifications_rounded;
     }
   }
 
@@ -390,12 +433,21 @@ class _AlertsScreenState extends State<AlertsScreen> {
       case 'appointment_cancelled':
       case 'appointment_completed':
         return 'Appointment';
-      case 'reminder':   return 'Reminder';
-      case 'thank_you':  return 'Thank You';
+      case 'reminder':
+        return 'Reminder';
+      case 'thank_you':
+        return 'Thank You';
       case 'eligibility':
       case 'eligibility_reviewed':
         return 'Eligibility';
-      default:           return 'General';
+      case 'screening_passed':
+        return 'Test Passed';
+      case 'screening_failed':
+        return 'Test Failed';
+      case 'screening_deferred':
+        return 'Test Deferred';
+      default:
+        return 'General';
     }
   }
 
@@ -403,7 +455,8 @@ class _AlertsScreenState extends State<AlertsScreen> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
 
-    final showDeleteAll = !_isLoading && _errorMessage == null && _notifications.isNotEmpty;
+    final showDeleteAll =
+        !_isLoading && _errorMessage == null && _notifications.isNotEmpty;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
@@ -419,10 +472,10 @@ class _AlertsScreenState extends State<AlertsScreen> {
                     child: CircularProgressIndicator(color: Color(0xFFDC2626)),
                   )
                 : _errorMessage != null
-                    ? _buildError()
-                    : _notifications.isEmpty
-                        ? _buildEmpty()
-                        : _buildList(size),
+                ? _buildError()
+                : _notifications.isEmpty
+                ? _buildEmpty()
+                : _buildList(size),
           ),
         ],
       ),
@@ -451,7 +504,11 @@ class _AlertsScreenState extends State<AlertsScreen> {
               ),
             ],
           ),
-          child: const Icon(Icons.delete_sweep_rounded, color: Colors.white, size: 26),
+          child: const Icon(
+            Icons.delete_sweep_rounded,
+            color: Colors.white,
+            size: 26,
+          ),
         ),
       ),
     );
@@ -504,7 +561,10 @@ class _AlertsScreenState extends State<AlertsScreen> {
             GestureDetector(
               onTap: _markAllAsRead,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 7,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.18),
                   borderRadius: BorderRadius.circular(20),
@@ -544,7 +604,11 @@ class _AlertsScreenState extends State<AlertsScreen> {
                 color: const Color(0xFFFFF1F1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.wifi_off_rounded, size: 40, color: Color(0xFFDC2626)),
+              child: const Icon(
+                Icons.wifi_off_rounded,
+                size: 40,
+                color: Color(0xFFDC2626),
+              ),
             ),
             const SizedBox(height: 20),
             const Text(
@@ -559,7 +623,11 @@ class _AlertsScreenState extends State<AlertsScreen> {
             Text(
               _errorMessage!,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Color(0xFF6B7280), fontSize: 13, height: 1.5),
+              style: const TextStyle(
+                color: Color(0xFF6B7280),
+                fontSize: 13,
+                height: 1.5,
+              ),
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
@@ -570,8 +638,13 @@ class _AlertsScreenState extends State<AlertsScreen> {
                 backgroundColor: const Color(0xFFDC2626),
                 foregroundColor: Colors.white,
                 elevation: 0,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ],
@@ -591,10 +664,17 @@ class _AlertsScreenState extends State<AlertsScreen> {
               color: Colors.white,
               shape: BoxShape.circle,
               boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 20),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 20,
+                ),
               ],
             ),
-            child: Icon(Icons.notifications_off_rounded, size: 48, color: Colors.grey.shade300),
+            child: Icon(
+              Icons.notifications_off_rounded,
+              size: 48,
+              color: Colors.grey.shade300,
+            ),
           ),
           const SizedBox(height: 20),
           const Text(
@@ -609,7 +689,11 @@ class _AlertsScreenState extends State<AlertsScreen> {
           const Text(
             "You're all caught up. We'll\nnotify you when something new arrives.",
             textAlign: TextAlign.center,
-            style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13, height: 1.5),
+            style: TextStyle(
+              color: Color(0xFF9CA3AF),
+              fontSize: 13,
+              height: 1.5,
+            ),
           ),
         ],
       ),
@@ -636,9 +720,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
               typeColor: _getTypeColor(_notifications[index].notificationType),
               typeBg: _getTypeBg(_notifications[index].notificationType),
               typeIcon: _getTypeIcon(_notifications[index].notificationType),
-              typeLabel: _getTypeLabel(
-                _notifications[index].notificationType,
-              ),
+              typeLabel: _getTypeLabel(_notifications[index].notificationType),
               onTap: () {
                 setState(() {
                   if (_expandedId == _notifications[index].id) {
@@ -706,7 +788,14 @@ class _NotificationCard extends StatelessWidget {
             children: [
               Icon(Icons.delete_rounded, color: Colors.white, size: 24),
               SizedBox(height: 4),
-              Text('Delete', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+              Text(
+                'Delete',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
         ),
@@ -762,7 +851,10 @@ class _NotificationCard extends StatelessWidget {
                               children: [
                                 // Type badge
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 7,
+                                    vertical: 2,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: typeBg,
                                     borderRadius: BorderRadius.circular(6),
@@ -801,7 +893,9 @@ class _NotificationCard extends StatelessWidget {
                                 color: const Color(0xFF111827),
                               ),
                               maxLines: isExpanded ? null : 1,
-                              overflow: isExpanded ? null : TextOverflow.ellipsis,
+                              overflow: isExpanded
+                                  ? null
+                                  : TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 2),
                             Text(
@@ -822,7 +916,9 @@ class _NotificationCard extends StatelessWidget {
                         curve: Curves.easeInOut,
                         child: Icon(
                           Icons.keyboard_arrow_down_rounded,
-                          color: isExpanded ? typeColor : const Color(0xFFD1D5DB),
+                          color: isExpanded
+                              ? typeColor
+                              : const Color(0xFFD1D5DB),
                           size: 22,
                         ),
                       ),
@@ -874,8 +970,11 @@ class _NotificationCard extends StatelessWidget {
                             // Footer row: timestamp + delete button
                             Row(
                               children: [
-                                Icon(Icons.access_time_rounded,
-                                    size: 13, color: Colors.grey.shade400),
+                                Icon(
+                                  Icons.access_time_rounded,
+                                  size: 13,
+                                  color: Colors.grey.shade400,
+                                ),
                                 const SizedBox(width: 4),
                                 Text(
                                   notification.createdAt.isNotEmpty
@@ -890,20 +989,27 @@ class _NotificationCard extends StatelessWidget {
                                 // Delete button
                                 GestureDetector(
                                   onTap: () async {
-                                    final confirm = await _confirmDelete(context);
+                                    final confirm = await _confirmDelete(
+                                      context,
+                                    );
                                     if (confirm == true) onDelete();
                                   },
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 6),
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: const Color(0xFFFFF1F1),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: const Row(
                                       children: [
-                                        Icon(Icons.delete_outline_rounded,
-                                            size: 14, color: Color(0xFFDC2626)),
+                                        Icon(
+                                          Icons.delete_outline_rounded,
+                                          size: 14,
+                                          color: Color(0xFFDC2626),
+                                        ),
                                         SizedBox(width: 4),
                                         Text(
                                           'Delete',
@@ -949,8 +1055,10 @@ class _NotificationCard extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel',
-                style: TextStyle(color: Color(0xFF6B7280))),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Color(0xFF6B7280)),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -959,7 +1067,8 @@ class _NotificationCard extends StatelessWidget {
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
             child: const Text('Delete'),
           ),
