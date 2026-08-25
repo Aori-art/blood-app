@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'anim.dart';
 import 'config.dart';
+import 'digital_id.dart';
 import 'edit_profile.dart';
 import 'help_support.dart';
 import 'login.dart';
@@ -295,6 +296,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       FadeSlideIn(
                         index: 4,
                         child: _card(null, [
+                          _menu(
+                            Icons.badge_rounded,
+                            'Digital Donor ID',
+                            () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const DigitalIdScreen(),
+                              ),
+                            ),
+                            subtitle: 'View your eDonate donor identification',
+                          ),
                           _menu(Icons.edit, 'Edit Profile', () async {
                             final changed = await Navigator.push<bool>(
                               context,
@@ -606,7 +618,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ],
         ),
       );
-  Widget _menu(IconData icon, String label, VoidCallback action) => InkWell(
+  Widget _menu(
+    IconData icon,
+    String label,
+    VoidCallback action, {
+    String? subtitle,
+  }) => InkWell(
     borderRadius: BorderRadius.circular(10),
     onTap: action,
     child: Padding(
@@ -616,13 +633,28 @@ class _HistoryScreenState extends State<HistoryScreen> {
           Icon(icon, size: 20, color: const Color(0xFF6B7280)),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontWeight: FontWeight.w500,
-                fontSize: 14,
-                color: Color(0xFF111827),
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
+                    color: Color(0xFF111827),
+                  ),
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF6B7280),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
           const Icon(Icons.chevron_right, size: 20, color: Color(0xFF9CA3AF)),
