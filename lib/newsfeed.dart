@@ -481,6 +481,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
 
   String _verificationStatus = 'unverified';
   bool _checkingVerification = true;
+  bool _manualRefreshing = false;
 
   List<Post> _posts = [];
   bool _loadingPosts = true;
@@ -591,6 +592,13 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     );
   }
 
+  Future<void> _onManualRefresh() async {
+    if (_manualRefreshing) return;
+    setState(() => _manualRefreshing = true);
+    await Future.wait([_loadPosts(), _fetchVerificationStatus()]);
+    if (mounted) setState(() => _manualRefreshing = false);
+  }
+
   Future<void> _loadPosts() async {
     setState(() {
       _loadingPosts = true;
@@ -622,7 +630,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
             _buildHeader(context),
             Expanded(
               child: RefreshIndicator(
-                onRefresh: _loadPosts,
+                onRefresh: () => Future.wait([_loadPosts(), _fetchVerificationStatus()]),
                 child: ListView(
                   controller: _scrollController,
                   padding: const EdgeInsets.only(bottom: 110),
@@ -894,7 +902,31 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
               ),
             ],
           ),
+          const Spacer(),
+          _buildHeaderRefreshButton(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderRefreshButton() {
+    return SizedBox(
+      width: 36,
+      height: 36,
+      child: IconButton(
+        padding: EdgeInsets.zero,
+        tooltip: 'Refresh',
+        onPressed: _manualRefreshing ? null : _onManualRefresh,
+        icon: _manualRefreshing
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.muted,
+                ),
+              )
+            : const Icon(Icons.refresh_rounded, color: AppColors.muted, size: 20),
       ),
     );
   }

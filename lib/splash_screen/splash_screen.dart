@@ -144,22 +144,19 @@ class _SplashScreenState extends State<SplashScreen>
     getFCMToken();
 
     Timer(const Duration(milliseconds: 3200), () {
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        PageRouteBuilder(
-          pageBuilder: (_, animation, __) =>
-              widget.isLoggedIn ? const HomeScreen() : const NewsfeedPage(),
-          transitionsBuilder: (_, animation, __, child) {
-            return FadeTransition(
-              opacity: animation,
-              child: child,
-            );
-          },
-          transitionDuration: const Duration(milliseconds: 500),
-        ),
-      );
-    });
+  if (!mounted) return;
+  Navigator.pushReplacement(
+    context,
+    PageRouteBuilder(
+      pageBuilder: (_, animation, __) =>
+          widget.isLoggedIn ? const NewsfeedPage() : const LoginScreen(),
+      transitionsBuilder: (_, animation, __, child) {
+        return FadeTransition(opacity: animation, child: child);
+      },
+      transitionDuration: const Duration(milliseconds: 500),
+    ),
+  );
+});
   }
 
   void getFCMToken() async {

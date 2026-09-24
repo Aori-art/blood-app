@@ -100,10 +100,10 @@ class _LoginScreenState extends State<LoginScreen>
         if (data['donor_id'] != null)
           await prefs.setString('donorId', data['donor_id'].toString());
         Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-          (route) => false,
-        );
+  context,
+  MaterialPageRoute(builder: (_) => const NewsfeedPage()),
+  (route) => false,
+);
       } else {
         _snack(data['message'] ?? 'Login failed.');
       }
