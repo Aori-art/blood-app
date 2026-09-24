@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'profile_page_widgets.dart';
@@ -7,18 +9,79 @@ import 'shared_design.dart';
 class HelpSupportScreen extends StatelessWidget {
   const HelpSupportScreen({super.key});
 
-  Future<void> _email(BuildContext context) async {
+  Future<void> _contactSupport(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!context.mounted) return;
+
+    final donorId = prefs.getString('donorId')?.trim();
+    final formattedDonorId = _formatDonorId(donorId);
+    final messageBody =
+        '''Hello eDonate Support,
+
+I need help regarding:
+
+[Please describe your concern here]
+
+Donor ID: $formattedDonorId
+
+Thank you.''';
     final uri = Uri(
       scheme: 'mailto',
-      path: 'edonate73@gmail.com',
-      queryParameters: {'subject': 'eDonate Support Request'},
+      path: 'oedonate@gmail.com',
+      queryParameters: {
+        'subject': 'eDonate Support Request',
+        'body': messageBody,
+      },
     );
-    if (!await launchUrl(uri) && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to open your mail application.')),
-      );
+
+    try {
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened && context.mounted) _showEmailFallback(context);
+    } catch (_) {
+      if (context.mounted) _showEmailFallback(context);
     }
   }
+
+  String _formatDonorId(String? donorId) {
+    if (donorId == null || donorId.isEmpty) return 'Not available';
+    final numericId = int.tryParse(donorId);
+    return numericId == null
+        ? donorId
+        : 'D${numericId.toString().padLeft(4, '0')}';
+  }
+
+  Future<void> _showEmailFallback(BuildContext context) => showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Unable to Open Email App'),
+      content: const Text(
+        "We couldn't open an email application on this device. You can "
+        'contact eDonate directly at:\n\noedonate@gmail.com',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('CANCEL'),
+        ),
+        TextButton(
+          onPressed: () async {
+            await Clipboard.setData(
+              const ClipboardData(text: 'oedonate@gmail.com'),
+            );
+            if (!dialogContext.mounted) return;
+            Navigator.pop(dialogContext);
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Support email copied to clipboard.'),
+              ),
+            );
+          },
+          child: const Text('COPY EMAIL'),
+        ),
+      ],
+    ),
+  );
 
   @override
   Widget build(BuildContext context) => ProfilePage(
@@ -57,22 +120,33 @@ class HelpSupportScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const Row(
+                children: [
+                  Icon(Icons.support_agent_rounded, color: kCrimson),
+                  SizedBox(width: 10),
+                  Text(
+                    'Contact Support',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
               const Text(
-                'Email',
+                'Need assistance? Send our support team an email.',
                 style: TextStyle(fontSize: 12, color: kTextMuted),
               ),
               const SizedBox(height: 3),
               const Text(
-                'edonate73@gmail.com',
+                'oedonate@gmail.com',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () => _email(context),
+                  onPressed: () => _contactSupport(context),
                   icon: const Icon(Icons.email_outlined),
-                  label: const Text('Email Support'),
+                  label: const Text('Contact Support'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: kCrimson,
                     foregroundColor: Colors.white,
@@ -101,7 +175,7 @@ class HelpSupportScreen extends StatelessWidget {
               ),
               SizedBox(height: 8),
               Text('eDonate Donor App', style: TextStyle(color: kTextMuted)),
-              Text('edonate73@gmail.com', style: TextStyle(color: kTextMuted)),
+              Text('oedonate@gmail.com', style: TextStyle(color: kTextMuted)),
             ],
           ),
         ),

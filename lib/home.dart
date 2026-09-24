@@ -115,17 +115,29 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF9FAFB),
       body: _screens[_selectedIndex],
-      bottomNavigationBar: _CustomNavBar(
-        selectedIndex: _selectedIndex,
-        onTap: _selectTab,
-        onCheckTap: () => _selectTab(2),
+      bottomNavigationBar: Material(
+        type: MaterialType.transparency,
+        child: _CustomNavBar(
+          selectedIndex: _selectedIndex,
+          onTap: _selectTab,
+          onCheckTap: () => _selectTab(2),
+        ),
       ),
     );
   }
 }
 
 // ── CUSTOM BOTTOM NAV ─────────────────────────────────────────────────────────
+
+// Total footprint of _CustomNavBar's floating pill, including the portion
+// of the center FAB that pokes above it — excludes the device safe-area
+// inset, which the bar's own SafeArea adds separately. Tabs hosted inside
+// HomeScreen that scroll under this bar should add at least this much
+// bottom padding so their last item isn't tucked behind it.
+const double kBottomNavBarHeight =
+    _CustomNavBar._barHeight + (_CustomNavBar._checkSize / 2) + 8;
 
 class _CustomNavBar extends StatelessWidget {
   final int selectedIndex;
@@ -144,7 +156,7 @@ class _CustomNavBar extends StatelessWidget {
   // overflowing (icon 22 + label ~13 + indicator 3 + spacing + padding ≈ 68).
   static const double _barHeight = 72;
   static const double _checkSize = 62;
-  static const double _stackHeight = _barHeight + (_checkSize / 2) + 8;
+  static const double _stackHeight = kBottomNavBarHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -170,14 +182,10 @@ class _CustomNavBar extends StatelessWidget {
                   borderRadius: BorderRadius.circular(_barHeight / 2),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFDC2626).withOpacity(0.16),
-                      blurRadius: 24,
-                      offset: const Offset(0, 10),
-                    ),
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
+                      color: Colors.black.withOpacity(0.10),
                       blurRadius: 16,
-                      offset: const Offset(0, 4),
+                      spreadRadius: -2,
+                      offset: const Offset(0, 6),
                     ),
                   ],
                 ),

@@ -10,7 +10,9 @@ import 'check.dart';
 import 'config.dart';
 
 class BookScreen extends StatefulWidget {
-  const BookScreen({super.key});
+  final bool showBackButton;
+
+  const BookScreen({super.key, this.showBackButton = false});
 
   @override
   State<BookScreen> createState() => _BookScreenState();
@@ -34,6 +36,7 @@ class _BookScreenState extends State<BookScreen>
   // full object returned by get_appointments.php, needed for reschedule.
   Map<String, dynamic>? _currentAppointment;
   bool _checkingAppointment = true;
+  bool _appointmentError = false;
 
   bool _isRescheduling = false;
   bool _isSubmitting = false;
@@ -135,6 +138,7 @@ class _BookScreenState extends State<BookScreen>
         setState(() {
           _currentAppointment = null;
           _checkingAppointment = false;
+          _appointmentError = false;
         });
         return;
       }
@@ -157,26 +161,40 @@ class _BookScreenState extends State<BookScreen>
                 ? Map<String, dynamic>.from(list.first as Map)
                 : null;
             _checkingAppointment = false;
+            _appointmentError = false;
           });
         } else {
+          // Unexpected response shape — don't assume "no appointment",
+          // surface a retryable error instead so we don't wrongly show
+          // the booking form to someone who already has one.
           setState(() {
-            _currentAppointment = null;
             _checkingAppointment = false;
+            _appointmentError = true;
           });
         }
       } else {
         setState(() {
-          _currentAppointment = null;
           _checkingAppointment = false;
+          _appointmentError = true;
         });
       }
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _currentAppointment = null;
         _checkingAppointment = false;
+        _appointmentError = true;
       });
     }
+  }
+
+  Future<void> _retryFetchAppointment() async {
+    if (mounted) {
+      setState(() {
+        _checkingAppointment = true;
+        _appointmentError = false;
+      });
+    }
+    await _fetchCurrentAppointment();
   }
 
   Future<void> _refreshStatuses() async {
@@ -184,6 +202,7 @@ class _BookScreenState extends State<BookScreen>
       setState(() {
         _checkingEligibility = true;
         _checkingAppointment = true;
+        _appointmentError = false;
       });
     }
 
@@ -591,24 +610,59 @@ class _BookScreenState extends State<BookScreen>
       _formatTime24(raw) ?? (raw ?? "N/A");
 
   String _formatAppointmentStatus(String? raw) {
-    final status = (raw ?? '').toLowerCase();
-    if (status.isEmpty) return "Pending";
-    return status
-        .split('_')
-        .where((w) => w.isNotEmpty)
-        .map((w) => w[0].toUpperCase() + w.substring(1))
-        .join(' ');
+    switch ((raw ?? '').toLowerCase()) {
+      case 'pending':
+        return "Pending Confirmation";
+      case 'confirmed':
+        return "Confirmed";
+      case 'rescheduled':
+        return "Rescheduled";
+      case 'scheduled':
+        return "Scheduled";
+      case 'cancelled':
+      case 'canceled':
+        return "Cancelled";
+      case 'completed':
+        return "Completed";
+      default:
+        final status = (raw ?? '').toLowerCase();
+        if (status.isEmpty) return "Pending Confirmation";
+        return status
+            .split('_')
+            .where((w) => w.isNotEmpty)
+            .map((w) => w[0].toUpperCase() + w.substring(1))
+            .join(' ');
+    }
+  }
+
+  // Short line shown under the status badge in the appointment summary card.
+  String _appointmentStatusSupportingText(String? raw) {
+    switch ((raw ?? '').toLowerCase()) {
+      case 'pending':
+      case 'scheduled':
+        return "We'll notify you once this is confirmed.";
+      case 'approved':
+      case 'confirmed':
+        return "Your appointment is confirmed — please avoid rescheduling unless necessary, as slots are limited for other donors too.";
+      case 'rescheduled':
+        return "Your appointment has been moved — here are the new details.";
+      default:
+        return "";
+    }
   }
 
   Color _appointmentStatusColor(String? raw) {
     switch ((raw ?? '').toLowerCase()) {
       case 'cancelled':
+      case 'canceled':
         return const Color(0xFFDC2626);
       case 'pending':
+      case 'scheduled':
         return const Color(0xFFF59E0B);
       case 'rescheduled':
         return const Color(0xFF2563EB);
       case 'approved':
+      case 'confirmed':
       case 'completed':
         return const Color(0xFF16A34A);
       default:
@@ -618,8 +672,6 @@ class _BookScreenState extends State<BookScreen>
 
   bool get _allSelected =>
       selectedDate != null && selectedCenter != null && selectedTime != null;
-
-  bool get _isLoading => _checkingEligibility || _checkingAppointment;
 
   @override
   Widget build(BuildContext context) {
@@ -641,21 +693,39 @@ class _BookScreenState extends State<BookScreen>
                 colors: [Color(0xFF750000), Color(0xFFFF4E4E)],
               ),
             ),
-            child: const Column(
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                Text(
-                  "Book Appointment",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                const Column(
+                  children: [
+                    Text(
+                      "Book Appointment",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      "Schedule your blood donation",
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                  ],
+                ),
+                if (widget.showBackButton)
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    child: IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
                   ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  "Schedule your blood donation",
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
-                ),
               ],
             ),
           ),
@@ -682,7 +752,7 @@ class _BookScreenState extends State<BookScreen>
   }
 
   Widget _buildBody() {
-    if (_isLoading) {
+    if (_checkingEligibility) {
       return const Center(
         key: ValueKey('loading'),
         child: Padding(
@@ -709,6 +779,26 @@ class _BookScreenState extends State<BookScreen>
       );
     }
 
+    if (_checkingAppointment) {
+      return const Center(
+        key: ValueKey('appointment_loading'),
+        child: Padding(
+          padding: EdgeInsets.only(top: 60),
+          child: CircularProgressIndicator(
+            color: Color(0xFFDC2626),
+            strokeWidth: 2.5,
+          ),
+        ),
+      );
+    }
+
+    if (_appointmentError) {
+      return _AppointmentFetchError(
+        key: const ValueKey('appointment_error'),
+        onRetry: _retryFetchAppointment,
+      );
+    }
+
     if (_currentAppointment != null && !_isRescheduling) {
       return _AppointmentManagementView(
         key: const ValueKey('manage_appointment'),
@@ -717,6 +807,7 @@ class _BookScreenState extends State<BookScreen>
         formatTime: _formatAppointmentTime,
         formatStatus: _formatAppointmentStatus,
         statusColor: _appointmentStatusColor,
+        supportingText: _appointmentStatusSupportingText,
         onReschedule: _startReschedule,
       );
     }
@@ -1136,6 +1227,7 @@ class _AppointmentManagementView extends StatelessWidget {
   final String Function(String?) formatTime;
   final String Function(String?) formatStatus;
   final Color Function(String?) statusColor;
+  final String Function(String?) supportingText;
   final VoidCallback onReschedule;
 
   const _AppointmentManagementView({
@@ -1145,6 +1237,7 @@ class _AppointmentManagementView extends StatelessWidget {
     required this.formatTime,
     required this.formatStatus,
     required this.statusColor,
+    required this.supportingText,
     required this.onReschedule,
   });
 
@@ -1152,6 +1245,10 @@ class _AppointmentManagementView extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = appointment['status']?.toString();
     final color = statusColor(status);
+    final subtitle = supportingText(status);
+    final isConfirmed = const ['approved', 'confirmed'].contains(
+      (status ?? '').toLowerCase(),
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1205,6 +1302,75 @@ class _AppointmentManagementView extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.circle, size: 8, color: color),
+                      const SizedBox(width: 6),
+                      Text(
+                        formatStatus(status),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: color,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (subtitle.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF6B7280),
+                    ),
+                  ),
+                ],
+                const Divider(height: 24, color: Color(0xFFF3F4F6)),
+                if (isConfirmed) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFBFDBFE)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.info_outline_rounded,
+                          color: Color(0xFF2563EB),
+                          size: 18,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            "You're all set for this appointment. Reschedule only if something comes up — this keeps a slot open for another donor in the meantime.",
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF1D4ED8),
+                              height: 1.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 _infoRow(
                   icon: Icons.calendar_today_rounded,
                   label: "Date",
@@ -1226,36 +1392,6 @@ class _AppointmentManagementView extends StatelessWidget {
                   label: "Donation Center",
                   value: appointment['donation_center']?.toString() ?? "N/A",
                 ),
-                const Divider(height: 24, color: Color(0xFFF3F4F6)),
-                Row(
-                  children: [
-                    Icon(Icons.circle, size: 14, color: color),
-                    const SizedBox(width: 10),
-                    const Text(
-                      "Status",
-                      style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-                    ),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: color.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        formatStatus(status),
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: color,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
               ],
             ),
           ),
@@ -1266,22 +1402,44 @@ class _AppointmentManagementView extends StatelessWidget {
           child: SizedBox(
             width: double.infinity,
             height: 50,
-            child: ElevatedButton.icon(
-              onPressed: onReschedule,
-              icon: const Icon(Icons.edit_calendar_rounded, size: 19),
-              label: const Text(
-                "Reschedule Appointment",
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFDC2626),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
+            child: isConfirmed
+                ? OutlinedButton.icon(
+                    onPressed: onReschedule,
+                    icon: const Icon(Icons.edit_calendar_rounded, size: 19),
+                    label: const Text(
+                      "Reschedule Appointment",
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFDC2626),
+                      side: const BorderSide(color: Color(0xFFDC2626)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  )
+                : ElevatedButton.icon(
+                    onPressed: onReschedule,
+                    icon: const Icon(Icons.edit_calendar_rounded, size: 19),
+                    label: const Text(
+                      "Reschedule Appointment",
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFDC2626),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
           ),
         ),
         const SizedBox(height: 16),
@@ -1324,6 +1482,71 @@ class _AppointmentManagementView extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── APPOINTMENT FETCH ERROR ─────────────────────────────────────────────────
+
+class _AppointmentFetchError extends StatelessWidget {
+  final VoidCallback onRetry;
+
+  const _AppointmentFetchError({super.key, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: const Color(0xFFE5E7EB), width: 2),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        children: [
+          const Icon(
+            Icons.wifi_off_rounded,
+            color: Color(0xFF9CA3AF),
+            size: 30,
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            "Couldn't check your appointment status",
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+              color: Color(0xFF111827),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            "Please check your connection and try again.",
+            style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 14),
+          TextButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(
+              Icons.refresh_rounded,
+              size: 18,
+              color: Color(0xFFDC2626),
+            ),
+            label: const Text(
+              "Retry",
+              style: TextStyle(
+                color: Color(0xFFDC2626),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'book.dart';
 import 'config.dart';
+import 'home.dart' show kBottomNavBarHeight;
 
 class Question {
   Question({
@@ -1160,88 +1161,172 @@ class _CheckScreenState extends State<CheckScreen>
         : legacy
         ? 'A previous screening still requires review.'
         : 'You are not eligible to book at this time.';
+    final bottomPad =
+        24 + kBottomNavBarHeight + MediaQuery.of(context).padding.bottom;
     return RefreshIndicator(
       onRefresh: _refresh,
       child: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.fromLTRB(24, 24, 24, bottomPad),
         children: [
-          FadeTransition(
-            opacity: _resultAnimation,
-            child: Column(
-              children: [
-                CircleAvatar(
-                  radius: 48,
-                  backgroundColor: color.withValues(alpha: .12),
-                  child: Icon(icon, size: 54, color: color),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 23,
-                    fontWeight: FontWeight.bold,
+          ScaleTransition(
+            scale: CurvedAnimation(
+              parent: _resultAnimation,
+              curve: Curves.easeOutBack,
+            ),
+            child: FadeTransition(
+              opacity: _resultAnimation,
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: 120,
+                    height: 120,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Container(
+                          width: 120,
+                          height: 120,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: RadialGradient(
+                              colors: [
+                                color.withValues(alpha: .22),
+                                color.withValues(alpha: 0),
+                              ],
+                            ),
+                          ),
+                        ),
+                        CircleAvatar(
+                          radius: 48,
+                          backgroundColor: color.withValues(alpha: .12),
+                          child: Icon(icon, size: 54, color: color),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 14),
-                if (_reason?.isNotEmpty == true)
+                  const SizedBox(height: 20),
                   Text(
-                    _reason!,
+                    title,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                const SizedBox(height: 8),
-                Text(
-                  _recommendation?.isNotEmpty == true
-                      ? _recommendation!
-                      : fallback,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Color(0xFF6B7280), height: 1.5),
-                ),
-                if (_nextDate?.isNotEmpty == true)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 16),
-                    child: Text(
-                      'Next Eligible Date: ${_formatDate(_nextDate!)}',
-                      style: TextStyle(
-                        color: color,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    style: const TextStyle(
+                      fontSize: 23,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                const SizedBox(height: 28),
-                if (eligible && _canBook)
-                  SizedBox(
+                  const SizedBox(height: 16),
+                  Container(
                     width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const BookScreen()),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: color,
-                        foregroundColor: Colors.white,
-                      ),
-                      child: const Text('Book an Appointment'),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: color.withValues(alpha: .18)),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black12,
+                          blurRadius: 6,
+                          offset: Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        if (_reason?.isNotEmpty == true)
+                          Text(
+                            _reason!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        if (_reason?.isNotEmpty == true)
+                          const SizedBox(height: 8),
+                        Text(
+                          _recommendation?.isNotEmpty == true
+                              ? _recommendation!
+                              : fallback,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Color(0xFF6B7280),
+                            height: 1.5,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                if (!eligible && _canRetake)
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _retake,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: color,
-                        foregroundColor: Colors.white,
+                  if (_nextDate?.isNotEmpty == true)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16),
+                      child: Text(
+                        'Next Eligible Date: ${_formatDate(_nextDate!)}',
+                        style: TextStyle(
+                          color: color,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                      child: const Text('Take Eligibility Check Again'),
                     ),
+                  const SizedBox(height: 28),
+                  if (eligible && _canBook)
+                    Container(
+                      width: double.infinity,
+                      height: 54,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: color.withValues(alpha: .35),
+                            blurRadius: 14,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: ElevatedButton.icon(
+                        onPressed: () =>
+                            Navigator.of(context, rootNavigator: true).push(
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    const BookScreen(showBackButton: true),
+                              ),
+                            ),
+                        icon: const Icon(
+                          Icons.calendar_month_rounded,
+                          size: 20,
+                        ),
+                        label: const Text(
+                          'Book an Appointment',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: color,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (!eligible && _canRetake)
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _retake,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: color,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('Take Eligibility Check Again'),
+                      ),
+                    ),
+                  const SizedBox(height: 12),
+                  TextButton.icon(
+                    onPressed: _refresh,
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: const Text('Refresh status'),
                   ),
-                TextButton(
-                  onPressed: _refresh,
-                  child: const Text('Refresh status'),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],

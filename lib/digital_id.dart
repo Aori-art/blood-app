@@ -18,6 +18,7 @@ class _DigitalIdScreenState extends State<DigitalIdScreen> {
   Map<String, dynamic>? _donor;
   String? _error;
   bool _loading = true;
+  bool _hidden = false;
 
   @override
   void initState() {
@@ -95,6 +96,10 @@ class _DigitalIdScreenState extends State<DigitalIdScreen> {
 
   String _value(String key) =>
       _safeText(_donor?[key]).isEmpty ? 'N/A' : _safeText(_donor?[key]);
+
+  // Masks a displayed value with a fixed-length placeholder (rather than
+  // dots matching the real length) so hiding info doesn't leak its length.
+  String _mask(String value) => _hidden ? '•' * 8 : value;
 
   String _donorCode() {
     final code = _safeText(_donor?['donor_code']);
@@ -181,6 +186,14 @@ class _DigitalIdScreenState extends State<DigitalIdScreen> {
               ),
             ],
           ),
+        ),
+        const SizedBox(width: 14),
+        HeaderIconButton(
+          icon: _hidden
+              ? Icons.visibility_off_rounded
+              : Icons.visibility_rounded,
+          tooltip: _hidden ? 'Show donor information' : 'Hide donor information',
+          onTap: () => setState(() => _hidden = !_hidden),
         ),
       ],
     ),
@@ -369,7 +382,7 @@ class _DigitalIdScreenState extends State<DigitalIdScreen> {
           child: Column(
             children: [
               Text(
-                _value('full_name').toUpperCase(),
+                _mask(_value('full_name').toUpperCase()),
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Color(0xFF111827),
@@ -379,7 +392,7 @@ class _DigitalIdScreenState extends State<DigitalIdScreen> {
               ),
               const SizedBox(height: 5),
               Text(
-                'Donor ID: ${_donorCode()}',
+                'Donor ID: ${_mask(_donorCode())}',
                 style: const TextStyle(
                   color: Color(0xFF6B7280),
                   fontSize: 13,
@@ -408,7 +421,7 @@ class _DigitalIdScreenState extends State<DigitalIdScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _value('blood_type'),
+                      _mask(_value('blood_type')),
                       style: const TextStyle(
                         color: kCrimson,
                         fontSize: 32,
@@ -422,30 +435,34 @@ class _DigitalIdScreenState extends State<DigitalIdScreen> {
               _detail(
                 Icons.person_outline_rounded,
                 'Name',
-                _value('full_name'),
+                _mask(_value('full_name')),
               ),
               _detail(
                 Icons.bloodtype_rounded,
                 'Blood Type',
-                _value('blood_type'),
+                _mask(_value('blood_type')),
                 color: kCrimson,
               ),
-              _detail(Icons.badge_outlined, 'Donor ID', _donorCode()),
-              _detail(Icons.location_on_outlined, 'Address', _value('address')),
+              _detail(Icons.badge_outlined, 'Donor ID', _mask(_donorCode())),
+              _detail(
+                Icons.location_on_outlined,
+                'Address',
+                _mask(_value('address')),
+              ),
               _detail(
                 Icons.phone_outlined,
                 'Contact Number',
-                _value('contact_number'),
+                _mask(_value('contact_number')),
               ),
               _detail(
                 Icons.history_rounded,
                 'Last Donation Date',
-                _formattedDate('last_donation_date'),
+                _mask(_formattedDate('last_donation_date')),
               ),
               _detail(
                 Icons.event_available_rounded,
                 'Next Eligible Donation Date',
-                _formattedDate('next_eligible_date'),
+                _mask(_formattedDate('next_eligible_date')),
               ),
             ],
           ),

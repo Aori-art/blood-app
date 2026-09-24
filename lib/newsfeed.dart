@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'anim.dart';
-import 'history.dart';
 import 'login.dart';
 import 'home.dart';
 import 'config.dart';
+import 'verify.dart';
 // ── Theme Colors ─────────────────────────────────────────────────────────────
 
 class AppColors {
@@ -389,181 +389,6 @@ class _PostCardState extends State<PostCard> {
             ),
           ),
 
-          // Event banner
-          if (post.type == PostType.event && post.eventDate != null)
-            Container(
-              margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: AppColors.accentBg,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.primary.withOpacity(0.2)),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    alignment: Alignment.center,
-                    child: const Icon(Icons.calendar_today,
-                        size: 18, color: Colors.white),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          post.eventDate!,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.foreground,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Row(
-                          children: [
-                            const Icon(Icons.location_on,
-                                size: 9, color: AppColors.muted),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                post.eventLocation ?? "",
-                                style: const TextStyle(
-                                    fontSize: 11, color: AppColors.muted),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: const Text(
-                      "RSVP",
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-          // Milestone banner
-          if (post.type == PostType.milestone)
-            Container(
-              margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                gradient: LinearGradient(
-                  colors: [Colors.red.shade50, Colors.pink.shade50],
-                ),
-                border: Border.all(color: AppColors.primary.withOpacity(0.15)),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    alignment: Alignment.center,
-                    child:
-                        const Icon(Icons.trending_up, size: 18, color: AppColors.primary),
-                  ),
-                  const SizedBox(width: 12),
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "50,000",
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.primary,
-                          height: 1,
-                        ),
-                      ),
-                      Text(
-                        "Donations completed",
-                        style: TextStyle(fontSize: 11, color: AppColors.muted),
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  SizedBox(
-                    width: 76,
-                    height: 32,
-                    child: Stack(
-                      children: [
-                        for (final entry in [
-                          "photo-1494790108755-2616b612b786",
-                          "photo-1539571696357-5a69c17a67c6",
-                          "photo-1507003211169-0a1dd7228f2d",
-                        ].asMap().entries)
-                          Positioned(
-                            left: entry.key * 20.0,
-                            child: Container(
-                              width: 32,
-                              height: 32,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 2),
-                              ),
-                              clipBehavior: Clip.antiAlias,
-                              child: netImage(
-                                  "https://images.unsplash.com/${entry.value}?w=64&h=64&fit=crop&auto=format"),
-                            ),
-                          ),
-                        Positioned(
-                          left: 60,
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
-                            ),
-                            alignment: Alignment.center,
-                            child: const Text(
-                              "+99k",
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
           // Post text
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -654,6 +479,9 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
   String? _userName;
   bool _checkedLogin = false;
 
+  String _verificationStatus = 'unverified';
+  bool _checkingVerification = true;
+
   List<Post> _posts = [];
   bool _loadingPosts = true;
   String? _postsError;
@@ -666,6 +494,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
   void initState() {
     super.initState();
     _checkLoginStatus();
+    _fetchVerificationStatus();
     _loadPosts();
     _scrollController.addListener(_handleScroll);
   }
@@ -705,6 +534,63 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     });
   }
 
+  Future<void> _fetchVerificationStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final donorId = int.tryParse(prefs.getString('donorId') ?? '') ?? 0;
+    if (!mounted) return;
+
+    if (donorId <= 0) {
+      setState(() {
+        _verificationStatus = 'unverified';
+        _checkingVerification = false;
+      });
+      return;
+    }
+
+    try {
+      final response = await http
+          .get(
+            Uri.parse(
+              '${AppConfig.baseUrl}/get_verification_status.php?donor_id=$donorId',
+            ),
+          )
+          .timeout(const Duration(seconds: 12));
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is Map && data['status'] == 'success') {
+          setState(() {
+            _verificationStatus = (data['verification_status'] as String?) ?? 'unverified';
+            _checkingVerification = false;
+          });
+          return;
+        }
+      }
+      setState(() {
+        _verificationStatus = 'unverified';
+        _checkingVerification = false;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _verificationStatus = 'unverified';
+          _checkingVerification = false;
+        });
+      }
+    }
+  }
+
+  void _scrollToVerifyCta() {
+    if (!_scrollController.hasClients) return;
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
   Future<void> _loadPosts() async {
     setState(() {
       _loadingPosts = true;
@@ -742,7 +628,8 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
                   padding: const EdgeInsets.only(bottom: 110),
                   children: [
                     FadeSlideIn(index: 0, child: _buildSignInCta(context)),
-                    FadeSlideIn(index: 1, child: _buildTrendingAlert(context)),
+                    if (_isLoggedIn)
+                      FadeSlideIn(index: 1, child: _buildVerifyIdCta(context)),
                     const SizedBox(height: 16),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -755,8 +642,67 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
           ],
         ),
       ),
-      floatingActionButton: _buildHomeFab(context),
+      floatingActionButton: _buildFabArea(context),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+    );
+  }
+
+  // ── FAB slot: "Go to Home"/"Sign In" button, or a quiet status banner ───
+  Widget? _buildFabArea(BuildContext context) {
+    if (!_isLoggedIn) return _buildHomeFab(context);
+    if (_checkingVerification) return null;
+    if (_verificationStatus == 'verified') return _buildHomeFab(context);
+    return _buildVerificationBanner(context);
+  }
+
+  Widget _buildVerificationBanner(BuildContext context) {
+    final isPending = _verificationStatus == 'pending';
+    final bg = isPending ? const Color(0xFFFFFBEB) : const Color(0xFFF3F4F6);
+    final border = isPending ? const Color(0xFFFDE68A) : AppColors.border;
+    final fg = isPending ? const Color(0xFFB45309) : AppColors.muted;
+    final icon = isPending ? Icons.hourglass_top_rounded : Icons.info_outline_rounded;
+    final text = isPending
+        ? "Home unlocks once your ID is verified"
+        : "Verify your ID to unlock the rest of the app";
+
+    return AnimatedSlide(
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+      offset: _fabVisible ? Offset.zero : const Offset(0, 2),
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+        opacity: _fabVisible ? 1 : 0,
+        child: IgnorePointer(
+          ignoring: !_fabVisible,
+          child: GestureDetector(
+            onTap: isPending ? null : _scrollToVerifyCta,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              decoration: BoxDecoration(
+                color: bg,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: border),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 14, color: fg),
+                  const SizedBox(width: 8),
+                  Text(
+                    text,
+                    style: TextStyle(
+                      color: fg,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -948,47 +894,10 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
               ),
             ],
           ),
-          const Spacer(),
-          GestureDetector(
-  onTap: () => _handleProfileTap(context),
-  child: ClipOval(
-    child: Container(
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: AppColors.mutedBg,
-        border: Border.all(
-            color: AppColors.primary.withOpacity(0.3), width: 2),
-      ),
-      child: const Icon(
-        Icons.person,
-        color: AppColors.muted,
-        size: 20,
-      ),
-    ),
-  ),
-),
         ],
       ),
     );
   }
-
-  Future<void> _handleProfileTap(BuildContext context) async {
-  final prefs = await SharedPreferences.getInstance();
-  final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
-  final donorId = prefs.getString('donorId');
-
-  if (isLoggedIn && donorId != null && donorId.isNotEmpty) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const HistoryScreen()),
-    );
-  } else {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-    );
-  }
-}
 
   Widget _buildSignInCta(BuildContext context) {
   // Avoid flashing the CTA before we've checked login state
@@ -1072,32 +981,9 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
   );
 }
 
-  Widget _statChip(IconData icon, String label) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 11, color: Colors.white70),
-        const SizedBox(width: 4),
-        Text(label, style: const TextStyle(fontSize: 11, color: Colors.white70)),
-      ],
-    );
-  }
-
-  Widget _dot() {
+  Widget _buildVerifyIdCta(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8),
-      width: 3,
-      height: 3,
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.3),
-        shape: BoxShape.circle,
-      ),
-    );
-  }
-
-  Widget _buildTrendingAlert(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1121,7 +1007,8 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
-            child: const Icon(Icons.trending_up, size: 15, color: AppColors.primary),
+            child: const Icon(Icons.verified_user_outlined,
+                size: 15, color: AppColors.primary),
           ),
           const SizedBox(width: 12),
           const Expanded(
@@ -1129,7 +1016,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  "Trending: Mega Blood Drive",
+                  "Verify Your Identity",
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
@@ -1137,7 +1024,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
                   ),
                 ),
                 Text(
-                  "142 people are going · SM MoA, this Saturday",
+                  "Upload a valid ID to unlock full access",
                   style: TextStyle(fontSize: 11, color: AppColors.muted),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1146,7 +1033,11 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
           ),
           const SizedBox(width: 8),
           OutlinedButton(
-            onPressed: () {},
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const VerifyScreen()),
+              );
+            },
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.primary,
               side: BorderSide(color: AppColors.primary.withOpacity(0.3)),
@@ -1158,7 +1049,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
             child: const Text(
-              "Join",
+              "Verify",
               style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
             ),
           ),
@@ -1166,4 +1057,28 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       ),
     );
   }
+
+  Widget _statChip(IconData icon, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 11, color: Colors.white70),
+        const SizedBox(width: 4),
+        Text(label, style: const TextStyle(fontSize: 11, color: Colors.white70)),
+      ],
+    );
+  }
+
+  Widget _dot() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8),
+      width: 3,
+      height: 3,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.3),
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+
 }

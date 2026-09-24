@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -38,6 +39,19 @@ Future<void> _firebaseMessagingBackgroundHandler(
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Draw edge-to-edge with a transparent system navigation bar so the
+  // Android nav bar never paints an opaque strip behind the floating
+  // bottom nav pill in home.dart.
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarDividerColor: Colors.transparent,
+      systemNavigationBarIconBrightness: Brightness.dark,
+      statusBarColor: Colors.transparent,
+    ),
+  );
 
   // Initialize Firebase using the configuration generated
   // by "flutterfire configure".
