@@ -11,8 +11,13 @@ import 'config.dart';
 
 class BookScreen extends StatefulWidget {
   final bool showBackButton;
+  final int? preselectedFacilityId;
 
-  const BookScreen({super.key, this.showBackButton = false});
+  const BookScreen({
+    super.key,
+    this.showBackButton = false,
+    this.preselectedFacilityId,
+  });
 
   @override
   State<BookScreen> createState() => _BookScreenState();
@@ -21,7 +26,7 @@ class BookScreen extends StatefulWidget {
 class _BookScreenState extends State<BookScreen>
     with SingleTickerProviderStateMixin {
   DateTime? selectedDate;
-  String? selectedCenter;
+  int? selectedFacilityId;
   String? selectedTime;
 
   // Raw backend eligibility_status.status value: eligible / not_eligible /
@@ -41,7 +46,27 @@ class _BookScreenState extends State<BookScreen>
   bool _isRescheduling = false;
   bool _isSubmitting = false;
 
-  final List<String> centers = ["Lipa City Hall"];
+  // Post-donation success screen (get_donation_status.php) — the backend
+  // decides when to show it via show_donation_success, we don't re-derive it.
+  Map<String, dynamic>? _latestDonation;
+  Map<String, dynamic>? _donationEligibility;
+  int _totalDonations = 0;
+  bool _showDonationSuccess = false;
+  bool _checkingDonation = true;
+
+  // Donation centers (facilities table) — fetched, not hardcoded.
+  List<Map<String, dynamic>> _facilities = [];
+  bool _loadingFacilities = true;
+  bool _facilitiesError = false;
+  bool _appliedPreselect = false;
+
+  Map<String, dynamic>? get _selectedFacility {
+    if (selectedFacilityId == null) return null;
+    for (final f in _facilities) {
+      if ((f['facility_id'] as num?)?.toInt() == selectedFacilityId) return f;
+    }
+    return null;
+  }
 
   final List<String> timeSlots = [
     "8:00 AM - 9:00 AM",
@@ -71,7 +96,12 @@ class _BookScreenState extends State<BookScreen>
   }
 
   Future<void> _loadStatuses() async {
-    await Future.wait([_fetchEligibilityStatus(), _fetchCurrentAppointment()]);
+    await Future.wait([
+      _fetchEligibilityStatus(),
+      _fetchCurrentAppointment(),
+      _fetchDonationStatus(),
+      _fetchFacilities(),
+    ]);
   }
 
   Future<void> _fetchEligibilityStatus() async {
@@ -187,6 +217,115 @@ class _BookScreenState extends State<BookScreen>
     }
   }
 
+  Future<void> _fetchDonationStatus() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final donorId = prefs.getString('donorId');
+
+      if (donorId == null || donorId.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _showDonationSuccess = false;
+          _checkingDonation = false;
+        });
+        return;
+      }
+
+      final url = Uri.parse(
+        "${AppConfig.baseUrl}/get_donation_status.php?donor_id=$donorId",
+      );
+
+      final response = await http.get(url).timeout(const Duration(seconds: 10));
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        if (data is Map && data['status'] == 'success') {
+          setState(() {
+            _showDonationSuccess = data['show_donation_success'] == true;
+            _latestDonation = data['latest_donation'] is Map
+                ? Map<String, dynamic>.from(data['latest_donation'])
+                : null;
+            _donationEligibility = data['eligibility'] is Map
+                ? Map<String, dynamic>.from(data['eligibility'])
+                : null;
+            _totalDonations = (data['total_donations'] as num?)?.toInt() ?? 0;
+            _checkingDonation = false;
+          });
+        } else {
+          setState(() {
+            _showDonationSuccess = false;
+            _checkingDonation = false;
+          });
+        }
+      } else {
+        setState(() {
+          _showDonationSuccess = false;
+          _checkingDonation = false;
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _showDonationSuccess = false;
+        _checkingDonation = false;
+      });
+    }
+  }
+
+  Future<void> _fetchFacilities() async {
+    try {
+      final url = Uri.parse("${AppConfig.baseUrl}/get_facilities.php");
+      final response = await http.get(url).timeout(const Duration(seconds: 10));
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final list = data is Map ? data['facilities'] : null;
+
+        if (data is Map && data['status'] == 'success' && list is List) {
+          final facilities = list
+              .whereType<Map>()
+              .map((f) => Map<String, dynamic>.from(f))
+              .toList();
+
+          int? preselect;
+          if (!_appliedPreselect &&
+              widget.preselectedFacilityId != null &&
+              !_isRescheduling &&
+              selectedFacilityId == null) {
+            final exists = facilities.any(
+              (f) => (f['facility_id'] as num?)?.toInt() == widget.preselectedFacilityId,
+            );
+            if (exists) preselect = widget.preselectedFacilityId;
+          }
+
+          setState(() {
+            _facilities = facilities;
+            _loadingFacilities = false;
+            _facilitiesError = false;
+            if (preselect != null) selectedFacilityId = preselect;
+            _appliedPreselect = true;
+          });
+          return;
+        }
+      }
+      setState(() {
+        _loadingFacilities = false;
+        _facilitiesError = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadingFacilities = false;
+        _facilitiesError = true;
+      });
+    }
+  }
+
   Future<void> _retryFetchAppointment() async {
     if (mounted) {
       setState(() {
@@ -203,6 +342,9 @@ class _BookScreenState extends State<BookScreen>
         _checkingEligibility = true;
         _checkingAppointment = true;
         _appointmentError = false;
+        _checkingDonation = true;
+        _loadingFacilities = true;
+        _facilitiesError = false;
       });
     }
 
@@ -270,7 +412,7 @@ class _BookScreenState extends State<BookScreen>
     }
 
     if (selectedDate == null ||
-        selectedCenter == null ||
+        selectedFacilityId == null ||
         selectedTime == null) {
       _showSnack("Please fill in all fields");
       return;
@@ -304,7 +446,8 @@ class _BookScreenState extends State<BookScreen>
               "donor_id": int.tryParse(donorId) ?? donorId,
               "appointment_date": formattedDate,
               "appointment_time": selectedTime,
-              "donation_center": selectedCenter,
+              "donation_center": _selectedFacility!['facility_name'],
+              "facility_id": selectedFacilityId,
             }),
           )
           .timeout(const Duration(seconds: 15));
@@ -325,7 +468,7 @@ class _BookScreenState extends State<BookScreen>
         final appointment = data['appointment'];
         setState(() {
           selectedDate = null;
-          selectedCenter = null;
+          selectedFacilityId = null;
           selectedTime = null;
           _isSubmitting = false;
           _currentAppointment = appointment is Map
@@ -369,9 +512,18 @@ class _BookScreenState extends State<BookScreen>
       prefillDate = null;
     }
 
-    final prefillCenter = centers.contains(appointment['donation_center'])
-        ? appointment['donation_center'].toString()
-        : null;
+    final appointmentCenterName =
+        appointment['donation_center']?.toString().trim().toLowerCase();
+    int? prefillFacilityId;
+    if (appointmentCenterName != null && appointmentCenterName.isNotEmpty) {
+      for (final f in _facilities) {
+        final name = f['facility_name']?.toString().trim().toLowerCase();
+        if (name != null && name == appointmentCenterName) {
+          prefillFacilityId = (f['facility_id'] as num?)?.toInt();
+          break;
+        }
+      }
+    }
 
     final formattedStart = _formatTime24(
       appointment['appointment_time']?.toString(),
@@ -388,7 +540,7 @@ class _BookScreenState extends State<BookScreen>
 
     setState(() {
       selectedDate = prefillDate;
-      selectedCenter = prefillCenter;
+      selectedFacilityId = prefillFacilityId;
       selectedTime = prefillTime;
       _isRescheduling = true;
     });
@@ -398,14 +550,14 @@ class _BookScreenState extends State<BookScreen>
     setState(() {
       _isRescheduling = false;
       selectedDate = null;
-      selectedCenter = null;
+      selectedFacilityId = null;
       selectedTime = null;
     });
   }
 
   Future<void> _confirmAndReschedule() async {
     if (selectedDate == null ||
-        selectedCenter == null ||
+        selectedFacilityId == null ||
         selectedTime == null) {
       _showSnack("Please fill in all fields");
       return;
@@ -483,7 +635,8 @@ class _BookScreenState extends State<BookScreen>
               "appointment_id": appointment['appointment_id'],
               "appointment_date": formattedDate,
               "appointment_time": selectedTime,
-              "donation_center": selectedCenter,
+              "donation_center": _selectedFacility!['facility_name'],
+              "facility_id": selectedFacilityId,
             }),
           )
           .timeout(const Duration(seconds: 15));
@@ -506,7 +659,7 @@ class _BookScreenState extends State<BookScreen>
           _isSubmitting = false;
           _isRescheduling = false;
           selectedDate = null;
-          selectedCenter = null;
+          selectedFacilityId = null;
           selectedTime = null;
           if (updated is Map) {
             _currentAppointment = Map<String, dynamic>.from(updated);
@@ -671,7 +824,7 @@ class _BookScreenState extends State<BookScreen>
   }
 
   bool get _allSelected =>
-      selectedDate != null && selectedCenter != null && selectedTime != null;
+      selectedDate != null && selectedFacilityId != null && selectedTime != null;
 
   @override
   Widget build(BuildContext context) {
@@ -752,13 +905,23 @@ class _BookScreenState extends State<BookScreen>
   }
 
   Widget _buildBody() {
-    if (_checkingEligibility) {
+    if (_checkingEligibility || _checkingDonation) {
       return const Center(
         key: ValueKey('loading'),
         child: Padding(
           padding: EdgeInsets.only(top: 80),
           child: CircularProgressIndicator(color: Color(0xFFDC2626)),
         ),
+      );
+    }
+
+    if (_showDonationSuccess && _latestDonation != null) {
+      return _DonationSuccessView(
+        key: const ValueKey('donation_success'),
+        donation: _latestDonation!,
+        eligibility: _donationEligibility,
+        totalDonations: _totalDonations,
+        formatDate: _formatDateString,
       );
     }
 
@@ -910,57 +1073,7 @@ class _BookScreenState extends State<BookScreen>
           child: _sectionCard(
             icon: Icons.location_on,
             title: "Choose Donation Center",
-            child: Column(
-              children: [
-                _styledDropdown<String>(
-                  value: selectedCenter,
-                  hint: "Select a center",
-                  items: centers,
-                  onChanged: (val) {
-                    setState(() => selectedCenter = val);
-                  },
-                ),
-                if (selectedCenter != null) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Address",
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFF6B7280),
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          "Areza Estate (Ayala Land), Lipa City",
-                          style: TextStyle(
-                            fontWeight: FontWeight.w500,
-                            fontSize: 13,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          "Open: Mon-Fri, 8 AM - 6 PM",
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFF2563EB),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
+            child: _donationCenterContent(),
           ),
         ),
         const SizedBox(height: 16),
@@ -1035,7 +1148,7 @@ class _BookScreenState extends State<BookScreen>
                   const SizedBox(height: 6),
                   _summaryRow("Time", selectedTime!),
                   const SizedBox(height: 6),
-                  _summaryRow("Center", selectedCenter!),
+                  _summaryRow("Center", _selectedFacility!['facility_name'].toString()),
                 ],
               ),
             ),
@@ -1190,6 +1303,206 @@ class _BookScreenState extends State<BookScreen>
             )
             .toList(),
         onChanged: onChanged,
+      ),
+    );
+  }
+
+  Widget _donationCenterContent() {
+    if (_loadingFacilities) {
+      return Container(
+        width: double.infinity,
+        height: 48,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF9FAFB),
+          border: Border.all(color: const Color(0xFFD1D5DB)),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: const SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFDC2626)),
+        ),
+      );
+    }
+
+    if (_facilitiesError) {
+      return Row(
+        children: [
+          const Icon(Icons.wifi_off_rounded, color: Color(0xFF9CA3AF), size: 18),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              "Couldn't load donation centers",
+              style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _loadingFacilities = true;
+                _facilitiesError = false;
+              });
+              _fetchFacilities();
+            },
+            child: const Text(
+              "Retry",
+              style: TextStyle(color: Color(0xFFDC2626), fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (_facilities.isEmpty) {
+      return const Text(
+        "No donation centers are available right now.",
+        style: TextStyle(fontSize: 13, color: Color(0xFF9CA3AF)),
+      );
+    }
+
+    final selected = _selectedFacility;
+    return Column(
+      children: [
+        _facilityDropdown(),
+        if (selected != null) ...[
+          const SizedBox(height: 12),
+          _facilityDetailsBox(selected),
+        ],
+      ],
+    );
+  }
+
+  Widget _facilityDropdown() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FAFB),
+        border: Border.all(color: const Color(0xFFD1D5DB)),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: DropdownButton<int>(
+        value: selectedFacilityId,
+        isExpanded: true,
+        itemHeight: 60,
+        menuMaxHeight: 360,
+        hint: const Text(
+          "Select a center",
+          style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
+        ),
+        underline: const SizedBox(),
+        icon: const Icon(Icons.expand_more, color: Color(0xFF9CA3AF)),
+        style: const TextStyle(color: Color(0xFF111827), fontSize: 14),
+        selectedItemBuilder: (context) => _facilities.map((f) {
+          return Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              f['facility_name']?.toString() ?? '',
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 14, color: Color(0xFF111827)),
+            ),
+          );
+        }).toList(),
+        items: _facilities.map((f) {
+          final id = (f['facility_id'] as num?)?.toInt();
+          final name = f['facility_name']?.toString() ?? '';
+          final typeLabel = f['facility_type_label']?.toString();
+          final barangay = f['barangay_name']?.toString();
+          final subtitle = [
+            if (typeLabel != null && typeLabel.isNotEmpty) typeLabel,
+            if (barangay != null && barangay.isNotEmpty) barangay,
+          ].join(' · ');
+
+          return DropdownMenuItem<int>(
+            value: id,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  name,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 14, color: Color(0xFF111827)),
+                ),
+                if (subtitle.isNotEmpty)
+                  Text(subtitle, style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
+              ],
+            ),
+          );
+        }).toList(),
+        onChanged: (val) => setState(() => selectedFacilityId = val),
+      ),
+    );
+  }
+
+  Widget _facilityDetailsBox(Map<String, dynamic> facility) {
+    final facilityType = facility['facility_type']?.toString();
+    final typeLabel = facility['facility_type_label']?.toString();
+    final address = facility['address']?.toString();
+    final contact = facility['contact_number']?.toString();
+
+    final subParts = <String>[];
+    for (final key in ['barangay_name', 'city', 'province']) {
+      final v = facility[key]?.toString();
+      if (v != null &&
+          v.isNotEmpty &&
+          !(address ?? '').toLowerCase().contains(v.toLowerCase())) {
+        subParts.add(v);
+      }
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (typeLabel != null && typeLabel.isNotEmpty) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(_facilityTypeIcon(facilityType), size: 12, color: const Color(0xFF2563EB)),
+                  const SizedBox(width: 4),
+                  Text(
+                    typeLabel,
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF2563EB)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          if (address != null && address.isNotEmpty) ...[
+            const Text("Address", style: TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
+            const SizedBox(height: 2),
+            Text(address, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
+            if (subParts.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(subParts.join(', '), style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
+            ],
+          ],
+          if (contact != null && contact.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.call_rounded, size: 12, color: Color(0xFF2563EB)),
+                const SizedBox(width: 6),
+                Text(contact, style: const TextStyle(fontSize: 11, color: Color(0xFF2563EB))),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -1451,31 +1764,179 @@ class _AppointmentManagementView extends StatelessWidget {
       ],
     );
   }
+}
 
-  Widget _infoRow({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: const Color(0xFF9CA3AF)),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+// ── SHARED HELPERS ──────────────────────────────────────────────────────────
+
+Widget _infoRow({
+  required IconData icon,
+  required String label,
+  required String value,
+}) {
+  return Row(
+    children: [
+      Icon(icon, size: 18, color: const Color(0xFF9CA3AF)),
+      const SizedBox(width: 10),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF111827),
               ),
-              const SizedBox(height: 2),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+}
+
+IconData _facilityTypeIcon(String? facilityType) {
+  switch (facilityType) {
+    case 'hospital':
+      return Icons.local_hospital_rounded;
+    case 'blood_bank':
+      return Icons.bloodtype_rounded;
+    case 'clinic':
+      return Icons.medical_services_rounded;
+    case 'health_center':
+      return Icons.health_and_safety_rounded;
+    default:
+      return Icons.apartment_rounded;
+  }
+}
+
+/// Formats 1/2/3/4/11/12/13/21/... into "1st"/"2nd"/"3rd"/"4th"/"11th"/etc.
+String _ordinal(int n) {
+  if (n % 100 >= 11 && n % 100 <= 13) return '${n}th';
+  switch (n % 10) {
+    case 1:
+      return '${n}st';
+    case 2:
+      return '${n}nd';
+    case 3:
+      return '${n}rd';
+    default:
+      return '${n}th';
+  }
+}
+
+// ── DONATION SUCCESS VIEW ────────────────────────────────────────────────────
+
+class _DonationSuccessView extends StatelessWidget {
+  final Map<String, dynamic> donation;
+  final Map<String, dynamic>? eligibility;
+  final int totalDonations;
+  final String Function(String?) formatDate;
+
+  const _DonationSuccessView({
+    super.key,
+    required this.donation,
+    required this.eligibility,
+    required this.totalDonations,
+    required this.formatDate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        FadeSlideIn(index: 0, child: _hero()),
+        const SizedBox(height: 20),
+        FadeSlideIn(index: 1, child: _nextEligibleCard()),
+        const SizedBox(height: 16),
+        FadeSlideIn(index: 2, child: _detailsCard()),
+        const SizedBox(height: 16),
+        FadeSlideIn(index: 3, child: _impactBanner()),
+        const SizedBox(height: 16),
+        FadeSlideIn(index: 4, child: _aftercareCard()),
+        const SizedBox(height: 16),
+        const Text(
+          "Booking will reopen automatically on your next eligible date. Pull down to refresh.",
+          style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
+  Widget _hero() {
+    return Column(
+      children: [
+        TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.6, end: 1.0),
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.easeOutBack,
+          builder: (_, scale, child) =>
+              Transform.scale(scale: scale, child: child),
+          child: Container(
+            width: 110,
+            height: 110,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFFF0FDF4),
+              border: Border.all(color: const Color(0xFFBBF7D0), width: 3),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF16A34A).withValues(alpha: 0.18),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.volunteer_activism_rounded,
+              size: 50,
+              color: Color(0xFF16A34A),
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        const Text(
+          "Thank You for Donating!",
+          style: TextStyle(
+            fontSize: 21,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF111827),
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 10),
+        const Text(
+          "Your donation was completed successfully. One donation can help save up to 3 lives.",
+          style: TextStyle(fontSize: 13, color: Color(0xFF6B7280), height: 1.55),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0FDF4),
+            borderRadius: BorderRadius.circular(99),
+            border: Border.all(color: const Color(0xFFBBF7D0)),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.check_circle_rounded, size: 15, color: Color(0xFF16A34A)),
+              SizedBox(width: 7),
               Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 15,
+                "Donation Completed",
+                style: TextStyle(
+                  fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF111827),
+                  color: Color(0xFF16A34A),
                 ),
               ),
             ],
@@ -1484,6 +1945,254 @@ class _AppointmentManagementView extends StatelessWidget {
       ],
     );
   }
+
+  Widget _nextEligibleCard() {
+    final elig = eligibility;
+    final daysRemaining = (elig?['days_remaining'] as num?)?.toInt();
+    final totalWaitDays = (elig?['total_wait_days'] as num?)?.toInt();
+    final nextEligibleDate = elig?['next_eligible_date']?.toString();
+    final donationDate = donation['donation_date']?.toString();
+
+    final showBar =
+        daysRemaining != null && totalWaitDays != null && totalWaitDays > 0;
+    final progress = showBar
+        ? ((totalWaitDays - daysRemaining) / totalWaitDays).clamp(0.0, 1.0)
+        : 0.0;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: const Color(0xFFE5E7EB), width: 2),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.event_repeat_rounded, color: Color(0xFFDC2626), size: 20),
+              SizedBox(width: 8),
+              Text(
+                "Next Donation",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Color(0xFF111827),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (elig == null)
+            const Text(
+              "We'll let you know when you can donate again.",
+              style: TextStyle(fontSize: 13, color: Color(0xFF6B7280), height: 1.5),
+            )
+          else ...[
+            Text(
+              formatDate(nextEligibleDate),
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF111827),
+              ),
+            ),
+            if (daysRemaining != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                daysRemaining == 1 ? "1 day to go" : "$daysRemaining days to go",
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFFDC2626),
+                ),
+              ),
+            ],
+            if (showBar) ...[
+              const SizedBox(height: 14),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(99),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 8,
+                  color: const Color(0xFF16A34A),
+                  backgroundColor: const Color(0xFFE5E7EB),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "Donated ${formatDate(donationDate)}",
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+                  ),
+                  Text(
+                    "Eligible ${formatDate(nextEligibleDate)}",
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _detailsCard() {
+    final donationDateRaw = donation['donation_date']?.toString();
+    final bloodTypeRaw = donation['blood_type']?.toString();
+    final unitsRaw = donation['blood_units'];
+    final centerRaw = donation['donation_center']?.toString();
+    final idRaw = donation['donation_id'];
+
+    final rows = <Widget>[];
+    void addRow(IconData icon, String label, String value) {
+      if (rows.isNotEmpty) {
+        rows.add(const Divider(height: 24, color: Color(0xFFF3F4F6)));
+      }
+      rows.add(_infoRow(icon: icon, label: label, value: value));
+    }
+
+    if (donationDateRaw != null && donationDateRaw.isNotEmpty) {
+      addRow(Icons.calendar_today_rounded, "Donation Date", formatDate(donationDateRaw));
+    }
+    if (bloodTypeRaw != null && bloodTypeRaw.isNotEmpty) {
+      addRow(Icons.bloodtype_rounded, "Blood Type", bloodTypeRaw);
+    }
+    if (unitsRaw != null) {
+      final n = (unitsRaw as num).toInt();
+      addRow(Icons.water_drop_rounded, "Units Donated", "$n unit${n == 1 ? '' : 's'}");
+    }
+    if (centerRaw != null && centerRaw.isNotEmpty) {
+      addRow(Icons.location_on_rounded, "Donation Center", centerRaw);
+    }
+    if (idRaw != null) {
+      addRow(Icons.tag_rounded, "Donation ID", "#$idRaw");
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: const Color(0xFFE5E7EB), width: 2),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.receipt_long_rounded, color: Color(0xFFDC2626), size: 20),
+              SizedBox(width: 8),
+              Text(
+                "Donation Details",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Color(0xFF111827),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ...rows,
+        ],
+      ),
+    );
+  }
+
+  Widget _impactBanner() {
+    final text = totalDonations > 1
+        ? "This was your ${_ordinal(totalDonations)} donation — together they could help save up to ${totalDonations * 3} lives."
+        : "This was your first donation — welcome to the eDonate donor community!";
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFBFDBFE)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.favorite_rounded, color: Color(0xFF2563EB), size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 12, color: Color(0xFF1D4ED8), height: 1.5),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _aftercareCard() => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      border: Border.all(color: const Color(0xFFE5E7EB), width: 2),
+      borderRadius: BorderRadius.circular(14),
+      boxShadow: const [
+        BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(Icons.health_and_safety_rounded, color: Color(0xFFDC2626), size: 20),
+            SizedBox(width: 8),
+            Text(
+              "Aftercare Tips",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: Color(0xFF111827),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _aftercareRow("Drink extra fluids for the next 24–48 hours."),
+        _aftercareRow("Avoid heavy lifting or strenuous exercise today."),
+        _aftercareRow("Eat iron-rich foods like leafy greens, beans, and lean meat."),
+      ],
+    ),
+  );
+
+  Widget _aftercareRow(String text) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 5),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Icon(Icons.check_circle_rounded, size: 16, color: Color(0xFF16A34A)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 13, color: Color(0xFF111827), height: 1.4),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 // ── APPOINTMENT FETCH ERROR ─────────────────────────────────────────────────

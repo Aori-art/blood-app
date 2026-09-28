@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'anim.dart';
+import 'book.dart';
 import 'login.dart';
 import 'home.dart';
 import 'config.dart';
@@ -58,6 +60,14 @@ class Post {
   final String author;
   final String authorAvatar;
   final String? authorBadge;
+  // Posts are made by admins or facilities, never donors. Both null when
+  // the post isn't linked to an account.
+  final String? authorType; // "admin" | "facility" | null
+  final int? authorId;
+  final bool isDonation;
+  final bool donationOpen;
+  final int? eventId;
+  final int? donationFacilityId;
   final String timeAgo;
   final String content;
   final String? image;
@@ -67,6 +77,7 @@ class Post {
   final String? eventDate;
   final String? eventLocation;
   final Urgency? urgency;
+  final bool liked;
 
   const Post({
     required this.id,
@@ -74,6 +85,12 @@ class Post {
     required this.author,
     required this.authorAvatar,
     this.authorBadge,
+    this.authorType,
+    this.authorId,
+    this.isDonation = false,
+    this.donationOpen = true,
+    this.eventId,
+    this.donationFacilityId,
     required this.timeAgo,
     required this.content,
     this.image,
@@ -83,6 +100,7 @@ class Post {
     this.eventDate,
     this.eventLocation,
     this.urgency,
+    this.liked = false,
   });
 
   factory Post.fromJson(Map<String, dynamic> json) {
@@ -92,6 +110,12 @@ class Post {
       author: json['author'] as String? ?? '',
       authorAvatar: json['authorAvatar'] as String? ?? '',
       authorBadge: json['authorBadge'] as String?,
+      authorType: json['authorType'] as String?,
+      authorId: (json['authorId'] as num?)?.toInt(),
+      isDonation: json['isDonation'] == true,
+      donationOpen: json['donationOpen'] != false,
+      eventId: (json['eventId'] as num?)?.toInt(),
+      donationFacilityId: (json['donationFacilityId'] as num?)?.toInt(),
       timeAgo: json['timeAgo'] as String? ?? '',
       content: json['content'] as String? ?? '',
       image: json['image'] as String?,
@@ -101,6 +125,7 @@ class Post {
       eventDate: json['eventDate'] as String?,
       eventLocation: json['eventLocation'] as String?,
       urgency: _urgencyFromString(json['urgency'] as String?),
+      liked: json['liked'] == true,
     );
   }
 }
@@ -108,8 +133,11 @@ class Post {
 // ── API ──────────────────────────────────────────────────────────────────────
 
 class NewsfeedApi {
-  static Future<List<Post>> fetchPosts({int limit = 50}) async {
-    final uri = Uri.parse('${AppConfig.baseUrl}/get_posts.php?limit=$limit');
+  static Future<List<Post>> fetchPosts({int limit = 50, String? donorId}) async {
+    final hasDonorId = donorId != null && donorId.isNotEmpty;
+    final uri = Uri.parse(
+      '${AppConfig.baseUrl}/get_posts.php?limit=$limit${hasDonorId ? '&donor_id=$donorId' : ''}',
+    );
     final response = await http.get(uri).timeout(const Duration(seconds: 15));
 
     if (response.statusCode != 200) {
@@ -181,6 +209,18 @@ class UrgencyBadge extends StatelessWidget {
 
 // ── Network Image Helper (graceful fallback) ────────────────────────────────
 
+// Builds a full URL for a server-relative media path (e.g. a profile
+// picture path like "uploads/profile/741.jpg"), leaving already-absolute
+// URLs untouched — same convention as the ready-made image/avatar URLs
+// this file already gets from get_posts.php.
+String? resolveMediaUrl(String? path) {
+  if (path == null || path.isEmpty) return null;
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  final origin = AppConfig.baseUrl.replaceAll(RegExp(r'/api/?$'), '');
+  final cleanPath = path.startsWith('/') ? path.substring(1) : path;
+  return '$origin/$cleanPath';
+}
+
 Widget netImage(String url, {BoxFit fit = BoxFit.cover}) {
   return Image.network(
     url,
@@ -197,11 +237,856 @@ Widget netImage(String url, {BoxFit fit = BoxFit.cover}) {
   );
 }
 
+// ── Pressable post image (press-in scale + full-screen viewer) ─────────────
+
+class _PressableImage extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+  const _PressableImage({required this.child, required this.onTap});
+
+  @override
+  State<_PressableImage> createState() => _PressableImageState();
+}
+
+class _PressableImageState extends State<_PressableImage> {
+  double _scale = 1.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _scale = 1.03),
+      onTapUp: (_) => setState(() => _scale = 1.0),
+      onTapCancel: () => setState(() => _scale = 1.0),
+      onTap: widget.onTap,
+      child: AnimatedScale(
+        scale: _scale,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+// ── Full-screen image viewer ────────────────────────────────────────────────
+
+class _ImageViewerPage extends StatefulWidget {
+  final List<String> imageUrls;
+  final int initialIndex;
+  final String heroTagPrefix;
+
+  const _ImageViewerPage({
+    required this.imageUrls,
+    required this.initialIndex,
+    required this.heroTagPrefix,
+  });
+
+  @override
+  State<_ImageViewerPage> createState() => _ImageViewerPageState();
+}
+
+class _ImageViewerPageState extends State<_ImageViewerPage> {
+  late final PageController _pageController;
+  late int _currentIndex;
+  final TransformationController _transformController = TransformationController();
+  bool _isZoomed = false;
+
+  bool _dragging = false;
+  double _dragOffset = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+    _transformController.addListener(_handleTransformChange);
+  }
+
+  @override
+  void dispose() {
+    _transformController.removeListener(_handleTransformChange);
+    _transformController.dispose();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _handleTransformChange() {
+    final zoomed = _transformController.value.getMaxScaleOnAxis() > 1.01;
+    if (zoomed != _isZoomed) setState(() => _isZoomed = zoomed);
+  }
+
+  void _handleDoubleTap(TapDownDetails details) {
+    if (_isZoomed) {
+      _transformController.value = Matrix4.identity();
+      return;
+    }
+    final position = details.localPosition;
+    const scale = 2.5;
+    final x = -position.dx * (scale - 1);
+    final y = -position.dy * (scale - 1);
+    _transformController.value = Matrix4.identity()
+      ..translate(x, y)
+      ..scale(scale);
+  }
+
+  void _handleVerticalDragUpdate(DragUpdateDetails details) {
+    if (_isZoomed) return;
+    setState(() {
+      _dragging = true;
+      _dragOffset = (_dragOffset + details.delta.dy).clamp(0, 400);
+    });
+  }
+
+  void _handleVerticalDragEnd(DragEndDetails details) {
+    if (_isZoomed) return;
+    final flungDown = details.velocity.pixelsPerSecond.dy > 700;
+    if (_dragOffset > 120 || flungDown) {
+      Navigator.of(context).pop();
+      return;
+    }
+    setState(() {
+      _dragging = false;
+      _dragOffset = 0;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final opacity = (1 - (_dragOffset / 400)).clamp(0.25, 1.0);
+    final multiple = widget.imageUrls.length > 1;
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: GestureDetector(
+          onVerticalDragUpdate: _handleVerticalDragUpdate,
+          onVerticalDragEnd: _handleVerticalDragEnd,
+          child: AnimatedContainer(
+            duration: _dragging ? Duration.zero : const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+            width: double.infinity,
+            height: double.infinity,
+            color: Colors.black.withValues(alpha: opacity),
+            transform: Matrix4.translationValues(0, _dragOffset, 0),
+            child: Stack(
+              children: [
+                PageView.builder(
+                  controller: _pageController,
+                  physics: _isZoomed
+                      ? const NeverScrollableScrollPhysics()
+                      : const PageScrollPhysics(),
+                  itemCount: widget.imageUrls.length,
+                  onPageChanged: (i) => setState(() {
+                    _currentIndex = i;
+                    _isZoomed = false;
+                    _transformController.value = Matrix4.identity();
+                  }),
+                  itemBuilder: (context, index) {
+                    final url = widget.imageUrls[index];
+                    return GestureDetector(
+                      onDoubleTapDown: _handleDoubleTap,
+                      child: InteractiveViewer(
+                        transformationController: _transformController,
+                        minScale: 1,
+                        maxScale: 4,
+                        // Panning is only meaningful once zoomed in — keeping
+                        // it off at rest lets our own vertical-drag-to-close
+                        // gesture win the arena instead of InteractiveViewer.
+                        panEnabled: _isZoomed,
+                        child: Center(
+                          child: Hero(
+                            tag: '${widget.heroTagPrefix}_$index',
+                            child: Image.network(
+                              url,
+                              fit: BoxFit.contain,
+                              loadingBuilder: (context, child, progress) {
+                                if (progress == null) return child;
+                                return const Center(
+                                  child: CircularProgressIndicator(color: Colors.white),
+                                );
+                              },
+                              errorBuilder: (context, error, stackTrace) => Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.broken_image_outlined,
+                                        color: Colors.grey[400], size: 40),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      "Couldn't load image",
+                                      style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Stack(
+                      children: [
+                        Align(
+                          alignment: Alignment.topLeft,
+                          child: Tooltip(
+                            message: 'Close',
+                            child: InkWell(
+                              onTap: () => Navigator.of(context).pop(),
+                              borderRadius: BorderRadius.circular(999),
+                              child: Container(
+                                width: 40,
+                                height: 40,
+                                decoration: const BoxDecoration(
+                                  color: Colors.black45,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.close_rounded, color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (multiple)
+                          Align(
+                            alignment: Alignment.topCenter,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.black54,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                '${_currentIndex + 1} / ${widget.imageUrls.length}',
+                                style: const TextStyle(color: Colors.white, fontSize: 12),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+void _openImageViewer(
+  BuildContext context, {
+  required List<String> imageUrls,
+  required int initialIndex,
+  required String heroTagPrefix,
+}) {
+  Navigator.of(context).push(PageRouteBuilder(
+    opaque: false,
+    barrierColor: Colors.black,
+    transitionDuration: const Duration(milliseconds: 280),
+    reverseTransitionDuration: const Duration(milliseconds: 240),
+    pageBuilder: (_, __, ___) => _ImageViewerPage(
+      imageUrls: imageUrls,
+      initialIndex: initialIndex,
+      heroTagPrefix: heroTagPrefix,
+    ),
+    transitionsBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
+  ));
+}
+
+// ── Poster (admin/facility) profile preview sheet ───────────────────────────
+
+void _showPosterPreview(BuildContext context, {required Post post}) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    useSafeArea: true,
+    builder: (_) => _PosterPreviewSheet(post: post),
+  );
+}
+
+String? _formatMonthYear(String? raw) {
+  if (raw == null || raw.isEmpty) return null;
+  final date = DateTime.tryParse(raw);
+  if (date == null) return null;
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+  return '${months[date.month - 1]} ${date.year}';
+}
+
+String? _formatTime12(String? raw) {
+  if (raw == null || raw.isEmpty) return null;
+  final parts = raw.split(':');
+  if (parts.length < 2) return null;
+  final hour24 = int.tryParse(parts[0]);
+  final minute = int.tryParse(parts[1]);
+  if (hour24 == null || minute == null) return null;
+  final period = hour24 >= 12 ? 'PM' : 'AM';
+  var hour = hour24 % 12;
+  if (hour == 0) hour = 12;
+  return '$hour:${minute.toString().padLeft(2, '0')} $period';
+}
+
+IconData _facilityTypeIcon(String? facilityType) {
+  switch (facilityType) {
+    case 'hospital':
+      return Icons.local_hospital_rounded;
+    case 'blood_bank':
+      return Icons.bloodtype_rounded;
+    case 'clinic':
+      return Icons.medical_services_rounded;
+    case 'health_center':
+      return Icons.health_and_safety_rounded;
+    default:
+      return Icons.apartment_rounded;
+  }
+}
+
+class _PosterPreviewSheet extends StatefulWidget {
+  final Post post;
+  const _PosterPreviewSheet({required this.post});
+
+  @override
+  State<_PosterPreviewSheet> createState() => _PosterPreviewSheetState();
+}
+
+class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
+  bool get _isLinked => widget.post.authorType != null && widget.post.authorId != null;
+
+  bool _loading = true;
+  bool _error = false;
+  Map<String, dynamic>? _profile;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isLinked) {
+      _fetchProfile();
+    } else {
+      _loading = false;
+    }
+  }
+
+  Future<void> _fetchProfile() async {
+    setState(() {
+      _loading = true;
+      _error = false;
+    });
+    try {
+      final uri = Uri.parse(
+        '${AppConfig.baseUrl}/get_poster_profile_preview.php'
+        '?type=${widget.post.authorType}&id=${widget.post.authorId}',
+      );
+      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is Map && data['status'] == 'success' && data['profile'] is Map) {
+          setState(() {
+            _profile = Map<String, dynamic>.from(data['profile']);
+            _loading = false;
+          });
+          return;
+        }
+      }
+      setState(() {
+        _loading = false;
+        _error = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = true;
+      });
+    }
+  }
+
+  String get _displayName {
+    final postAuthor = widget.post.author.trim();
+    if (postAuthor.isNotEmpty) return postAuthor;
+    return _profile?['name']?.toString() ?? 'Unknown';
+  }
+
+  (IconData, Color, Color) _avatarFallbackStyle() {
+    final authorType = widget.post.authorType;
+    if (authorType == 'facility') {
+      final facilityType = _profile?['facility_type']?.toString();
+      return (_facilityTypeIcon(facilityType), const Color(0xFF2563EB), const Color(0xFFEFF6FF));
+    }
+    if (authorType == 'admin') {
+      return (Icons.verified_rounded, const Color(0xFFDC2626), const Color(0xFFFFF1F1));
+    }
+    return (Icons.groups_rounded, const Color(0xFF6B7280), const Color(0xFFF3F4F6));
+  }
+
+  Widget _avatar() {
+    const size = 80.0;
+    final isFacility = widget.post.authorType == 'facility';
+    final (icon, fg, bg) = _avatarFallbackStyle();
+    final innerRadius = BorderRadius.circular(isFacility ? 20 : size / 2);
+
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(isFacility ? 23 : size / 2 + 3),
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
+      ),
+      child: ClipRRect(
+        borderRadius: innerRadius,
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: Image.network(
+            widget.post.authorAvatar,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Container(
+              color: bg,
+              alignment: Alignment.center,
+              child: Icon(icon, color: fg, size: 32),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _pill({
+    required IconData icon,
+    required String label,
+    required Color fg,
+    required Color bg,
+    required Color border,
+  }) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    decoration: BoxDecoration(
+      color: bg,
+      borderRadius: BorderRadius.circular(999),
+      border: Border.all(color: border),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 13, color: fg),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: fg),
+        ),
+      ],
+    ),
+  );
+
+  Widget? _typePill() {
+    final profile = _profile;
+    final authorType = widget.post.authorType;
+
+    if (profile != null && authorType == 'facility') {
+      final facilityType = profile['facility_type']?.toString();
+      final label = profile['facility_type_label']?.toString() ?? 'Facility';
+      return _pill(
+        icon: _facilityTypeIcon(facilityType),
+        label: label,
+        fg: const Color(0xFF2563EB),
+        bg: const Color(0xFFEFF6FF),
+        border: const Color(0xFFBFDBFE),
+      );
+    }
+    if (profile != null && authorType == 'admin') {
+      final label = profile['role_label']?.toString() ?? 'Official eDonate Account';
+      return _pill(
+        icon: Icons.verified_rounded,
+        label: label,
+        fg: const Color(0xFFDC2626),
+        bg: const Color(0xFFFFF1F1),
+        border: const Color(0xFFFECACA),
+      );
+    }
+    // Loading / unlinked / error — fall back to whatever badge the post
+    // itself carries, until (or unless) the typed profile pill is ready.
+    if (widget.post.authorBadge != null) {
+      return _pill(
+        icon: Icons.emoji_events,
+        label: widget.post.authorBadge!,
+        fg: const Color(0xFFDC2626),
+        bg: const Color(0xFFFFF1F1),
+        border: const Color(0xFFFECACA),
+      );
+    }
+    return null;
+  }
+
+  Widget _iconBox(IconData icon) => Container(
+    width: 32,
+    height: 32,
+    decoration: BoxDecoration(color: const Color(0xFFFFF1F1), borderRadius: BorderRadius.circular(10)),
+    alignment: Alignment.center,
+    child: Icon(icon, size: 16, color: const Color(0xFFDC2626)),
+  );
+
+  Widget _addressBlock(Map<String, dynamic> profile) {
+    final address = profile['address']!.toString();
+    final subParts = <String>[];
+    for (final key in ['barangay_name', 'city', 'province']) {
+      final v = profile[key]?.toString();
+      if (v != null && v.isNotEmpty && !address.toLowerCase().contains(v.toLowerCase())) {
+        subParts.add(v);
+      }
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _iconBox(Icons.location_on_rounded),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text("Address", style: TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
+              const SizedBox(height: 2),
+              Text(address, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF111827))),
+              if (subParts.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(subParts.join(', '), style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _contactRow(String contactNumber) => InkWell(
+    onTap: () {
+      Clipboard.setData(ClipboardData(text: contactNumber));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Contact number copied"),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    },
+    borderRadius: BorderRadius.circular(10),
+    child: Row(
+      children: [
+        _iconBox(Icons.call_rounded),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text("Contact", style: TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
+              const SizedBox(height: 2),
+              Text(contactNumber, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF111827))),
+            ],
+          ),
+        ),
+        const Icon(Icons.copy_rounded, size: 14, color: Color(0xFF9CA3AF)),
+      ],
+    ),
+  );
+
+  Widget _facilityInfoCard(Map<String, dynamic> profile) {
+    final address = profile['address']?.toString();
+    final contact = profile['contact_number']?.toString();
+    final rows = <Widget>[];
+    if (address != null && address.isNotEmpty) rows.add(_addressBlock(profile));
+    if (contact != null && contact.isNotEmpty) {
+      if (rows.isNotEmpty) rows.add(const Divider(height: 20, color: Color(0xFFF3F4F6)));
+      rows.add(_contactRow(contact));
+    }
+    if (rows.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FAFB),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(children: rows),
+    );
+  }
+
+  Widget _eventRow(Map<String, dynamic> event) {
+    final date = DateTime.tryParse(event['event_date']?.toString() ?? '');
+    const monthsShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final monthLabel = date != null ? monthsShort[date.month - 1] : '—';
+    final dayLabel = date != null ? '${date.day}' : '—';
+
+    final start = _formatTime12(event['start_time']?.toString());
+    final end = _formatTime12(event['end_time']?.toString());
+    final timeLabel = (start != null && end != null) ? '$start – $end' : (start ?? end ?? '');
+    final location = event['location_name']?.toString();
+    final subtitle = [
+      if (timeLabel.isNotEmpty) timeLabel,
+      if (location != null && location.isNotEmpty) location,
+    ].join(' · ');
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(color: const Color(0xFFFFF1F1), borderRadius: BorderRadius.circular(10)),
+          alignment: Alignment.center,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(monthLabel, style: const TextStyle(fontSize: 10, color: Color(0xFFDC2626), fontWeight: FontWeight.w700)),
+              Text(dayLabel, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF111827))),
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                event['title']?.toString() ?? '',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF111827)),
+              ),
+              if (subtitle.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(subtitle, style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _upcomingEventsSection(Map<String, dynamic> profile) {
+    final events = profile['upcoming_events'];
+    final list = events is List ? events : const [];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Upcoming Donation Events",
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF6B7280)),
+        ),
+        const SizedBox(height: 8),
+        if (list.isEmpty)
+          const Text(
+            "No upcoming events right now.",
+            style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+          )
+        else
+          for (final e in list) ...[
+            _eventRow(Map<String, dynamic>.from(e as Map)),
+            const SizedBox(height: 10),
+          ],
+      ],
+    );
+  }
+
+  Widget _facilitySections(Map<String, dynamic> profile) {
+    final showInactiveNote = profile['is_active'] == false;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (showInactiveNote) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFBEB),
+              border: Border.all(color: const Color(0xFFFDE68A)),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFFB45309)),
+                SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    "This facility isn't accepting donations right now.",
+                    style: TextStyle(fontSize: 11, color: Color(0xFFB45309)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        _facilityInfoCard(profile),
+        const SizedBox(height: 16),
+        _upcomingEventsSection(profile),
+      ],
+    );
+  }
+
+  Widget _adminBanner() => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: const Color(0xFFEFF6FF),
+      border: Border.all(color: const Color(0xFFBFDBFE)),
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: const Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.shield_rounded, size: 16, color: Color(0xFF2563EB)),
+        SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            "Posts from this account are official announcements from the eDonate team.",
+            style: TextStyle(fontSize: 12, color: Color(0xFF1D4ED8), height: 1.4),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Widget _basicNote() => const Padding(
+    padding: EdgeInsets.symmetric(vertical: 8),
+    child: Text(
+      "More details about this organization aren't available yet.",
+      textAlign: TextAlign.center,
+      style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+    ),
+  );
+
+  Widget _loadingPlaceholders() => Column(
+    children: [
+      Container(width: double.infinity, height: 56, decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(8))),
+      const SizedBox(height: 10),
+      Container(width: double.infinity, height: 56, decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(8))),
+      const SizedBox(height: 10),
+      Container(width: double.infinity, height: 72, decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(8))),
+    ],
+  );
+
+  Widget _errorSection() => Column(
+    children: [
+      const Icon(Icons.wifi_off_rounded, color: Color(0xFF9CA3AF), size: 28),
+      const SizedBox(height: 8),
+      const Text(
+        "Couldn't load this profile",
+        style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+      ),
+      const SizedBox(height: 10),
+      TextButton.icon(
+        onPressed: _fetchProfile,
+        icon: const Icon(Icons.refresh_rounded, size: 16, color: Color(0xFFDC2626)),
+        label: const Text(
+          "Retry",
+          style: TextStyle(color: Color(0xFFDC2626), fontWeight: FontWeight.w600),
+        ),
+      ),
+    ],
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final post = widget.post;
+    final profile = _profile;
+    final pill = _typePill();
+    final memberSince = profile != null ? _formatMonthYear(profile['member_since']?.toString()) : null;
+
+    Widget sections;
+    if (_isLinked && _loading) {
+      sections = _loadingPlaceholders();
+    } else if (_isLinked && _error) {
+      sections = _errorSection();
+    } else if (post.authorType == 'facility' && profile != null) {
+      sections = _facilitySections(profile);
+    } else if (post.authorType == 'admin' && profile != null) {
+      sections = _adminBanner();
+    } else {
+      sections = _basicNote();
+    }
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE5E7EB),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+              const SizedBox(height: 16),
+              _avatar(),
+              const SizedBox(height: 12),
+              Text(
+                _displayName,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF111827)),
+              ),
+              if (pill != null) ...[
+                const SizedBox(height: 8),
+                pill,
+              ],
+              if (memberSince != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  "On eDonate since $memberSince",
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+                ),
+              ],
+              const SizedBox(height: 16),
+              sections,
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 46,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFDC2626),
+                    side: const BorderSide(color: Color(0xFFDC2626)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text("Close", style: TextStyle(fontWeight: FontWeight.w600)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ── Post Card ────────────────────────────────────────────────────────────────
 
 class PostCard extends StatefulWidget {
   final Post post;
-  const PostCard({super.key, required this.post});
+  final bool canDonate;
+  const PostCard({super.key, required this.post, this.canDonate = false});
 
   @override
   State<PostCard> createState() => _PostCardState();
@@ -215,8 +1100,20 @@ class _PostCardState extends State<PostCard> {
   @override
   void initState() {
     super.initState();
-    liked = false;
+    liked = widget.post.liked;
     likeCount = widget.post.likes;
+  }
+
+  @override
+  void didUpdateWidget(covariant PostCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.post.liked != widget.post.liked ||
+        oldWidget.post.likes != widget.post.likes) {
+      setState(() {
+        liked = widget.post.liked;
+        likeCount = widget.post.likes;
+      });
+    }
   }
 
   Future<void> _handleLike() async {
@@ -237,7 +1134,23 @@ class _PostCardState extends State<PostCard> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final donorId = prefs.getString('donorId');
-      if (donorId == null || donorId.isEmpty) return; // not logged in, skip persisting
+      if (donorId == null || donorId.isEmpty) {
+        // Not logged in — undo the optimistic toggle instead of leaving the
+        // heart in a state that was never actually persisted.
+        if (mounted) {
+          setState(() {
+            liked = wasLiked;
+            likeCount = previousCount;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Sign in to like posts.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        return;
+      }
 
       final uri = Uri.parse('${AppConfig.baseUrl}/like_post.php');
       final response = await http
@@ -297,95 +1210,102 @@ class _PostCardState extends State<PostCard> {
           // Header
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                            color: AppColors.primary.withOpacity(0.2), width: 2),
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: netImage(post.authorAvatar),
-                    ),
-                    if (post.type == PostType.urgent)
-                      Positioned(
-                        bottom: -2,
-                        right: -2,
+            child: InkWell(
+              onTap: () => _showPosterPreview(context, post: post),
+              borderRadius: BorderRadius.circular(10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Hero(
+                        tag: 'author_avatar_${post.id}',
                         child: Container(
-                          width: 16,
-                          height: 16,
+                          width: 44,
+                          height: 44,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFDC2626),
                             shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
+                            border: Border.all(
+                                color: AppColors.primary.withOpacity(0.2), width: 2),
                           ),
-                          child: const Icon(Icons.water_drop,
-                              size: 8, color: Colors.white),
+                          clipBehavior: Clip.antiAlias,
+                          child: netImage(post.authorAvatar),
                         ),
                       ),
-                  ],
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Wrap(
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: [
-                          Text(
-                            post.author,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.foreground,
+                      if (post.type == PostType.urgent)
+                        Positioned(
+                          bottom: -2,
+                          right: -2,
+                          child: Container(
+                            width: 16,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDC2626),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
                             ),
+                            child: const Icon(Icons.water_drop,
+                                size: 8, color: Colors.white),
                           ),
-                          if (post.urgency != null)
-                            UrgencyBadge(urgency: post.urgency!),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          if (post.authorBadge != null) ...[
-                            const Icon(Icons.emoji_events,
-                                size: 10, color: AppColors.primary),
-                            const SizedBox(width: 4),
-                            Text(
-                              post.authorBadge!,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            const Text("·",
-                                style: TextStyle(
-                                    fontSize: 11, color: AppColors.muted)),
-                            const SizedBox(width: 6),
-                          ],
-                          Text(
-                            post.timeAgo,
-                            style: const TextStyle(
-                                fontSize: 11, color: AppColors.muted),
-                          ),
-                        ],
-                      ),
+                        ),
                     ],
                   ),
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 8,
+                          runSpacing: 4,
+                          children: [
+                            Text(
+                              post.author,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.foreground,
+                              ),
+                            ),
+                            if (post.urgency != null)
+                              UrgencyBadge(urgency: post.urgency!),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            if (post.authorBadge != null) ...[
+                              const Icon(Icons.emoji_events,
+                                  size: 10, color: AppColors.primary),
+                              const SizedBox(width: 4),
+                              Text(
+                                post.authorBadge!,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              const Text("·",
+                                  style: TextStyle(
+                                      fontSize: 11, color: AppColors.muted)),
+                              const SizedBox(width: 6),
+                            ],
+                            Text(
+                              post.timeAgo,
+                              style: const TextStyle(
+                                  fontSize: 11, color: AppColors.muted),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
 
@@ -404,12 +1324,28 @@ class _PostCardState extends State<PostCard> {
 
           // Post image
           if (post.image != null)
-            Container(
-              color: AppColors.mutedBg,
-              constraints: const BoxConstraints(maxHeight: 240),
-              width: double.infinity,
-              child: netImage(post.image!),
+            _PressableImage(
+              onTap: () => _openImageViewer(
+                context,
+                imageUrls: [post.image!],
+                initialIndex: 0,
+                heroTagPrefix: 'post_image_${post.id}',
+              ),
+              child: Hero(
+                tag: 'post_image_${post.id}_0',
+                child: Container(
+                  color: AppColors.mutedBg,
+                  constraints: const BoxConstraints(maxHeight: 240),
+                  width: double.infinity,
+                  child: netImage(post.image!),
+                ),
+              ),
             ),
+
+          // Donate block — only for open donation posts, and only when the
+          // viewer is a verified, logged-in donor.
+          if (post.isDonation && post.donationOpen && widget.canDonate)
+            _DonateBlock(post: post),
 
           // Action bar
           Container(
@@ -457,6 +1393,105 @@ class _PostCardState extends State<PostCard> {
                   style: const TextStyle(fontSize: 12, color: AppColors.muted),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Donate block (shown on open donation posts to verified donors) ────────
+
+class _DonateBlock extends StatefulWidget {
+  final Post post;
+  const _DonateBlock({required this.post});
+
+  @override
+  State<_DonateBlock> createState() => _DonateBlockState();
+}
+
+class _DonateBlockState extends State<_DonateBlock> {
+  double _scale = 1.0;
+
+  Widget _detailRow(IconData icon, String text) => Row(
+    children: [
+      Icon(icon, size: 14, color: AppColors.primary),
+      const SizedBox(width: 6),
+      Expanded(
+        child: Text(text, style: const TextStyle(fontSize: 12, color: AppColors.foreground)),
+      ),
+    ],
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final post = widget.post;
+    final hasDate = post.eventDate != null && post.eventDate!.isNotEmpty;
+    final hasLocation = post.eventLocation != null && post.eventLocation!.isNotEmpty;
+
+    final detailRows = <Widget>[];
+    if (hasDate) detailRows.add(_detailRow(Icons.event_rounded, post.eventDate!));
+    if (hasLocation) {
+      if (detailRows.isNotEmpty) detailRows.add(const SizedBox(height: 6));
+      detailRows.add(_detailRow(Icons.location_on_rounded, post.eventLocation!));
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ...detailRows,
+          if (detailRows.isNotEmpty) const SizedBox(height: 10),
+          GestureDetector(
+            onTapDown: (_) => setState(() => _scale = 0.97),
+            onTapUp: (_) => setState(() => _scale = 1.0),
+            onTapCancel: () => setState(() => _scale = 1.0),
+            onTap: () {
+              Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => BookScreen(
+                  showBackButton: true,
+                  preselectedFacilityId: post.donationFacilityId,
+                ),
+              ));
+            },
+            child: AnimatedScale(
+              scale: _scale,
+              duration: const Duration(milliseconds: 120),
+              curve: Curves.easeOut,
+              child: Container(
+                width: double.infinity,
+                height: 46,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [AppColors.primary, AppColors.primaryDark],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.25),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.water_drop, size: 16, color: Colors.white),
+                    SizedBox(width: 8),
+                    Text(
+                      "Donate Now",
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white),
+                    ),
+                    SizedBox(width: 2),
+                    Icon(Icons.chevron_right, size: 18, color: Colors.white),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -563,23 +1598,17 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
         final data = jsonDecode(response.body);
         if (data is Map && data['status'] == 'success') {
           setState(() {
-            _verificationStatus = (data['verification_status'] as String?) ?? 'unverified';
+            _verificationStatus = (data['verification_status'] as String?) ?? _verificationStatus;
             _checkingVerification = false;
           });
           return;
         }
       }
-      setState(() {
-        _verificationStatus = 'unverified';
-        _checkingVerification = false;
-      });
+      // Unexpected shape/non-200 — keep whatever status we last knew about
+      // rather than flashing the unverified card on a network hiccup.
+      setState(() => _checkingVerification = false);
     } catch (_) {
-      if (mounted) {
-        setState(() {
-          _verificationStatus = 'unverified';
-          _checkingVerification = false;
-        });
-      }
+      if (mounted) setState(() => _checkingVerification = false);
     }
   }
 
@@ -590,6 +1619,13 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       duration: const Duration(milliseconds: 400),
       curve: Curves.easeOutCubic,
     );
+  }
+
+  Future<void> _openVerifyScreen() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const VerifyScreen()),
+    );
+    if (mounted) _fetchVerificationStatus();
   }
 
   Future<void> _onManualRefresh() async {
@@ -605,7 +1641,9 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       _postsError = null;
     });
     try {
-      final posts = await NewsfeedApi.fetchPosts();
+      final prefs = await SharedPreferences.getInstance();
+      final donorId = prefs.getString('donorId');
+      final posts = await NewsfeedApi.fetchPosts(donorId: donorId);
       if (!mounted) return;
       setState(() {
         _posts = posts;
@@ -781,6 +1819,9 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     );
   }
 
+  bool get _canDonate =>
+      _isLoggedIn && !_checkingVerification && _verificationStatus == 'verified';
+
   Widget _buildPostsList() {
     if (_loadingPosts) {
       return const Padding(
@@ -828,7 +1869,11 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
         for (int i = 0; i < _posts.length; i++) ...[
           FadeSlideIn(
             index: i,
-            child: PostCard(post: _posts[i]),
+            child: PostCard(
+              key: ValueKey(_posts[i].id),
+              post: _posts[i],
+              canDonate: _canDonate,
+            ),
           ),
           const SizedBox(height: 12),
         ],
@@ -1014,78 +2059,22 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
 }
 
   Widget _buildVerifyIdCta(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+    if (_checkingVerification) return const SizedBox.shrink();
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: animation,
+        child: SizeTransition(
+          sizeFactor: animation,
+          axisAlignment: -1,
+          child: child,
+        ),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: Colors.red.shade50,
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: const Icon(Icons.verified_user_outlined,
-                size: 15, color: AppColors.primary),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Verify Your Identity",
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.foreground,
-                  ),
-                ),
-                Text(
-                  "Upload a valid ID to unlock full access",
-                  style: TextStyle(fontSize: 11, color: AppColors.muted),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          OutlinedButton(
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const VerifyScreen()),
-              );
-            },
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.primary,
-              side: BorderSide(color: AppColors.primary.withOpacity(0.3)),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(999),
-              ),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: const Text(
-              "Verify",
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
+      child: _VerificationCard(
+        key: ValueKey(_verificationStatus),
+        status: _verificationStatus,
+        onTap: _openVerifyScreen,
       ),
     );
   }
@@ -1113,4 +2102,221 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     );
   }
 
+}
+
+// ── Verification status card ────────────────────────────────────────────────
+
+class _VerificationCard extends StatelessWidget {
+  final String status;
+  final VoidCallback onTap;
+
+  const _VerificationCard({super.key, required this.status, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    switch (status) {
+      case 'pending':
+        return _card(
+          icon: Icons.hourglass_top_rounded,
+          iconBg: const Color(0xFFFFFBEB),
+          accent: const Color(0xFFD97706),
+          title: "Verification in Progress",
+          subtitle: "We're reviewing your ID — hang tight",
+          trailing: _outlinedButton("View", const Color(0xFFD97706)),
+        );
+      case 'rejected':
+        return _card(
+          icon: Icons.gpp_bad_outlined,
+          iconBg: const Color(0xFFFFF1F1),
+          accent: const Color(0xFFDC2626),
+          title: "Verification Unsuccessful",
+          subtitle: "Please upload a clearer photo of your ID",
+          trailing: _filledButton("Retry"),
+          borderColor: const Color(0xFFFECACA),
+        );
+      case 'verified':
+        return _verifiedCard();
+      case 'unverified':
+      default:
+        return _card(
+          icon: Icons.shield_outlined,
+          iconBg: const Color(0xFFFFF1F1),
+          accent: const Color(0xFFDC2626),
+          title: "Verify Your Identity",
+          subtitle: "Upload a valid ID to unlock full access",
+          trailing: _outlinedButton("Verify", const Color(0xFFDC2626)),
+        );
+    }
+  }
+
+  Widget _outlinedButton(String label, Color color) => OutlinedButton(
+    onPressed: onTap,
+    style: OutlinedButton.styleFrom(
+      foregroundColor: color,
+      side: BorderSide(color: color.withOpacity(0.3)),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+      minimumSize: Size.zero,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    ),
+    child: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+  );
+
+  Widget _filledButton(String label) => ElevatedButton(
+    onPressed: onTap,
+    style: ElevatedButton.styleFrom(
+      backgroundColor: const Color(0xFFDC2626),
+      foregroundColor: Colors.white,
+      elevation: 0,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+      minimumSize: Size.zero,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    ),
+    child: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+  );
+
+  Widget _card({
+    required IconData icon,
+    required Color iconBg,
+    required Color accent,
+    required String title,
+    required String subtitle,
+    required Widget trailing,
+    Color? borderColor,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: borderColor ?? AppColors.border),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
+              alignment: Alignment.center,
+              child: Icon(icon, size: 20, color: accent),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.foreground,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(fontSize: 12, color: AppColors.muted),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            trailing,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _verifiedCard() {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFF0FDF4), Color(0xFFDCFCE7)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFBBF7D0), width: 1.5),
+        ),
+        child: Row(
+          children: [
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0.9, end: 1.0),
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeOutBack,
+              builder: (_, scale, child) => Transform.scale(scale: scale, child: child),
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(color: Color(0xFFDCFCE7), shape: BoxShape.circle),
+                alignment: Alignment.center,
+                child: const Icon(Icons.verified_user_rounded, size: 20, color: Color(0xFF16A34A)),
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Identity Verified",
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.foreground,
+                    ),
+                  ),
+                  Text(
+                    "Your account has full access to eDonate",
+                    style: TextStyle(fontSize: 12, color: AppColors.muted),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF16A34A),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.check_rounded, size: 14, color: Colors.white),
+                  SizedBox(width: 4),
+                  Text(
+                    "Verified",
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

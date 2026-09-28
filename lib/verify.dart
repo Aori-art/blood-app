@@ -9,6 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'config.dart';
 import 'shared_design.dart';
 
+enum _IdSide { front, back }
+
 // Donor identity verification — upload a photo of a valid ID and pick its
 // type, then submit to the backend for manual review.
 class VerifyScreen extends StatefulWidget {
@@ -36,14 +38,22 @@ class _VerifyScreenState extends State<VerifyScreen>
     "There's no substitute for donated blood — it can't be manufactured.",
   ];
 
+  // A barangay certificate is a single-sided paper document; every
+  // card-type ID needs both sides photographed.
+  static const Set<String> _backOptionalTypes = {'barangay_certificate'};
+
   int _donorId = 0;
   bool _loadingStatus = true;
   String _verificationStatus = 'unverified';
   Map<String, dynamic>? _latestSubmission;
 
-  XFile? _idImage;
+  XFile? _frontImage;
+  XFile? _backImage;
   String? _documentType;
   bool _submitting = false;
+
+  bool get _backRequired =>
+      _documentType == null || !_backOptionalTypes.contains(_documentType);
 
   late final AnimationController _resultAnimation;
   late final AnimationController _refreshIconController;
@@ -119,24 +129,39 @@ class _VerifyScreenState extends State<VerifyScreen>
     await _fetchStatus();
   }
 
-  Future<void> _pickImage() async {
+  Future<void> _pickImage(_IdSide side) async {
     try {
       final picked = await ImagePicker().pickImage(
         source: ImageSource.gallery,
         imageQuality: 85,
       );
       if (picked != null && mounted) {
-        setState(() => _idImage = picked);
+        setState(() {
+          if (side == _IdSide.front) {
+            _frontImage = picked;
+          } else {
+            _backImage = picked;
+          }
+        });
       }
     } catch (_) {
       _showSnack('Unable to open your gallery. Please try again.', isError: true);
     }
   }
 
-  void _removeImage() => setState(() => _idImage = null);
+  void _removeImage(_IdSide side) => setState(() {
+    if (side == _IdSide.front) {
+      _frontImage = null;
+    } else {
+      _backImage = null;
+    }
+  });
 
   bool get _canSubmit =>
-      !_submitting && _documentType != null && _idImage != null;
+      !_submitting &&
+      _documentType != null &&
+      _frontImage != null &&
+      (!_backRequired || _backImage != null);
 
   Future<void> _submit() async {
     if (!_canSubmit) return;
@@ -155,8 +180,13 @@ class _VerifyScreenState extends State<VerifyScreen>
       request.fields['donor_id'] = _donorId.toString();
       request.fields['document_type'] = _documentType!;
       request.files.add(
-        await http.MultipartFile.fromPath('id_photo', _idImage!.path),
+        await http.MultipartFile.fromPath('id_front', _frontImage!.path),
       );
+      if (_backImage != null) {
+        request.files.add(
+          await http.MultipartFile.fromPath('id_back', _backImage!.path),
+        );
+      }
 
       final streamedResponse =
           await request.send().timeout(const Duration(seconds: 30));
@@ -173,7 +203,8 @@ class _VerifyScreenState extends State<VerifyScreen>
 
       if (body is Map && body['success'] == true) {
         setState(() {
-          _idImage = null;
+          _frontImage = null;
+          _backImage = null;
           _documentType = null;
         });
         _showSnack('Your ID was submitted for verification.');
@@ -202,7 +233,15 @@ class _VerifyScreenState extends State<VerifyScreen>
       case 'INVALID_FILE_TYPE':
         return 'Please upload a JPG or PNG photo of your ID.';
       case 'FILE_TOO_LARGE':
-        return 'That photo is too large. Please upload a smaller file.';
+        return 'One of your photos is too large. Please upload a smaller file.';
+      case 'MISSING_FRONT':
+        return 'Please upload a photo of the front of your ID.';
+      case 'MISSING_BACK':
+        return 'Please upload a photo of the back of your ID.';
+      case 'INVALID_DOCUMENT_TYPE':
+        return 'Please select a valid ID type.';
+      case 'UPLOAD_FAILED':
+        return "We couldn't save your photos. Please try again.";
       default:
         return message ?? 'Something went wrong. Please try again.';
     }
@@ -533,6 +572,7 @@ class _VerifyScreenState extends State<VerifyScreen>
   Widget _verifiedState() {
     final docType = _latestSubmission?['document_type'] as String?;
     final reviewedAt = _latestSubmission?['reviewed_at'] as String?;
+    final hasBackPhoto = _latestSubmission?['has_back_photo'] as bool?;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -544,11 +584,12 @@ class _VerifyScreenState extends State<VerifyScreen>
           subtitle: 'Your identity has been confirmed. You now have full '
               'access to book appointments and more.',
         ),
-        if (docType != null || reviewedAt != null) ...[
+        if (_latestSubmission != null) ...[
           const SizedBox(height: 20),
           _detailCard([
             if (docType != null) _detailRow('Document type', _documentTypeLabel(docType)),
             if (reviewedAt != null) _detailRow('Verified on', _formatDate(reviewedAt)),
+            _detailRow('Photos submitted', hasBackPhoto == true ? 'Front & back' : 'Front only'),
           ]),
         ],
         const SizedBox(height: 20),
@@ -563,6 +604,7 @@ class _VerifyScreenState extends State<VerifyScreen>
   Widget _pendingState() {
     final docType = _latestSubmission?['document_type'] as String?;
     final createdAt = _latestSubmission?['created_at'] as String?;
+    final hasBackPhoto = _latestSubmission?['has_back_photo'] as bool?;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -574,11 +616,12 @@ class _VerifyScreenState extends State<VerifyScreen>
           subtitle: "Your ID is being reviewed by our team. We'll notify "
               "you once it's confirmed.",
         ),
-        if (docType != null || createdAt != null) ...[
+        if (_latestSubmission != null) ...[
           const SizedBox(height: 20),
           _detailCard([
             if (docType != null) _detailRow('Document type', _documentTypeLabel(docType)),
             if (createdAt != null) _detailRow('Submitted on', _formatDate(createdAt)),
+            _detailRow('Photos submitted', hasBackPhoto == true ? 'Front & back' : 'Front only'),
           ]),
         ],
         const SizedBox(height: 18),
@@ -759,7 +802,7 @@ class _VerifyScreenState extends State<VerifyScreen>
   );
 
   Widget _uploadArea() {
-    final hasImage = _idImage != null;
+    final backOptional = !_backRequired;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -779,104 +822,160 @@ class _VerifyScreenState extends State<VerifyScreen>
               const Icon(Icons.badge_outlined, color: kCrimson, size: 20),
               const SizedBox(width: 8),
               const Text(
-                'Valid ID Photo',
+                'Valid ID Photos',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
                   color: kTextPrimary,
                 ),
               ),
-              const Spacer(),
-              if (hasImage)
-                TextButton.icon(
-                  onPressed: _removeImage,
-                  icon: const Icon(Icons.close_rounded, size: 16, color: kCrimson),
-                  label: const Text(
-                    'Remove',
-                    style: TextStyle(
-                      color: kCrimson,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                ),
             ],
           ),
+          const SizedBox(height: 6),
+          Text(
+            backOptional
+                ? 'Upload the front of your document. The back is optional.'
+                : 'Upload clear photos of the front and back of your ID.',
+            style: const TextStyle(fontSize: 11, color: kTextMuted),
+          ),
           const SizedBox(height: 12),
-          InkWell(
-            onTap: _pickImage,
-            borderRadius: BorderRadius.circular(14),
-            child: hasImage ? _imagePreview() : _uploadPlaceholder(),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _uploadSlot(_IdSide.front)),
+              const SizedBox(width: 12),
+              Expanded(child: _uploadSlot(_IdSide.back)),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _uploadPlaceholder() => Container(
-    width: double.infinity,
-    height: 180,
-    alignment: Alignment.center,
-    decoration: BoxDecoration(
-      color: kInputFill,
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: kBorder, width: 1.5),
-    ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
+  Widget _uploadSlot(_IdSide side) {
+    final isFront = side == _IdSide.front;
+    final image = isFront ? _frontImage : _backImage;
+    final hasImage = image != null;
+    final optional = !isFront && !_backRequired;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 52,
-          height: 52,
-          alignment: Alignment.center,
-          decoration: const BoxDecoration(
-            color: Color(0xFFFFF1F1),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.add_photo_alternate_rounded,
-            color: kCrimson,
-            size: 26,
-          ),
+        Row(
+          children: [
+            Text(
+              isFront ? 'Front' : 'Back',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: kTextPrimary,
+              ),
+            ),
+            if (optional)
+              const Text(
+                ' (optional)',
+                style: TextStyle(fontSize: 12, color: kTextMuted),
+              ),
+            if (hasImage) ...[
+              const SizedBox(width: 6),
+              const Icon(Icons.check_circle_rounded, size: 14, color: Color(0xFF16A34A)),
+            ],
+          ],
         ),
-        const SizedBox(height: 12),
-        const Text(
-          'Tap to upload a photo of your ID',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 13,
-            color: kTextPrimary,
-          ),
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'From your gallery · JPG or PNG',
-          style: TextStyle(fontSize: 11, color: kTextMuted),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: () => _pickImage(side),
+          borderRadius: BorderRadius.circular(14),
+          child: hasImage ? _imagePreview(side, image) : _uploadPlaceholder(side),
         ),
       ],
-    ),
-  );
+    );
+  }
 
-  Widget _imagePreview() => Stack(
+  Widget _uploadPlaceholder(_IdSide side) {
+    final isFront = side == _IdSide.front;
+    return Container(
+      width: double.infinity,
+      height: 140,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: kInputFill,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: kBorder, width: 1.5),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: Color(0xFFFFF1F1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isFront ? Icons.credit_card_rounded : Icons.flip_rounded,
+              color: kCrimson,
+              size: 20,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            isFront ? 'Tap to add front' : 'Tap to add back',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+              color: kTextPrimary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'JPG or PNG',
+            style: TextStyle(fontSize: 10, color: kTextMuted),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _imagePreview(_IdSide side, XFile image) => Stack(
     children: [
       ClipRRect(
         borderRadius: BorderRadius.circular(14),
         child: SizedBox(
           width: double.infinity,
-          height: 200,
-          child: Image.file(File(_idImage!.path), fit: BoxFit.cover),
+          height: 140,
+          child: Image.file(File(image.path), fit: BoxFit.cover),
         ),
       ),
       Positioned(
-        right: 8,
-        bottom: 8,
+        right: 6,
+        top: 6,
+        child: Tooltip(
+          message: 'Remove',
+          child: InkWell(
+            onTap: () => _removeImage(side),
+            borderRadius: BorderRadius.circular(999),
+            child: Container(
+              width: 24,
+              height: 24,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                color: Colors.black54,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.close_rounded, size: 14, color: Colors.white),
+            ),
+          ),
+        ),
+      ),
+      Positioned(
+        right: 6,
+        bottom: 6,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
           decoration: BoxDecoration(
             color: Colors.black54,
             borderRadius: BorderRadius.circular(999),
@@ -884,13 +983,13 @@ class _VerifyScreenState extends State<VerifyScreen>
           child: const Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.edit_rounded, size: 13, color: Colors.white),
-              SizedBox(width: 4),
+              Icon(Icons.edit_rounded, size: 11, color: Colors.white),
+              SizedBox(width: 3),
               Text(
-                'Change photo',
+                'Change',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 11,
+                  fontSize: 10,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -925,7 +1024,8 @@ class _VerifyScreenState extends State<VerifyScreen>
         ),
         const SizedBox(height: 12),
         _requirementRow('Your ID is valid and not expired'),
-        _requirementRow('All four corners are visible'),
+        _requirementRow('Photos of both the front and back of your ID'),
+        _requirementRow('All four corners are visible in each photo'),
         _requirementRow('Text and photo are clear and readable'),
         _requirementRow('No glare, blur, or obstructions'),
       ],
