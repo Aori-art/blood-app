@@ -7,7 +7,7 @@ import 'anim.dart';
 import 'book.dart';
 import 'history.dart';
 import 'login.dart';
-import 'home.dart';
+import 'pin_screen.dart'; // PIN: "Go to Home" now goes through the PIN screen
 import 'config.dart';
 import 'verify.dart';
 // ── Theme Colors ─────────────────────────────────────────────────────────────
@@ -1890,6 +1890,25 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     if (mounted) _fetchVerificationStatus();
   }
 
+  // PIN: "Go to Home" is protected by the eDonate PIN. The PIN screen
+  // creates a PIN first if the donor doesn't have one yet, then opens Home.
+  // If this newsfeed was opened from an already-unlocked Home screen, just
+  // go back to it instead of asking for the PIN again.
+  Future<void> _goHome() async {
+    final navigator = Navigator.of(context);
+    if (AppSession.homeInStack && navigator.canPop()) {
+      navigator.pop();
+      return;
+    }
+    HapticFeedback.selectionClick();
+    await navigator.push(
+      MaterialPageRoute(builder: (_) => const PinScreen()),
+    );
+    // Back here without unlocking (the user pressed back) — refresh in case
+    // anything changed while the PIN screen was open.
+    if (mounted) _fetchVerificationStatus();
+  }
+
   Future<void> _loadPosts() async {
     setState(() {
       _loadingPosts = true;
@@ -2027,9 +2046,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
           child: GestureDetector(
             onTap: () {
               if (_isLoggedIn) {
-                Navigator.of(
-                  context,
-                ).push(MaterialPageRoute(builder: (_) => const HomeScreen()));
+                _goHome(); // PIN: ask for (or create) the PIN first
               } else {
                 Navigator.of(
                   context,

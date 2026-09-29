@@ -10,6 +10,7 @@ import 'edit_profile.dart';
 import 'help_support.dart';
 import 'login.dart';
 import 'notification_settings.dart';
+import 'pin_screen.dart'; // PIN: Change PIN + logout reset
 import 'privacy_security.dart';
 import 'shared_design.dart';
 import 'verify.dart';
@@ -114,6 +115,34 @@ class _HistoryScreenState extends State<HistoryScreen> {
     } catch (_) {}
   }
 
+  // PIN: opens the PIN screen in "change" mode (current → new → confirm).
+  Future<void> _changePin() async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const PinScreen(purpose: PinPurpose.change),
+      ),
+    );
+    if (changed == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(0xFF16A34A),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          content: const Row(
+            children: [
+              Icon(Icons.check_circle_outline, color: Colors.white),
+              SizedBox(width: 8),
+              Expanded(child: Text('Your PIN was updated.')),
+            ],
+          ),
+        ),
+      );
+    }
+  }
+
   Future<void> _logout() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -148,6 +177,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       }
     }
     await prefs.clear();
+    AppSession.homeInStack = false; // PIN: next Home visit asks for the PIN
     if (mounted)
       Navigator.pushAndRemoveUntil(
         context,
@@ -335,6 +365,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             );
                             if (changed == true) _load(progress: false);
                           }),
+                          // PIN: only verified donors have (or can create) a PIN.
+                          if (verificationStatus == 'verified')
+                            _menu(
+                              Icons.password_rounded,
+                              'Change PIN',
+                              _changePin,
+                              subtitle:
+                                  'Update the 4-digit PIN you use to open eDonate',
+                            ),
                           _menu(
                             Icons.notifications,
                             'Notification Settings',
