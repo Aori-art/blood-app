@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'anim.dart';
 import 'config.dart';
 import 'notification_service.dart';
+import 'shared_design.dart';
 
 class NotificationModel {
   final int id;
@@ -514,88 +515,45 @@ class _AlertsScreenState extends State<AlertsScreen> {
     );
   }
 
-  Widget _buildHeader(Size size) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.only(
-        top: size.height * 0.06,
-        left: 20,
-        right: 20,
-        bottom: 18,
-      ),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF750000), Color(0xFFFF4E4E)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Column(
-            children: [
-              const Text(
-                'Notifications',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: -0.3,
+  Widget _buildHeader(Size size) => EdonateHeader(
+    title: 'Notifications',
+    subtitle: _unreadCount > 0
+        ? '$_unreadCount unread message${_unreadCount > 1 ? 's' : ''}'
+        : 'All caught up!',
+    actions: (_unreadCount > 0 && !_isLoading && _errorMessage == null)
+        ? [
+            GestureDetector(
+              onTap: _markAllAsRead,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 7,
                 ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                _unreadCount > 0
-                    ? '$_unreadCount unread message${_unreadCount > 1 ? 's' : ''}'
-                    : 'All caught up!',
-                style: const TextStyle(color: Colors.white70, fontSize: 12),
-              ),
-            ],
-          ),
-          // Mark all read button — in header, top-right
-          if (_unreadCount > 0 && !_isLoading && _errorMessage == null)
-            Positioned(
-              right: 0,
-              top: 0,
-              bottom: 0,
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: GestureDetector(
-                  onTap: _markAllAsRead,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 7,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white38),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.done_all_rounded, color: Colors.white, size: 13),
+                    SizedBox(width: 4),
+                    Text(
+                      'Mark all read',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.18),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white38),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.done_all_rounded, color: Colors.white, size: 14),
-                        SizedBox(width: 5),
-                        Text(
-                          'Mark all read',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  ],
                 ),
               ),
             ),
-        ],
-      ),
-    );
-  }
+          ]
+        : const [],
+  );
 
   Widget _buildError() {
     return Center(

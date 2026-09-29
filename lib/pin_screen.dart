@@ -16,7 +16,7 @@ import 'login.dart';
 //
 //  • Newsfeed "Go to Home"  → PinScreen()                → unlock, or create
 //                                                           a PIN the first time
-//  • Profile "Change PIN"   → PinScreen(purpose: change) → current → new → confirm
+//  • Privacy & Security "Change PIN" → PinScreen(purpose: change) → current → new → confirm
 //
 // The PIN lives on the server (hashed) — see pin_api.php. Nothing about the
 // PIN is stored on the phone.

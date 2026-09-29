@@ -125,7 +125,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
-      body: _screens[_selectedIndex],
+      // IndexedStack keeps every tab mounted (instead of swapping the body
+      // widget), so switching tabs — e.g. tapping Home mid eligibility-check —
+      // no longer disposes/rebuilds the other tabs and loses their state.
+      body: IndexedStack(index: _selectedIndex, children: _screens),
       bottomNavigationBar: Material(
         type: MaterialType.transparency,
         child: _CustomNavBar(
@@ -1701,103 +1704,53 @@ class _HomeContentState extends State<HomeContent> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
     final firstName = userName.split(' ').first;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       body: Column(
         children: [
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.only(
-              top: screenHeight * 0.06,
-              left: 20,
-              right: 20,
-              bottom: 20,
-            ),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF750000), Color(0xFFFF4E4E)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _greetingText(),
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 13,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            firstName,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          const Text(
-                            'Thank you for saving lives',
-                            style: TextStyle(
-                              color: Colors.white60,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    HeaderIconButton(
-                      icon: Icons.dynamic_feed_rounded,
-                      tooltip: 'Newsfeed',
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const NewsfeedPage()),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    PressableScale(
-                      onTap: _navigateToHistory,
-                      child: Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white38, width: 2),
-                        ),
-                        child: CircleAvatar(
-                          radius: 22,
-                          backgroundColor: Colors.white24,
-                          child: _digitalId?.donor.photoUrl != null
-                              ? ClipOval(
-                                  child: Image.network(
-                                    _digitalId!.donor.photoUrl!,
-                                    fit: BoxFit.cover,
-                                    width: 44,
-                                    height: 44,
-                                    errorBuilder: (_, _, _) =>
-                                        _headerInitial(firstName),
-                                  ),
-                                )
-                              : _headerInitial(firstName),
-                        ),
-                      ),
-                    ),
-                  ],
+          EdonateHeader(
+            eyebrow: _greetingText(),
+            title: firstName,
+            titleSize: 24,
+            subtitle: 'Thank you for saving lives',
+            actions: [
+              HeaderIconButton(
+                icon: Icons.dynamic_feed_rounded,
+                tooltip: 'Newsfeed',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const NewsfeedPage()),
                 ),
-              ],
-            ),
+              ),
+              PressableScale(
+                onTap: _navigateToHistory,
+                child: Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white38, width: 2),
+                  ),
+                  child: CircleAvatar(
+                    radius: 22,
+                    backgroundColor: Colors.white24,
+                    child: _digitalId?.donor.photoUrl != null
+                        ? ClipOval(
+                            child: Image.network(
+                              _digitalId!.donor.photoUrl!,
+                              fit: BoxFit.cover,
+                              width: 44,
+                              height: 44,
+                              errorBuilder: (_, _, _) =>
+                                  _headerInitial(firstName),
+                            ),
+                          )
+                        : _headerInitial(firstName),
+                  ),
+                ),
+              ),
+            ],
           ),
           Expanded(
             child: RefreshIndicator(

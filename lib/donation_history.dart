@@ -339,34 +339,34 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
         : GestureDetector(onTap: onTap, child: content);
   }
 
+  // A Stack sizes itself to its only non-positioned child (the card), so the
+  // dot/line overlay always matches the card's real height — including while
+  // it's mid-animation between collapsed and expanded — without needing
+  // IntrinsicHeight to measure a subtree that contains an AnimatedCrossFade,
+  // which was reporting an unstable intrinsic height and overflowing.
   Widget _timelineItem({required Color dotColor, required Widget child}) =>
-      IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 24,
-              child: Column(
-                children: [
-                  const SizedBox(height: 14),
-                  Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: dotColor,
-                    ),
-                  ),
-                  Expanded(
-                    child: Container(width: 2, color: const Color(0xFFF3F4F6)),
-                  ),
-                ],
+      Stack(
+        children: [
+          Positioned(
+            left: 11,
+            top: 26,
+            bottom: 0,
+            child: Container(width: 2, color: const Color(0xFFF3F4F6)),
+          ),
+          Positioned(
+            left: 6,
+            top: 14,
+            child: Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: dotColor,
               ),
             ),
-            const SizedBox(width: 6),
-            Expanded(child: child),
-          ],
-        ),
+          ),
+          Padding(padding: const EdgeInsets.only(left: 30), child: child),
+        ],
       );
 
   Widget _statDivider() =>
@@ -374,67 +374,27 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       body: Column(
         children: [
-          // 🔥 HEADER (IMPROVED)
-          ClipRRect(
-            borderRadius: const BorderRadius.only(
-              bottomLeft: Radius.circular(24),
-              bottomRight: Radius.circular(24),
-            ),
-            child: Container(
-              width: double.infinity,
-              padding: EdgeInsets.only(
-                top: screenHeight * 0.06,
-                bottom: screenHeight * 0.03,
-              ),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFF750000), Color(0xFFFF4E4E)],
-                ),
-              ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  const Column(
-                    children: [
-                      Text(
-                        "Donation History",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        "Your journey of saving lives",
-                        style: TextStyle(color: Colors.white70, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                  if (_digitalId != null)
-                    Positioned(
-                      right: 16,
-                      top: 0,
-                      child: HeaderIconButton(
-                        icon: Icons.badge_rounded,
-                        tooltip: 'Digital Donor ID',
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const DigitalIdScreen(),
-                          ),
+          EdonateHeader(
+            title: 'Donation History',
+            subtitle: 'Your journey of saving lives',
+            actions: _digitalId != null
+                ? [
+                    HeaderIconButton(
+                      icon: Icons.badge_rounded,
+                      tooltip: 'Digital Donor ID',
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const DigitalIdScreen(),
                         ),
                       ),
                     ),
-                ],
-              ),
-            ),
+                  ]
+                : const [],
           ),
 
           // 🔥 CONTENT

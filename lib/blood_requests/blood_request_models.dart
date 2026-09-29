@@ -58,8 +58,9 @@ class BloodRequestFacility {
         province: json['province']?.toString(),
         contactNumber: json['contact_number']?.toString(),
         latitude: json['latitude'] == null ? null : _double(json['latitude']),
-        longitude:
-            json['longitude'] == null ? null : _double(json['longitude']),
+        longitude: json['longitude'] == null
+            ? null
+            : _double(json['longitude']),
       );
 }
 
@@ -122,6 +123,8 @@ class BloodRequest {
   final int requestId;
   final String reference;
   final String? bloodType;
+  final String bloodTypeLabel;
+  final bool bloodTypeUnknown;
   final List<String> compatibleDonorTypes;
   final String urgency;
   final String urgencyLabel;
@@ -153,6 +156,8 @@ class BloodRequest {
     required this.requestId,
     required this.reference,
     this.bloodType,
+    required this.bloodTypeLabel,
+    required this.bloodTypeUnknown,
     required this.compatibleDonorTypes,
     required this.urgency,
     required this.urgencyLabel,
@@ -185,6 +190,11 @@ class BloodRequest {
     requestId: _int(json['request_id']),
     reference: json['reference']?.toString() ?? '',
     bloodType: json['blood_type']?.toString(),
+    bloodTypeLabel:
+        json['blood_type_label']?.toString() ??
+        json['blood_type']?.toString() ??
+        '',
+    bloodTypeUnknown: _boolish(json['blood_type_unknown']),
     compatibleDonorTypes: _stringList(json['compatible_donor_types']),
     urgency: json['urgency']?.toString() ?? 'normal',
     urgencyLabel: json['urgency_label']?.toString() ?? '',
@@ -227,12 +237,11 @@ class VolunteerBlock {
 
   VolunteerBlock({required this.reason, required this.message, this.action});
 
-  factory VolunteerBlock.fromJson(Map<String, dynamic> json) =>
-      VolunteerBlock(
-        reason: json['reason']?.toString() ?? '',
-        message: json['message']?.toString() ?? '',
-        action: json['action']?.toString(),
-      );
+  factory VolunteerBlock.fromJson(Map<String, dynamic> json) => VolunteerBlock(
+    reason: json['reason']?.toString() ?? '',
+    message: json['message']?.toString() ?? '',
+    action: json['action']?.toString(),
+  );
 }
 
 class ActiveCommitment {
@@ -360,13 +369,19 @@ class BloodRequestSummary {
 class BloodTypeOption {
   final int bloodTypeId;
   final String bloodType;
+  final bool isUnknown;
 
-  BloodTypeOption({required this.bloodTypeId, required this.bloodType});
+  BloodTypeOption({
+    required this.bloodTypeId,
+    required this.bloodType,
+    required this.isUnknown,
+  });
 
   factory BloodTypeOption.fromJson(Map<String, dynamic> json) =>
       BloodTypeOption(
         bloodTypeId: _int(json['blood_type_id']),
         bloodType: json['blood_type']?.toString() ?? '',
+        isUnknown: _boolish(json['is_unknown']),
       );
 }
 
@@ -412,6 +427,10 @@ class RequestFormOptions {
   final List<UrgencyOption> urgencies;
   final String defaultContactNumber;
   final String defaultFirstName;
+  final String? defaultFullName;
+  final int? defaultBloodTypeId;
+  final String? defaultBloodType;
+  final bool defaultBloodTypeUnknown;
   final int maxDonors;
   final int maxNeededByDays;
   final int notesMaxLength;
@@ -428,6 +447,10 @@ class RequestFormOptions {
     required this.urgencies,
     required this.defaultContactNumber,
     required this.defaultFirstName,
+    this.defaultFullName,
+    this.defaultBloodTypeId,
+    this.defaultBloodType,
+    required this.defaultBloodTypeUnknown,
     required this.maxDonors,
     required this.maxNeededByDays,
     required this.notesMaxLength,
@@ -456,9 +479,7 @@ class RequestFormOptions {
           .toList(),
       relationships: (json['relationships'] as List? ?? const [])
           .whereType<Map>()
-          .map(
-            (e) => RelationshipOption.fromJson(Map<String, dynamic>.from(e)),
-          )
+          .map((e) => RelationshipOption.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
       urgencies: (json['urgencies'] as List? ?? const [])
           .whereType<Map>()
@@ -466,6 +487,12 @@ class RequestFormOptions {
           .toList(),
       defaultContactNumber: defaults['contact_number']?.toString() ?? '',
       defaultFirstName: defaults['first_name']?.toString() ?? '',
+      defaultFullName: defaults['full_name']?.toString(),
+      defaultBloodTypeId: defaults['blood_type_id'] == null
+          ? null
+          : _int(defaults['blood_type_id']),
+      defaultBloodType: defaults['blood_type']?.toString(),
+      defaultBloodTypeUnknown: _boolish(defaults['blood_type_unknown']),
       maxDonors: _int(limits['max_donors'], 10),
       maxNeededByDays: _int(limits['max_needed_by_days'], 30),
       notesMaxLength: _int(limits['notes_max_length'], 500),
@@ -597,9 +624,7 @@ class BloodRequestDetailResult {
             .toList(),
         volunteers: (json['volunteers'] as List? ?? const [])
             .whereType<Map>()
-            .map(
-              (e) => RequestVolunteer.fromJson(Map<String, dynamic>.from(e)),
-            )
+            .map((e) => RequestVolunteer.fromJson(Map<String, dynamic>.from(e)))
             .toList(),
       );
 }

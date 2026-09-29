@@ -9,6 +9,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:screen_brightness/screen_brightness.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'anim.dart';
@@ -16,6 +17,12 @@ import 'book.dart';
 import 'digital_id_service.dart';
 import 'newsfeed.dart' show resolveMediaUrl;
 import 'shared_design.dart';
+
+// Fixed design canvas every ID card is authored at, then uniformly scaled
+// (via FittedBox) to whatever box it's actually shown or captured in — so
+// the same layout can never overflow on screen or crop in the PDF.
+const double kCardCanvasWidth = 380;
+const double kCardCanvasHeight = kCardCanvasWidth / 1.586;
 
 class DigitalIdScreen extends StatefulWidget {
   const DigitalIdScreen({super.key});
@@ -25,7 +32,7 @@ class DigitalIdScreen extends StatefulWidget {
 }
 
 class _DigitalIdScreenState extends State<DigitalIdScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   DigitalIdData? _data;
   bool _loading = true;
   bool _locked = false;
@@ -38,20 +45,78 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
   bool _qrSheetOpen = false;
   bool _pdfBusy = false;
 
+  // Tracks whether we've actually asked the OS to raise the app's window
+  // brightness, so we only call the platform channel when the target state
+  // changes and can cleanly put it back the way we found it.
+  bool _brightnessBoosted = false;
+
   @override
   void initState() {
     super.initState();
-    _flipCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 500),
-    );
+    WidgetsBinding.instance.addObserver(this);
+    _flipCtrl =
+        AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 500),
+        )..addStatusListener((status) {
+          if (status == AnimationStatus.completed ||
+              status == AnimationStatus.dismissed) {
+            _updateBrightness();
+          }
+        });
     _load();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _flipCtrl.dispose();
+    _forceResetBrightness();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      _forceResetBrightness();
+    } else if (state == AppLifecycleState.resumed) {
+      _updateBrightness();
+    }
+  }
+
+  // Whether the QR code is currently on screen and scannable — either the
+  // big "Show QR Code" sheet is open, or the card is flipped to its back —
+  // and not blurred behind the masked-details toggle.
+  bool get _qrVisible {
+    if (_masked) return false;
+    if (_data?.card.qrPayload == null) return false;
+    return _qrSheetOpen || _isBack;
+  }
+
+  Future<void> _updateBrightness() async {
+    final shouldBoost = _qrVisible;
+    if (shouldBoost == _brightnessBoosted) return;
+    _brightnessBoosted = shouldBoost;
+    try {
+      if (shouldBoost) {
+        await ScreenBrightness.instance.setApplicationScreenBrightness(1.0);
+      } else {
+        await ScreenBrightness.instance.resetApplicationScreenBrightness();
+      }
+    } catch (_) {}
+  }
+
+  // Fire-and-forget variant for places that can't await (dispose, app going
+  // to the background) — still only calls the platform when needed.
+  void _forceResetBrightness() {
+    if (!_brightnessBoosted) return;
+    _brightnessBoosted = false;
+    () async {
+      try {
+        await ScreenBrightness.instance.resetApplicationScreenBrightness();
+      } catch (_) {}
+    }();
   }
 
   Future<void> _load() async {
@@ -81,6 +146,7 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
         _locked = data == null;
         _loading = false;
       });
+      _updateBrightness();
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -96,6 +162,7 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
     HapticFeedback.selectionClick();
     final next = !_masked;
     setState(() => _masked = next);
+    _updateBrightness();
     await DigitalIdService.setMasked(donorId, next);
     if (next && _qrSheetOpen && mounted) {
       Navigator.of(context).pop();
@@ -123,6 +190,7 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
     if (payload == null) return;
     HapticFeedback.lightImpact();
     _qrSheetOpen = true;
+    _updateBrightness();
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -131,7 +199,10 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (sheetContext) => _qrSheetBody(sheetContext, data),
-    ).whenComplete(() => _qrSheetOpen = false);
+    ).whenComplete(() {
+      _qrSheetOpen = false;
+      _updateBrightness();
+    });
   }
 
   void _showMaskedPdfHint() {
@@ -150,9 +221,53 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
     final boundary =
         key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
     if (boundary == null) return null;
-    final image = await boundary.toImage(pixelRatio: 4);
+    final image = await boundary.toImage(pixelRatio: 4.0);
     final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
     return byteData?.buffer.asUint8List();
+  }
+
+  // The RepaintBoundary is laid out at exactly kCardCanvasWidth x
+  // kCardCanvasHeight (see _downloadPdf's capture tree) — this just confirms
+  // the frame actually settled at that size before we capture it.
+  bool _boundarySizeOk(GlobalKey key) {
+    final box = key.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return false;
+    final size = box.size;
+    return (size.width - kCardCanvasWidth).abs() < 1 &&
+        (size.height - kCardCanvasHeight).abs() < 1;
+  }
+
+  // Renders a card at the fixed design canvas size inside a small preview
+  // box — the FittedBox only scales what's shown on screen, so the
+  // RepaintBoundary underneath still lays out (and captures) at exactly
+  // kCardCanvasWidth x kCardCanvasHeight regardless of the dialog's own
+  // width constraints, text scale or theme.
+  Widget _pdfCapturePreview({
+    required GlobalKey boundaryKey,
+    required ThemeData theme,
+    required TextStyle textStyle,
+    required Widget card,
+  }) {
+    return SizedBox(
+      width: kCardCanvasWidth * 0.4,
+      height: kCardCanvasHeight * 0.4,
+      child: FittedBox(
+        fit: BoxFit.contain,
+        child: SizedBox(
+          width: kCardCanvasWidth,
+          height: kCardCanvasHeight,
+          child: Theme(
+            data: theme,
+            child: DefaultTextStyle(
+              style: textStyle,
+              child: MediaQuery.withNoTextScaling(
+                child: RepaintBoundary(key: boundaryKey, child: card),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _downloadPdf(DigitalIdData data) async {
@@ -167,6 +282,11 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
     final backKey = GlobalKey();
     var dialogShowing = false;
     try {
+      // Captured before the dialog opens, so the preview isn't skewed by
+      // the dialog's own DefaultTextStyle or a squeezed width.
+      final savedTheme = Theme.of(context);
+      final savedTextStyle = DefaultTextStyle.of(context).style;
+
       showDialog<void>(
         context: context,
         barrierDismissible: false,
@@ -197,29 +317,18 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Transform.scale(
-                    scale: 0.45,
-                    alignment: Alignment.topCenter,
-                    child: Column(
-                      children: [
-                        RepaintBoundary(
-                          key: frontKey,
-                          child: SizedBox(
-                            width: 342,
-                            height: 342 / 1.586,
-                            child: _IdCardFront(data: data, masked: false),
-                          ),
-                        ),
-                        RepaintBoundary(
-                          key: backKey,
-                          child: SizedBox(
-                            width: 342,
-                            height: 342 / 1.586,
-                            child: _IdCardBack(data: data, masked: false),
-                          ),
-                        ),
-                      ],
-                    ),
+                  _pdfCapturePreview(
+                    boundaryKey: frontKey,
+                    theme: savedTheme,
+                    textStyle: savedTextStyle,
+                    card: _IdCardFront(data: data, masked: false),
+                  ),
+                  const SizedBox(height: 8),
+                  _pdfCapturePreview(
+                    boundaryKey: backKey,
+                    theme: savedTheme,
+                    textStyle: savedTextStyle,
+                    card: _IdCardBack(data: data, masked: false),
                   ),
                 ],
               ),
@@ -237,6 +346,9 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
       }
       await WidgetsBinding.instance.endOfFrame;
       await WidgetsBinding.instance.endOfFrame;
+      if (!_boundarySizeOk(frontKey) || !_boundarySizeOk(backKey)) {
+        await WidgetsBinding.instance.endOfFrame;
+      }
 
       final frontBytes = await _captureBoundary(frontKey);
       final backBytes = await _captureBoundary(backKey);
@@ -256,22 +368,22 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
       doc.addPage(
         pw.Page(
           pageFormat: format,
-          build: (_) => pw.Image(
-            pw.MemoryImage(frontBytes),
-            fit: pw.BoxFit.cover,
+          build: (_) => pw.Container(
             width: format.width,
             height: format.height,
+            alignment: pw.Alignment.center,
+            child: pw.Image(pw.MemoryImage(frontBytes), fit: pw.BoxFit.contain),
           ),
         ),
       );
       doc.addPage(
         pw.Page(
           pageFormat: format,
-          build: (_) => pw.Image(
-            pw.MemoryImage(backBytes),
-            fit: pw.BoxFit.cover,
+          build: (_) => pw.Container(
             width: format.width,
             height: format.height,
+            alignment: pw.Alignment.center,
+            child: pw.Image(pw.MemoryImage(backBytes), fit: pw.BoxFit.contain),
           ),
         ),
       );
@@ -737,18 +849,25 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
               border: Border.all(color: const Color(0xFFBFDBFE)),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Row(
+            child: Row(
               children: [
                 Icon(
-                  Icons.light_mode_rounded,
+                  _brightnessBoosted
+                      ? Icons.brightness_high_rounded
+                      : Icons.light_mode_rounded,
                   size: 16,
-                  color: Color(0xFF1D4ED8),
+                  color: const Color(0xFF1D4ED8),
                 ),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Turn your screen brightness up for faster scanning.',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF1D4ED8)),
+                    _brightnessBoosted
+                        ? 'Brightness turned up for easier scanning.'
+                        : 'Turn your screen brightness up for faster scanning.',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF1D4ED8),
+                    ),
                   ),
                 ),
               ],
@@ -810,18 +929,8 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
               borderColor: kCrimson,
             ),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: _actionButton(
-              icon: Icons.flip_rounded,
-              label: 'Flip Card',
-              onTap: _flip,
-              color: kTextMuted,
-              borderColor: kBorder,
-            ),
-          ),
           if (data.card.qrPayload != null) ...[
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Expanded(
               child: _actionButton(
                 icon: Icons.picture_as_pdf_rounded,
@@ -1380,181 +1489,198 @@ class _IdCardFront extends StatelessWidget {
   Widget build(BuildContext context) {
     final donor = data.donor;
     final card = data.card;
-    return MediaQuery.withNoTextScaling(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF7F1D1D), Color(0xFFDC2626), Color(0xFFEF4444)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: kCrimson.withValues(alpha: .35),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: CustomPaint(painter: _DiagonalSheenPainter()),
-              ),
-              Positioned(
-                right: -10,
-                bottom: -10,
-                child: CustomPaint(
-                  size: const Size(140, 170),
-                  painter: _DropWatermarkPainter(),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const _MiniDrop(size: 16),
-                        const SizedBox(width: 6),
-                        const Text(
-                          'eDonate',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const Spacer(),
-                        const Text(
-                          'DIGITAL DONOR ID',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white70,
-                            letterSpacing: 1.4,
-                          ),
-                        ),
-                      ],
+    return AspectRatio(
+      aspectRatio: 1.586,
+      child: FittedBox(
+        fit: BoxFit.contain,
+        child: SizedBox(
+          width: kCardCanvasWidth,
+          height: kCardCanvasHeight,
+          child: MediaQuery.withNoTextScaling(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFF7F1D1D),
+                      Color(0xFFDC2626),
+                      Color(0xFFEF4444),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: kCrimson.withValues(alpha: .35),
+                      blurRadius: 24,
+                      offset: const Offset(0, 10),
                     ),
-                    const SizedBox(height: 16),
-                    Expanded(
-                      child: Row(
+                  ],
+                ),
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: CustomPaint(painter: _DiagonalSheenPainter()),
+                    ),
+                    Positioned(
+                      right: -10,
+                      bottom: -10,
+                      child: CustomPaint(
+                        size: const Size(140, 170),
+                        painter: _DropWatermarkPainter(),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            width: 78,
-                            height: 78,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.white, width: 3),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Colors.black26,
-                                  blurRadius: 8,
-                                  offset: Offset(0, 3),
+                          Row(
+                            children: [
+                              const _MiniDrop(size: 16),
+                              const SizedBox(width: 6),
+                              const Text(
+                                'eDonate',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
                                 ),
-                              ],
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(13),
-                              child: _AvatarPhoto(
-                                photoUrl: donor.photoUrl,
-                                photoPath: donor.photoPath,
-                                initials: _initialsFor(donor.fullName),
-                                size: 72,
                               ),
-                            ),
+                              const Spacer(),
+                              const Text(
+                                'DIGITAL DONOR ID',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white70,
+                                  letterSpacing: 1.4,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 14),
+                          const SizedBox(height: 16),
                           Expanded(
-                            child: Column(
+                            child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text(
-                                  donor.fullName,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white,
+                                Container(
+                                  width: 60,
+                                  height: 60,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 3,
+                                    ),
+                                    boxShadow: const [
+                                      BoxShadow(
+                                        color: Colors.black26,
+                                        blurRadius: 8,
+                                        offset: Offset(0, 3),
+                                      ),
+                                    ],
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(11),
+                                    child: _AvatarPhoto(
+                                      photoUrl: donor.photoUrl,
+                                      photoPath: donor.photoPath,
+                                      initials: _initialsFor(donor.fullName),
+                                      size: 54,
+                                    ),
                                   ),
                                 ),
-                                const SizedBox(height: 6),
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 3,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        borderRadius: BorderRadius.circular(
-                                          999,
-                                        ),
-                                      ),
-                                      child: Text(
-                                        donor.bloodType ?? '—',
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        donor.fullName,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w900,
-                                          color: kCrimson,
+                                          fontSize: 17,
+                                          fontWeight: FontWeight.w800,
+                                          color: Colors.white,
                                         ),
                                       ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    if (donor.bloodTypeVerified)
-                                      const Icon(
-                                        Icons.verified_rounded,
-                                        size: 14,
-                                        color: Color(0xFF16A34A),
-                                      )
-                                    else
-                                      const Text(
-                                        'Unconfirmed',
-                                        style: TextStyle(
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w700,
-                                          color: Color(0xFFFDE68A),
-                                        ),
+                                      const SizedBox(height: 6),
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 3,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              borderRadius:
+                                                  BorderRadius.circular(999),
+                                            ),
+                                            child: Text(
+                                              donor.bloodType ?? '—',
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w900,
+                                                color: kCrimson,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          if (donor.bloodTypeVerified)
+                                            const Icon(
+                                              Icons.verified_rounded,
+                                              size: 14,
+                                              color: Color(0xFF16A34A),
+                                            )
+                                          else
+                                            const Text(
+                                              'Unconfirmed',
+                                              style: TextStyle(
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.w700,
+                                                color: Color(0xFFFDE68A),
+                                              ),
+                                            ),
+                                        ],
                                       ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
+                          ),
+                          _infoStrip(data),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              _maskedSwitcher(
+                                Text(
+                                  masked ? card.codeMasked : card.code,
+                                  key: ValueKey(masked),
+                                  style: const TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                    letterSpacing: 1.5,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
-                    _infoStrip(data),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        _maskedSwitcher(
-                          Text(
-                            masked ? card.codeMasked : card.code,
-                            key: ValueKey(masked),
-                            style: const TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                              letterSpacing: 1.5,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -1578,147 +1704,173 @@ class _IdCardBack extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final card = data.card;
-    return MediaQuery.withNoTextScaling(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: const Color(0xFFE5E7EB)),
-          ),
-          child: Column(
-            children: [
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: card.qrPayload == null
-                      ? const Center(
-                          child: Text(
-                            'This ID is not active',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: kTextMuted,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        )
-                      : Row(
-                          children: [
-                            _maskedSwitcher(
-                              masked
-                                  ? GestureDetector(
-                                      key: const ValueKey('blurred_qr'),
-                                      onTap: onMaskedQrTap,
-                                      child: ImageFiltered(
-                                        imageFilter: ImageFilter.blur(
-                                          sigmaX: 8,
-                                          sigmaY: 8,
-                                        ),
-                                        child: _qrBox(card.qrPayload!),
-                                      ),
-                                    )
-                                  : GestureDetector(
-                                      key: const ValueKey('qr'),
-                                      onTap: onQrTap,
-                                      child: _qrBox(card.qrPayload!),
-                                    ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
+    final qrSize = kCardCanvasHeight * 0.62;
+    return AspectRatio(
+      aspectRatio: 1.586,
+      child: FittedBox(
+        fit: BoxFit.contain,
+        child: SizedBox(
+          width: kCardCanvasWidth,
+          height: kCardCanvasHeight,
+          child: MediaQuery.withNoTextScaling(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                ),
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(18),
+                        child: card.qrPayload == null
+                            ? const Center(
+                                child: Text(
+                                  'This ID is not active',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: kTextMuted,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              )
+                            : Row(
                                 children: [
-                                  const Text(
-                                    'Scan to verify',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      color: kTextPrimary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  const Text(
-                                    'Facility staff can scan this to confirm your ID is genuine.',
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      color: kTextMuted,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    _memberSinceLabel(data.donor.memberSince),
-                                    style: const TextStyle(
-                                      fontSize: 10,
-                                      color: kTextMuted,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Issued ${_shortDate(card.issuedOn)}',
-                                    style: const TextStyle(
-                                      fontSize: 10,
-                                      color: kTextMuted,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
                                   _maskedSwitcher(
-                                    Text(
-                                      masked ? card.codeMasked : card.code,
-                                      key: ValueKey('back_$masked'),
-                                      style: const TextStyle(
-                                        fontFamily: 'monospace',
-                                        fontSize: 12,
-                                        color: kTextPrimary,
+                                    masked
+                                        ? GestureDetector(
+                                            key: const ValueKey('blurred_qr'),
+                                            onTap: onMaskedQrTap,
+                                            child: ImageFiltered(
+                                              imageFilter: ImageFilter.blur(
+                                                sigmaX: 8,
+                                                sigmaY: 8,
+                                              ),
+                                              child: _qrBox(
+                                                card.qrPayload!,
+                                                size: qrSize,
+                                              ),
+                                            ),
+                                          )
+                                        : GestureDetector(
+                                            key: const ValueKey('qr'),
+                                            onTap: onQrTap,
+                                            child: _qrBox(
+                                              card.qrPayload!,
+                                              size: qrSize,
+                                            ),
+                                          ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerLeft,
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'Scan to verify',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700,
+                                              color: kTextPrimary,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          const Text(
+                                            'Staff can scan this to confirm your ID is genuine.',
+                                            style: TextStyle(
+                                              fontSize: 10.5,
+                                              color: kTextMuted,
+                                              height: 1.3,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            _memberSinceLabel(
+                                              data.donor.memberSince,
+                                            ),
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                              color: kTextMuted,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'Issued ${_shortDate(card.issuedOn)}',
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                              color: kTextMuted,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          _maskedSwitcher(
+                                            Text(
+                                              masked
+                                                  ? card.codeMasked
+                                                  : card.code,
+                                              key: ValueKey('back_$masked'),
+                                              style: const TextStyle(
+                                                fontFamily: 'monospace',
+                                                fontSize: 12,
+                                                color: kTextPrimary,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
-                            ),
-                          ],
-                        ),
-                ),
-              ),
-              if (masked && card.qrPayload != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: kBorder),
-                    ),
-                    child: const Text(
-                      'Tap the eye to show',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: kTextPrimary,
                       ),
                     ),
-                  ),
-                ),
-              Container(
-                width: double.infinity,
-                color: kCrimson,
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: const Text(
-                  'eDonate · Lipa City Blood Donation Network',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 9,
-                    color: Colors.white,
-                    letterSpacing: 0.6,
-                  ),
+                    if (masked && card.qrPayload != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(color: kBorder),
+                          ),
+                          child: const Text(
+                            'Tap the eye to show',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: kTextPrimary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    Container(
+                      width: double.infinity,
+                      color: kCrimson,
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: const Text(
+                        'eDonate · Lipa City Blood Donation Network',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 9,
+                          color: Colors.white,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),

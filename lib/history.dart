@@ -10,7 +10,7 @@ import 'edit_profile.dart';
 import 'help_support.dart';
 import 'login.dart';
 import 'notification_settings.dart';
-import 'pin_screen.dart'; // PIN: Change PIN + logout reset
+import 'pin_screen.dart'; // PIN: logout reset
 import 'privacy_security.dart';
 import 'shared_design.dart';
 import 'verify.dart';
@@ -25,7 +25,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Map<String, dynamic>? profile;
   String? notice;
   bool loading = true;
-  String? verificationStatus; // 'unverified' | 'pending' | 'verified' | 'rejected'
+  String?
+  verificationStatus; // 'unverified' | 'pending' | 'verified' | 'rejected'
 
   @override
   void initState() {
@@ -103,44 +104,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Future<void> _fetchVerificationStatus(String id) async {
     try {
       final response = await http
-          .get(Uri.parse('${AppConfig.baseUrl}/get_verification_status.php?donor_id=$id'))
+          .get(
+            Uri.parse(
+              '${AppConfig.baseUrl}/get_verification_status.php?donor_id=$id',
+            ),
+          )
           .timeout(const Duration(seconds: 10));
       if (!mounted) return;
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
         if (body is Map && body['status'] == 'success') {
-          setState(() => verificationStatus = body['verification_status']?.toString());
+          setState(
+            () => verificationStatus = body['verification_status']?.toString(),
+          );
         }
       }
     } catch (_) {}
-  }
-
-  // PIN: opens the PIN screen in "change" mode (current → new → confirm).
-  Future<void> _changePin() async {
-    final changed = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const PinScreen(purpose: PinPurpose.change),
-      ),
-    );
-    if (changed == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: const Color(0xFF16A34A),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-          content: const Row(
-            children: [
-              Icon(Icons.check_circle_outline, color: Colors.white),
-              SizedBox(width: 8),
-              Expanded(child: Text('Your PIN was updated.')),
-            ],
-          ),
-        ),
-      );
-    }
   }
 
   Future<void> _logout() async {
@@ -365,15 +344,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             );
                             if (changed == true) _load(progress: false);
                           }),
-                          // PIN: only verified donors have (or can create) a PIN.
-                          if (verificationStatus == 'verified')
-                            _menu(
-                              Icons.password_rounded,
-                              'Change PIN',
-                              _changePin,
-                              subtitle:
-                                  'Update the 4-digit PIN you use to open eDonate',
-                            ),
                           _menu(
                             Icons.notifications,
                             'Notification Settings',
@@ -391,7 +361,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             () => Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => const PrivacySecurityScreen(),
+                                builder: (_) => PrivacySecurityScreen(
+                                  showChangePin:
+                                      verificationStatus == 'verified',
+                                ),
                               ),
                             ),
                           ),
@@ -458,50 +431,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
-  Widget _header(BuildContext c) => Container(
-    width: double.infinity,
-    padding: EdgeInsets.fromLTRB(
-      20,
-      MediaQuery.of(c).size.height * .06,
-      20,
-      20,
-    ),
-    decoration: const BoxDecoration(
-      gradient: LinearGradient(
-        colors: kHeaderGradient,
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-    ),
-    child: Row(
-      children: [
-        HeaderIconButton(
-          icon: Icons.arrow_back_rounded,
-          tooltip: 'Back',
-          onTap: () => Navigator.pop(c),
-        ),
-        const SizedBox(width: 14),
-        const Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'My Profile',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              SizedBox(height: 2),
-              Text(
-                'Manage your account & donations',
-                style: TextStyle(color: Colors.white70, fontSize: 12),
-              ),
-            ],
-          ),
-        ),
-      ],
+  Widget _header(BuildContext c) => EdonateHeader(
+    title: 'My Profile',
+    subtitle: 'Manage your account & donations',
+    leading: HeaderIconButton(
+      icon: Icons.arrow_back_rounded,
+      tooltip: 'Back',
+      onTap: () => Navigator.pop(c),
     ),
   );
   BoxDecoration _box({Gradient? gradient, Color? border}) => BoxDecoration(
@@ -645,12 +581,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
       onTap: isVerified
           ? null
           : () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const VerifyScreen()),
-              ),
+              context,
+              MaterialPageRoute(builder: (_) => const VerifyScreen()),
+            ),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(20),
+        ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -658,13 +597,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
             const SizedBox(width: 6),
             Text(
               label,
-              style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: fg,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
       ),
     );
   }
+
   Widget _stat(IconData icon, String value, String label, Color color) =>
       Container(
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),

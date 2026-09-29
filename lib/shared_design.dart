@@ -6,13 +6,13 @@ import 'package:flutter/services.dart';
 // ─── Design tokens ────────────────────────────────────────────────────────────
 // Mirrors the palette used across home.dart / alerts.dart / book.dart / check.dart
 // so the auth flow (login, register, OTP) reads as part of the same app.
-const Color kCrimson     = Color(0xFFDC2626);
+const Color kCrimson = Color(0xFFDC2626);
 const Color kCrimsonDark = Color(0xFF750000);
-const Color kSurface     = Colors.white;
-const Color kInputFill   = Color(0xFFF9FAFB);
-const Color kBorder      = Color(0xFFD1D5DB);
+const Color kSurface = Colors.white;
+const Color kInputFill = Color(0xFFF9FAFB);
+const Color kBorder = Color(0xFFD1D5DB);
 const Color kTextPrimary = Color(0xFF111827);
-const Color kTextMuted   = Color(0xFF6B7280);
+const Color kTextMuted = Color(0xFF6B7280);
 
 const List<Color> kHeaderGradient = [kCrimsonDark, Color(0xFFFF4E4E)];
 
@@ -26,15 +26,15 @@ class GradientScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: kHeaderGradient,
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: SafeArea(child: child),
-      );
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        colors: kHeaderGradient,
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+    ),
+    child: SafeArea(child: child),
+  );
 }
 
 // ─── Circular icon button for gradient headers (back / feed shortcuts) ───────
@@ -70,40 +70,144 @@ class HeaderIconButton extends StatelessWidget {
   }
 }
 
+// ─── Shared gradient header ────────────────────────────────────────────────────
+// Reproduces book.dart's header exactly (gradient, rounded bottom corners,
+// padding, status-bar handling via a proportional top pad instead of
+// SafeArea, text styles) so every screen that uses it lines up identically —
+// including across HomeScreen's tabs, where book.dart is one of the tabs.
+class EdonateHeader extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final String? eyebrow;
+  final Widget? leading;
+  final List<Widget> actions;
+  final Widget? bottom;
+  final double titleSize;
+
+  const EdonateHeader({
+    super.key,
+    required this.title,
+    this.subtitle,
+    this.eyebrow,
+    this.leading,
+    this.actions = const [],
+    this.bottom,
+    this.titleSize = 20,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    return ClipRRect(
+      borderRadius: const BorderRadius.only(
+        bottomLeft: Radius.circular(24),
+        bottomRight: Radius.circular(24),
+      ),
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.fromLTRB(
+          20,
+          screenHeight * 0.06,
+          20,
+          bottom != null ? 16 : screenHeight * 0.03,
+        ),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(colors: kHeaderGradient),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                if (leading != null) ...[leading!, const SizedBox(width: 14)],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (eyebrow != null) ...[
+                        Text(
+                          eyebrow!,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                      ],
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: titleSize,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle!,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                for (var i = 0; i < actions.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 10),
+                  actions[i],
+                ],
+              ],
+            ),
+            if (bottom != null) ...[const SizedBox(height: 14), bottom!],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ─── Step progress indicator ──────────────────────────────────────────────────
 class StepIndicator extends StatelessWidget {
   final int currentStep;
   final int totalSteps;
-  const StepIndicator(
-      {super.key, required this.currentStep, required this.totalSteps});
+  const StepIndicator({
+    super.key,
+    required this.currentStep,
+    required this.totalSteps,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(totalSteps, (i) {
-        final active  = i + 1 <= currentStep;
+        final active = i + 1 <= currentStep;
         final current = i + 1 == currentStep;
-        return Row(children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            width: current ? 28 : 10,
-            height: 10,
-            decoration: BoxDecoration(
-              color: active ? Colors.white : Colors.white.withOpacity(0.35),
-              borderRadius: BorderRadius.circular(5),
+        return Row(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: current ? 28 : 10,
+              height: 10,
+              decoration: BoxDecoration(
+                color: active ? Colors.white : Colors.white.withOpacity(0.35),
+                borderRadius: BorderRadius.circular(5),
+              ),
             ),
-          ),
-          if (i < totalSteps - 1)
-            Container(
-              width: 24,
-              height: 2,
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              color: active
-                  ? Colors.white.withOpacity(0.55)
-                  : Colors.white.withOpacity(0.2),
-            ),
-        ]);
+            if (i < totalSteps - 1)
+              Container(
+                width: 24,
+                height: 2,
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                color: active
+                    ? Colors.white.withOpacity(0.55)
+                    : Colors.white.withOpacity(0.2),
+              ),
+          ],
+        );
       }),
     );
   }
@@ -113,8 +217,7 @@ class StepIndicator extends StatelessWidget {
 class RegisterHeader extends StatelessWidget {
   final int step;
   final String subtitle;
-  const RegisterHeader(
-      {super.key, required this.step, required this.subtitle});
+  const RegisterHeader({super.key, required this.step, required this.subtitle});
 
   @override
   Widget build(BuildContext context) {
@@ -130,20 +233,27 @@ class RegisterHeader extends StatelessWidget {
             children: const [
               Icon(Icons.bloodtype_rounded, color: Colors.white, size: 22),
               SizedBox(width: 8),
-              Text('eDonate',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.3)),
+              Text(
+                'eDonate',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.3,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
           StepIndicator(currentStep: step, totalSteps: 3),
           const SizedBox(height: 12),
-          Text(subtitle,
-              style: TextStyle(
-                  color: Colors.white.withOpacity(0.75), fontSize: 12)),
+          Text(
+            subtitle,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.75),
+              fontSize: 12,
+            ),
+          ),
         ],
       ),
     );
@@ -157,12 +267,12 @@ class RegisterCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        decoration: const BoxDecoration(
-          color: kSurface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-        ),
-        child: child,
-      );
+    decoration: const BoxDecoration(
+      color: kSurface,
+      borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+    ),
+    child: child,
+  );
 }
 
 // ─── Field label ─────────────────────────────────────────────────────────────
@@ -172,13 +282,16 @@ class FieldLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Text(text,
-            style: const TextStyle(
-                color: kTextPrimary,
-                fontWeight: FontWeight.w600,
-                fontSize: 13)),
-      );
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Text(
+      text,
+      style: const TextStyle(
+        color: kTextPrimary,
+        fontWeight: FontWeight.w600,
+        fontSize: 13,
+      ),
+    ),
+  );
 }
 
 // ─── Text field ───────────────────────────────────────────────────────────────
@@ -208,36 +321,37 @@ class AppTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => TextField(
-        controller: controller,
-        obscureText: obscure,
-        keyboardType: keyboardType,
-        readOnly: readOnly,
-        inputFormatters: inputFormatters,
-        onTap: onTap,
-        style: const TextStyle(color: kTextPrimary, fontSize: 14),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle:
-              TextStyle(color: kTextMuted.withOpacity(0.6), fontSize: 14),
-          filled: true,
-          fillColor: kInputFill,
-          prefixIcon: prefixIcon != null
-              ? Icon(prefixIcon, color: kTextMuted, size: 18)
-              : null,
-          suffixIcon: suffix,
-          border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: kBorder)),
-          enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: kBorder)),
-          focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: kCrimson, width: 1.5)),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        ),
-      );
+    controller: controller,
+    obscureText: obscure,
+    keyboardType: keyboardType,
+    readOnly: readOnly,
+    inputFormatters: inputFormatters,
+    onTap: onTap,
+    style: const TextStyle(color: kTextPrimary, fontSize: 14),
+    decoration: InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(color: kTextMuted.withOpacity(0.6), fontSize: 14),
+      filled: true,
+      fillColor: kInputFill,
+      prefixIcon: prefixIcon != null
+          ? Icon(prefixIcon, color: kTextMuted, size: 18)
+          : null,
+      suffixIcon: suffix,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: kBorder),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: kBorder),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: kCrimson, width: 1.5),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+    ),
+  );
 }
 
 // ─── Dropdown ─────────────────────────────────────────────────────────────────
@@ -257,32 +371,38 @@ class AppDropdown<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => DropdownButtonFormField<T>(
-        value: value,
-        isExpanded: true,
-        icon: const Icon(Icons.keyboard_arrow_down_rounded,
-            color: kTextMuted, size: 20),
-        decoration: InputDecoration(
-          filled: true,
-          fillColor: kInputFill,
-          border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: kBorder)),
-          enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: kBorder)),
-          focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: kCrimson, width: 1.5)),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        ),
-        hint: Text(hint,
-            style: TextStyle(
-                color: kTextMuted.withOpacity(0.6), fontSize: 14)),
-        style: const TextStyle(color: kTextPrimary, fontSize: 14),
-        items: items,
-        onChanged: onChanged,
-      );
+    value: value,
+    isExpanded: true,
+    icon: const Icon(
+      Icons.keyboard_arrow_down_rounded,
+      color: kTextMuted,
+      size: 20,
+    ),
+    decoration: InputDecoration(
+      filled: true,
+      fillColor: kInputFill,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: kBorder),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: kBorder),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: kCrimson, width: 1.5),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+    ),
+    hint: Text(
+      hint,
+      style: TextStyle(color: kTextMuted.withOpacity(0.6), fontSize: 14),
+    ),
+    style: const TextStyle(color: kTextPrimary, fontSize: 14),
+    items: items,
+    onChanged: onChanged,
+  );
 }
 
 // ─── Primary button ───────────────────────────────────────────────────────────
@@ -291,36 +411,40 @@ class PrimaryButton extends StatelessWidget {
   final bool loading;
   final VoidCallback? onTap;
 
-  const PrimaryButton(
-      {super.key,
-      required this.label,
-      this.loading = false,
-      required this.onTap});
+  const PrimaryButton({
+    super.key,
+    required this.label,
+    this.loading = false,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        width: double.infinity,
-        height: 52,
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: kCrimson,
-            foregroundColor: Colors.white,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16)),
-          ),
-          onPressed: loading ? null : onTap,
-          child: loading
-              ? const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2.5, color: Colors.white))
-              : Text(label,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w700, fontSize: 15)),
-        ),
-      );
+    width: double.infinity,
+    height: 52,
+    child: ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: kCrimson,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+      onPressed: loading ? null : onTap,
+      child: loading
+          ? const SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: Colors.white,
+              ),
+            )
+          : Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+            ),
+    ),
+  );
 }
 
 // ─── Outline button ───────────────────────────────────────────────────────────
@@ -331,20 +455,20 @@ class OutlineBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        height: 52,
-        child: OutlinedButton(
-          style: OutlinedButton.styleFrom(
-            foregroundColor: kCrimson,
-            side: const BorderSide(color: kCrimson, width: 1.5),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16)),
-          ),
-          onPressed: onTap,
-          child: Text(label,
-              style: const TextStyle(
-                  fontWeight: FontWeight.w700, fontSize: 15)),
-        ),
-      );
+    height: 52,
+    child: OutlinedButton(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: kCrimson,
+        side: const BorderSide(color: kCrimson, width: 1.5),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+      onPressed: onTap,
+      child: Text(
+        label,
+        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+      ),
+    ),
+  );
 }
 
 // ─── Section title ────────────────────────────────────────────────────────────
@@ -354,20 +478,25 @@ class SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(
-        children: [
-          Container(
-            width: 3,
-            height: 16,
-            decoration: BoxDecoration(
-                color: kCrimson, borderRadius: BorderRadius.circular(2)),
-          ),
-          const SizedBox(width: 8),
-          Text(text,
-              style: const TextStyle(
-                  color: kTextMuted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.8)),
-        ],
-      );
+    children: [
+      Container(
+        width: 3,
+        height: 16,
+        decoration: BoxDecoration(
+          color: kCrimson,
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
+      const SizedBox(width: 8),
+      Text(
+        text,
+        style: const TextStyle(
+          color: kTextMuted,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.8,
+        ),
+      ),
+    ],
+  );
 }

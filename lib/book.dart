@@ -9,7 +9,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'anim.dart';
 import 'check.dart';
 import 'config.dart';
-import 'home.dart' show kBottomNavBarHeight;
 import 'shared_design.dart';
 
 // Shared soft shadow used across every card in this file (5.1 consistency
@@ -17,6 +16,11 @@ import 'shared_design.dart';
 const List<BoxShadow> kBookSoftShadow = [
   BoxShadow(color: Color(0x0A000000), blurRadius: 10, offset: Offset(0, 3)),
 ];
+
+// Sticky bottom bar's own content height (12 top pad + 50 confirm button
+// height + 12 bottom pad) — used so the scroll content ends exactly one
+// gap above it instead of guessing at a fixed value.
+const double kStickyBarHeight = 12 + 50 + 12;
 
 class BookScreen extends StatefulWidget {
   final bool showBackButton;
@@ -445,6 +449,218 @@ class _BookScreenState extends State<BookScreen>
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
+    );
+  }
+
+  void _showConfirmBookingSheet() {
+    if (!_allSelected) return;
+    HapticFeedback.selectionClick();
+
+    final facility = _selectedFacility;
+    final facilityName = facility?['facility_name']?.toString() ?? '';
+    final facilityAddress = facility?['address']?.toString();
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE5E7EB),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Confirm your booking?',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF111827),
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Please review your appointment details.',
+                style: TextStyle(fontSize: 12.5, color: Color(0xFF6B7280)),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF9FAFB),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Column(
+                  children: [
+                    _confirmSummaryRow(
+                      icon: Icons.event_rounded,
+                      label: 'Date',
+                      value: _formatDate(selectedDate!),
+                    ),
+                    const SizedBox(height: 12),
+                    _confirmSummaryRow(
+                      icon: Icons.schedule_rounded,
+                      label: 'Time',
+                      value: selectedTime!,
+                    ),
+                    const SizedBox(height: 12),
+                    _confirmSummaryRow(
+                      icon: Icons.location_on_rounded,
+                      label: 'Donation center',
+                      value: facilityName,
+                      sublabel:
+                          (facilityAddress != null && facilityAddress.isNotEmpty)
+                          ? facilityAddress
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  border: Border.all(color: const Color(0xFFBFDBFE)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.info_outline_rounded,
+                      size: 16,
+                      color: Color(0xFF1D4ED8),
+                    ),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Arrive 10 minutes early and bring a valid ID.',
+                        style: TextStyle(fontSize: 12, color: Color(0xFF1D4ED8)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 50,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(sheetContext).pop(),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF6B7280),
+                          side: const BorderSide(color: Color(0xFFE5E7EB)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: const Text(
+                          'Go Back',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SizedBox(
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(sheetContext).pop();
+                          _submitBooking();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFDC2626),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: const Text(
+                          'Confirm Booking',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _confirmSummaryRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    String? sublabel,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF1F1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, size: 16, color: kCrimson),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+              ),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF111827),
+                ),
+              ),
+              if (sublabel != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  sublabel,
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -892,14 +1108,19 @@ class _BookScreenState extends State<BookScreen>
       backgroundColor: const Color(0xFFF9FAFB),
       body: Column(
         children: [
-          _header(screenHeight, showingForm),
+          _header(showingForm),
           Expanded(
             child: RefreshIndicator(
               color: const Color(0xFFDC2626),
               onRefresh: _refreshStatuses,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  20,
+                  16,
+                  showingForm ? kStickyBarHeight + 16 : 24,
+                ),
                 child: ConstrainedBox(
                   constraints: BoxConstraints(minHeight: screenHeight * 0.6),
                   child: AnimatedSwitcher(
@@ -916,66 +1137,24 @@ class _BookScreenState extends State<BookScreen>
     );
   }
 
-  Widget _header(double screenHeight, bool showSteps) => ClipRRect(
-    borderRadius: const BorderRadius.only(
-      bottomLeft: Radius.circular(24),
-      bottomRight: Radius.circular(24),
-    ),
-    child: Container(
-      width: double.infinity,
-      padding: EdgeInsets.fromLTRB(
-        20,
-        screenHeight * 0.06,
-        20,
-        showSteps ? 16 : screenHeight * 0.03,
+  Widget _header(bool showSteps) => EdonateHeader(
+    title: 'Book Appointment',
+    subtitle: 'Schedule your blood donation',
+    leading: widget.showBackButton
+        ? HeaderIconButton(
+            icon: Icons.arrow_back_rounded,
+            tooltip: 'Back',
+            onTap: () => Navigator.of(context).pop(),
+          )
+        : null,
+    actions: [
+      HeaderIconButton(
+        icon: Icons.refresh_rounded,
+        tooltip: 'Refresh',
+        onTap: _refreshStatuses,
       ),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(colors: kHeaderGradient),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              if (widget.showBackButton) ...[
-                HeaderIconButton(
-                  icon: Icons.arrow_back_rounded,
-                  tooltip: 'Back',
-                  onTap: () => Navigator.of(context).pop(),
-                ),
-                const SizedBox(width: 14),
-              ],
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Book Appointment",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      "Schedule your blood donation",
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-              HeaderIconButton(
-                icon: Icons.refresh_rounded,
-                tooltip: 'Refresh',
-                onTap: _refreshStatuses,
-              ),
-            ],
-          ),
-          if (showSteps) ...[const SizedBox(height: 14), _stepIndicatorRow()],
-        ],
-      ),
-    ),
+    ],
+    bottom: showSteps ? _stepIndicatorRow() : null,
   );
 
   Widget _stepIndicatorRow() {
@@ -1048,7 +1227,6 @@ class _BookScreenState extends State<BookScreen>
   }
 
   Widget _stickyBottomBar({required bool isReschedule}) {
-    final navBarPad = widget.showBackButton ? 0.0 : kBottomNavBarHeight;
     final completedCount = [
       selectedDate,
       selectedFacilityId,
@@ -1114,26 +1292,27 @@ class _BookScreenState extends State<BookScreen>
       );
     }
 
-    return Container(
+    final bar = Container(
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: kBorder)),
       ),
-      child: SafeArea(
-        top: false,
-        minimum: EdgeInsets.only(bottom: navBarPad),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          child: Row(
-            children: [
-              Expanded(child: left),
-              const SizedBox(width: 12),
-              _confirmButton(isReschedule: isReschedule),
-            ],
-          ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Row(
+          children: [
+            Expanded(child: left),
+            const SizedBox(width: 12),
+            _confirmButton(isReschedule: isReschedule),
+          ],
         ),
       ),
     );
+
+    // Tab mode: HomeScreen's own bottom navigation bar already handles the
+    // device inset, so this bar just ends at the bottom of our body.
+    // Pushed mode: there's no bottom navigation, so clear the gesture area.
+    return widget.showBackButton ? SafeArea(top: false, child: bar) : bar;
   }
 
   Widget _confirmButton({required bool isReschedule}) {
@@ -1146,7 +1325,7 @@ class _BookScreenState extends State<BookScreen>
       },
       child: ElevatedButton(
         onPressed: enabled
-            ? (isReschedule ? _confirmAndReschedule : _submitBooking)
+            ? (isReschedule ? _confirmAndReschedule : _showConfirmBookingSheet)
             : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
@@ -3372,6 +3551,7 @@ class _EligibilityGate extends StatelessWidget {
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Icon(
                           Icons.event_repeat_rounded,
@@ -3379,13 +3559,16 @@ class _EligibilityGate extends StatelessWidget {
                           color: accent,
                         ),
                         const SizedBox(width: 7),
-                        Text(
-                          'Retake the check on ${_formatLongDate(retakeDate!)} · '
-                          '${_retakeWhen(retakeDaysRemaining)}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: accent,
+                        Flexible(
+                          child: Text(
+                            'Retake the check on ${_formatLongDate(retakeDate!)} · '
+                            '${_retakeWhen(retakeDaysRemaining)}',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: accent,
+                            ),
                           ),
                         ),
                       ],
