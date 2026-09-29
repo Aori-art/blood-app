@@ -6,13 +6,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'anim.dart';
 import 'config.dart';
-import 'digital_id.dart';
 import 'edit_profile.dart';
 import 'help_support.dart';
 import 'login.dart';
 import 'notification_settings.dart';
 import 'privacy_security.dart';
 import 'shared_design.dart';
+import 'verify.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -24,6 +24,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Map<String, dynamic>? profile;
   String? notice;
   bool loading = true;
+  String? verificationStatus; // 'unverified' | 'pending' | 'verified' | 'rejected'
 
   @override
   void initState() {
@@ -55,6 +56,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
       loading = progress && cached == null;
       notice = null;
     });
+    await Future.wait([
+      _fetchProfileFromServer(prefs, id, cached),
+      _fetchVerificationStatus(id),
+    ]);
+  }
+
+  Future<void> _fetchProfileFromServer(
+    SharedPreferences prefs,
+    String id,
+    Map<String, dynamic>? cached,
+  ) async {
     try {
       final response = await http
           .get(Uri.parse(AppConfig.baseUrl + '/get_profile.php?donor_id=' + id))
@@ -82,6 +94,24 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ? 'Unable to load your profile. Check your internet connection and try again.'
             : "You're offline — showing saved profile information.";
       });
+  }
+
+  // Leaves verificationStatus untouched on failure (null on first load,
+  // or whatever it was last known to be) — this screen should never claim
+  // a status it doesn't actually know.
+  Future<void> _fetchVerificationStatus(String id) async {
+    try {
+      final response = await http
+          .get(Uri.parse('${AppConfig.baseUrl}/get_verification_status.php?donor_id=$id'))
+          .timeout(const Duration(seconds: 10));
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        if (body is Map && body['status'] == 'success') {
+          setState(() => verificationStatus = body['verification_status']?.toString());
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> _logout() async {
@@ -296,17 +326,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       FadeSlideIn(
                         index: 4,
                         child: _card(null, [
-                          _menu(
-                            Icons.badge_rounded,
-                            'Digital Donor ID',
-                            () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const DigitalIdScreen(),
-                              ),
-                            ),
-                            subtitle: 'View your eDonate donor identification',
-                          ),
                           _menu(Icons.edit, 'Edit Profile', () async {
                             final changed = await Navigator.push<bool>(
                               context,
@@ -536,9 +555,77 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ),
           ),
         ),
+        const SizedBox(height: 8),
+        _verificationBadge(),
       ],
     ),
   );
+
+  Widget _verificationBadge() {
+    late Color fg;
+    late Color bg;
+    late String label;
+    late IconData icon;
+
+    switch (verificationStatus) {
+      case 'verified':
+        fg = const Color(0xFF16A34A);
+        bg = const Color(0xFFDCFCE7);
+        label = 'Verified';
+        icon = Icons.verified_user_rounded;
+        break;
+      case 'pending':
+        fg = const Color(0xFFD97706);
+        bg = const Color(0xFFFFFBEB);
+        label = 'Verification Pending';
+        icon = Icons.hourglass_top_rounded;
+        break;
+      case 'rejected':
+        fg = kCrimson;
+        bg = const Color(0xFFFFF1F1);
+        label = 'Verification Rejected';
+        icon = Icons.gpp_bad_outlined;
+        break;
+      case 'unverified':
+        fg = kCrimson;
+        bg = const Color(0xFFFFF1F1);
+        label = 'Not Verified';
+        icon = Icons.shield_outlined;
+        break;
+      default:
+        fg = const Color(0xFF6B7280);
+        bg = const Color(0xFFF3F4F6);
+        label = 'Checking...';
+        icon = Icons.hourglass_empty_rounded;
+    }
+
+    final isVerified = verificationStatus == 'verified';
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: isVerified
+          ? null
+          : () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const VerifyScreen()),
+              ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: fg),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
   Widget _stat(IconData icon, String value, String label, Color color) =>
       Container(
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),

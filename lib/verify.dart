@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'config.dart';
+import 'id_camera_capture.dart';
 import 'shared_design.dart';
 
 enum _IdSide { front, back }
@@ -700,10 +701,91 @@ class _VerifyScreenState extends State<VerifyScreen>
     );
   }
 
+  Future<void> _openCameraCapture() async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => IdCameraCaptureScreen(
+          documentTypes: _documentTypes,
+          backOptionalTypes: _backOptionalTypes,
+          donorId: _donorId,
+        ),
+      ),
+    );
+    if (result == true) {
+      _showSnack('Your ID was submitted for verification.');
+      await _fetchStatus();
+    }
+  }
+
+  Widget _cameraCaptureEntryCard() => InkWell(
+    onTap: _openCameraCapture,
+    borderRadius: BorderRadius.circular(16),
+    child: Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kBorder, width: 1.5),
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: Color(0xFFFFF1F1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.camera_alt_rounded, color: kCrimson, size: 22),
+          ),
+          const SizedBox(width: 14),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Verify with Your Camera',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: kTextPrimary),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Guided step-by-step ID capture',
+                  style: TextStyle(fontSize: 12, color: kTextMuted),
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded, color: kTextMuted),
+        ],
+      ),
+    ),
+  );
+
+  Widget _orDivider(String label) => Row(
+    children: [
+      const Expanded(child: Divider(color: kBorder)),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        child: Text(label, style: const TextStyle(fontSize: 11, color: kTextMuted)),
+      ),
+      const Expanded(child: Divider(color: kBorder)),
+    ],
+  );
+
   Widget _uploadFormBody() => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       _infoBanner(),
+      const SizedBox(height: 18),
+      _cameraCaptureEntryCard(),
+      const SizedBox(height: 18),
+      _orDivider('or upload manually'),
       const SizedBox(height: 18),
       _documentTypeCard(),
       const SizedBox(height: 18),

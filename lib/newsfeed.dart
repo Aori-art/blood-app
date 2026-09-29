@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'anim.dart';
 import 'book.dart';
+import 'history.dart';
 import 'login.dart';
 import 'home.dart';
 import 'config.dart';
@@ -133,7 +134,10 @@ class Post {
 // ── API ──────────────────────────────────────────────────────────────────────
 
 class NewsfeedApi {
-  static Future<List<Post>> fetchPosts({int limit = 50, String? donorId}) async {
+  static Future<List<Post>> fetchPosts({
+    int limit = 50,
+    String? donorId,
+  }) async {
     final hasDonorId = donorId != null && donorId.isNotEmpty;
     final uri = Uri.parse(
       '${AppConfig.baseUrl}/get_posts.php?limit=$limit${hasDonorId ? '&donor_id=$donorId' : ''}',
@@ -178,7 +182,9 @@ class UrgencyBadge extends StatelessWidget {
     if (urgency == Urgency.normal) return const SizedBox.shrink();
 
     final isCritical = urgency == Urgency.critical;
-    final color = isCritical ? const Color(0xFFDC2626) : const Color(0xFFF97316);
+    final color = isCritical
+        ? const Color(0xFFDC2626)
+        : const Color(0xFFF97316);
     final label = isCritical ? "CRITICAL" : "URGENT";
 
     return Container(
@@ -227,8 +233,11 @@ Widget netImage(String url, {BoxFit fit = BoxFit.cover}) {
     fit: fit,
     errorBuilder: (context, error, stackTrace) => Container(
       color: AppColors.mutedBg,
-      child: const Icon(Icons.image_not_supported_outlined,
-          color: AppColors.muted, size: 20),
+      child: const Icon(
+        Icons.image_not_supported_outlined,
+        color: AppColors.muted,
+        size: 20,
+      ),
     ),
     loadingBuilder: (context, child, progress) {
       if (progress == null) return child;
@@ -288,7 +297,8 @@ class _ImageViewerPage extends StatefulWidget {
 class _ImageViewerPageState extends State<_ImageViewerPage> {
   late final PageController _pageController;
   late int _currentIndex;
-  final TransformationController _transformController = TransformationController();
+  final TransformationController _transformController =
+      TransformationController();
   bool _isZoomed = false;
 
   bool _dragging = false;
@@ -363,7 +373,9 @@ class _ImageViewerPageState extends State<_ImageViewerPage> {
           onVerticalDragUpdate: _handleVerticalDragUpdate,
           onVerticalDragEnd: _handleVerticalDragEnd,
           child: AnimatedContainer(
-            duration: _dragging ? Duration.zero : const Duration(milliseconds: 250),
+            duration: _dragging
+                ? Duration.zero
+                : const Duration(milliseconds: 250),
             curve: Curves.easeOut,
             width: double.infinity,
             height: double.infinity,
@@ -403,23 +415,32 @@ class _ImageViewerPageState extends State<_ImageViewerPage> {
                               loadingBuilder: (context, child, progress) {
                                 if (progress == null) return child;
                                 return const Center(
-                                  child: CircularProgressIndicator(color: Colors.white),
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                  ),
                                 );
                               },
-                              errorBuilder: (context, error, stackTrace) => Center(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.broken_image_outlined,
-                                        color: Colors.grey[400], size: 40),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      "Couldn't load image",
-                                      style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Center(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.broken_image_outlined,
+                                          color: Colors.grey[400],
+                                          size: 40,
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          "Couldn't load image",
+                                          style: TextStyle(
+                                            color: Colors.grey[400],
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
-                              ),
+                                  ),
                             ),
                           ),
                         ),
@@ -446,7 +467,10 @@ class _ImageViewerPageState extends State<_ImageViewerPage> {
                                   color: Colors.black45,
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(Icons.close_rounded, color: Colors.white),
+                                child: const Icon(
+                                  Icons.close_rounded,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                           ),
@@ -455,14 +479,20 @@ class _ImageViewerPageState extends State<_ImageViewerPage> {
                           Align(
                             alignment: Alignment.topCenter,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.black54,
                                 borderRadius: BorderRadius.circular(999),
                               ),
                               child: Text(
                                 '${_currentIndex + 1} / ${widget.imageUrls.length}',
-                                style: const TextStyle(color: Colors.white, fontSize: 12),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                ),
                               ),
                             ),
                           ),
@@ -485,18 +515,21 @@ void _openImageViewer(
   required int initialIndex,
   required String heroTagPrefix,
 }) {
-  Navigator.of(context).push(PageRouteBuilder(
-    opaque: false,
-    barrierColor: Colors.black,
-    transitionDuration: const Duration(milliseconds: 280),
-    reverseTransitionDuration: const Duration(milliseconds: 240),
-    pageBuilder: (_, __, ___) => _ImageViewerPage(
-      imageUrls: imageUrls,
-      initialIndex: initialIndex,
-      heroTagPrefix: heroTagPrefix,
+  Navigator.of(context).push(
+    PageRouteBuilder(
+      opaque: false,
+      barrierColor: Colors.black,
+      transitionDuration: const Duration(milliseconds: 280),
+      reverseTransitionDuration: const Duration(milliseconds: 240),
+      pageBuilder: (_, __, ___) => _ImageViewerPage(
+        imageUrls: imageUrls,
+        initialIndex: initialIndex,
+        heroTagPrefix: heroTagPrefix,
+      ),
+      transitionsBuilder: (_, anim, __, child) =>
+          FadeTransition(opacity: anim, child: child),
     ),
-    transitionsBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
-  ));
+  );
 }
 
 // ── Poster (admin/facility) profile preview sheet ───────────────────────────
@@ -516,8 +549,18 @@ String? _formatMonthYear(String? raw) {
   final date = DateTime.tryParse(raw);
   if (date == null) return null;
   const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
   return '${months[date.month - 1]} ${date.year}';
 }
@@ -559,7 +602,8 @@ class _PosterPreviewSheet extends StatefulWidget {
 }
 
 class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
-  bool get _isLinked => widget.post.authorType != null && widget.post.authorId != null;
+  bool get _isLinked =>
+      widget.post.authorType != null && widget.post.authorId != null;
 
   bool _loading = true;
   bool _error = false;
@@ -590,7 +634,9 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data is Map && data['status'] == 'success' && data['profile'] is Map) {
+        if (data is Map &&
+            data['status'] == 'success' &&
+            data['profile'] is Map) {
           setState(() {
             _profile = Map<String, dynamic>.from(data['profile']);
             _loading = false;
@@ -621,12 +667,24 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
     final authorType = widget.post.authorType;
     if (authorType == 'facility') {
       final facilityType = _profile?['facility_type']?.toString();
-      return (_facilityTypeIcon(facilityType), const Color(0xFF2563EB), const Color(0xFFEFF6FF));
+      return (
+        _facilityTypeIcon(facilityType),
+        const Color(0xFF2563EB),
+        const Color(0xFFEFF6FF),
+      );
     }
     if (authorType == 'admin') {
-      return (Icons.verified_rounded, const Color(0xFFDC2626), const Color(0xFFFFF1F1));
+      return (
+        Icons.verified_rounded,
+        const Color(0xFFDC2626),
+        const Color(0xFFFFF1F1),
+      );
     }
-    return (Icons.groups_rounded, const Color(0xFF6B7280), const Color(0xFFF3F4F6));
+    return (
+      Icons.groups_rounded,
+      const Color(0xFF6B7280),
+      const Color(0xFFF3F4F6),
+    );
   }
 
   Widget _avatar() {
@@ -640,7 +698,9 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(isFacility ? 23 : size / 2 + 3),
-        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
+        ],
       ),
       child: ClipRRect(
         borderRadius: innerRadius,
@@ -681,7 +741,11 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
         const SizedBox(width: 4),
         Text(
           label,
-          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: fg),
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: fg,
+          ),
         ),
       ],
     ),
@@ -703,7 +767,8 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
       );
     }
     if (profile != null && authorType == 'admin') {
-      final label = profile['role_label']?.toString() ?? 'Official eDonate Account';
+      final label =
+          profile['role_label']?.toString() ?? 'Official eDonate Account';
       return _pill(
         icon: Icons.verified_rounded,
         label: label,
@@ -729,7 +794,10 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
   Widget _iconBox(IconData icon) => Container(
     width: 32,
     height: 32,
-    decoration: BoxDecoration(color: const Color(0xFFFFF1F1), borderRadius: BorderRadius.circular(10)),
+    decoration: BoxDecoration(
+      color: const Color(0xFFFFF1F1),
+      borderRadius: BorderRadius.circular(10),
+    ),
     alignment: Alignment.center,
     child: Icon(icon, size: 16, color: const Color(0xFFDC2626)),
   );
@@ -739,7 +807,9 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
     final subParts = <String>[];
     for (final key in ['barangay_name', 'city', 'province']) {
       final v = profile[key]?.toString();
-      if (v != null && v.isNotEmpty && !address.toLowerCase().contains(v.toLowerCase())) {
+      if (v != null &&
+          v.isNotEmpty &&
+          !address.toLowerCase().contains(v.toLowerCase())) {
         subParts.add(v);
       }
     }
@@ -753,12 +823,28 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Address", style: TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
+              const Text(
+                "Address",
+                style: TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+              ),
               const SizedBox(height: 2),
-              Text(address, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF111827))),
+              Text(
+                address,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF111827),
+                ),
+              ),
               if (subParts.isNotEmpty) ...[
                 const SizedBox(height: 2),
-                Text(subParts.join(', '), style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
+                Text(
+                  subParts.join(', '),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF6B7280),
+                  ),
+                ),
               ],
             ],
           ),
@@ -786,9 +872,19 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Contact", style: TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
+              const Text(
+                "Contact",
+                style: TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+              ),
               const SizedBox(height: 2),
-              Text(contactNumber, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF111827))),
+              Text(
+                contactNumber,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF111827),
+                ),
+              ),
             ],
           ),
         ),
@@ -803,7 +899,8 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
     final rows = <Widget>[];
     if (address != null && address.isNotEmpty) rows.add(_addressBlock(profile));
     if (contact != null && contact.isNotEmpty) {
-      if (rows.isNotEmpty) rows.add(const Divider(height: 20, color: Color(0xFFF3F4F6)));
+      if (rows.isNotEmpty)
+        rows.add(const Divider(height: 20, color: Color(0xFFF3F4F6)));
       rows.add(_contactRow(contact));
     }
     if (rows.isEmpty) return const SizedBox.shrink();
@@ -822,13 +919,28 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
 
   Widget _eventRow(Map<String, dynamic> event) {
     final date = DateTime.tryParse(event['event_date']?.toString() ?? '');
-    const monthsShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthsShort = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     final monthLabel = date != null ? monthsShort[date.month - 1] : '—';
     final dayLabel = date != null ? '${date.day}' : '—';
 
     final start = _formatTime12(event['start_time']?.toString());
     final end = _formatTime12(event['end_time']?.toString());
-    final timeLabel = (start != null && end != null) ? '$start – $end' : (start ?? end ?? '');
+    final timeLabel = (start != null && end != null)
+        ? '$start – $end'
+        : (start ?? end ?? '');
     final location = event['location_name']?.toString();
     final subtitle = [
       if (timeLabel.isNotEmpty) timeLabel,
@@ -841,13 +953,30 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
         Container(
           width: 44,
           height: 44,
-          decoration: BoxDecoration(color: const Color(0xFFFFF1F1), borderRadius: BorderRadius.circular(10)),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF1F1),
+            borderRadius: BorderRadius.circular(10),
+          ),
           alignment: Alignment.center,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(monthLabel, style: const TextStyle(fontSize: 10, color: Color(0xFFDC2626), fontWeight: FontWeight.w700)),
-              Text(dayLabel, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF111827))),
+              Text(
+                monthLabel,
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: Color(0xFFDC2626),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              Text(
+                dayLabel,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF111827),
+                ),
+              ),
             ],
           ),
         ),
@@ -858,11 +987,21 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
             children: [
               Text(
                 event['title']?.toString() ?? '',
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF111827)),
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF111827),
+                ),
               ),
               if (subtitle.isNotEmpty) ...[
                 const SizedBox(height: 2),
-                Text(subtitle, style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF6B7280),
+                  ),
+                ),
               ],
             ],
           ),
@@ -880,7 +1019,11 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
       children: [
         const Text(
           "Upcoming Donation Events",
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF6B7280)),
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF6B7280),
+          ),
         ),
         const SizedBox(height: 8),
         if (list.isEmpty)
@@ -914,7 +1057,11 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
             ),
             child: const Row(
               children: [
-                Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFFB45309)),
+                Icon(
+                  Icons.info_outline_rounded,
+                  size: 14,
+                  color: Color(0xFFB45309),
+                ),
                 SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -950,7 +1097,11 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
         Expanded(
           child: Text(
             "Posts from this account are official announcements from the eDonate team.",
-            style: TextStyle(fontSize: 12, color: Color(0xFF1D4ED8), height: 1.4),
+            style: TextStyle(
+              fontSize: 12,
+              color: Color(0xFF1D4ED8),
+              height: 1.4,
+            ),
           ),
         ),
       ],
@@ -968,11 +1119,32 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
 
   Widget _loadingPlaceholders() => Column(
     children: [
-      Container(width: double.infinity, height: 56, decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(8))),
+      Container(
+        width: double.infinity,
+        height: 56,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3F4F6),
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
       const SizedBox(height: 10),
-      Container(width: double.infinity, height: 56, decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(8))),
+      Container(
+        width: double.infinity,
+        height: 56,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3F4F6),
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
       const SizedBox(height: 10),
-      Container(width: double.infinity, height: 72, decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(8))),
+      Container(
+        width: double.infinity,
+        height: 72,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3F4F6),
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
     ],
   );
 
@@ -987,10 +1159,17 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
       const SizedBox(height: 10),
       TextButton.icon(
         onPressed: _fetchProfile,
-        icon: const Icon(Icons.refresh_rounded, size: 16, color: Color(0xFFDC2626)),
+        icon: const Icon(
+          Icons.refresh_rounded,
+          size: 16,
+          color: Color(0xFFDC2626),
+        ),
         label: const Text(
           "Retry",
-          style: TextStyle(color: Color(0xFFDC2626), fontWeight: FontWeight.w600),
+          style: TextStyle(
+            color: Color(0xFFDC2626),
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     ],
@@ -1001,7 +1180,9 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
     final post = widget.post;
     final profile = _profile;
     final pill = _typePill();
-    final memberSince = profile != null ? _formatMonthYear(profile['member_since']?.toString()) : null;
+    final memberSince = profile != null
+        ? _formatMonthYear(profile['member_since']?.toString())
+        : null;
 
     Widget sections;
     if (_isLinked && _loading) {
@@ -1017,7 +1198,9 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
     }
 
     return ConstrainedBox(
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
       child: Container(
         decoration: const BoxDecoration(
           color: Colors.white,
@@ -1044,17 +1227,21 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF111827)),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF111827),
+                ),
               ),
-              if (pill != null) ...[
-                const SizedBox(height: 8),
-                pill,
-              ],
+              if (pill != null) ...[const SizedBox(height: 8), pill],
               if (memberSince != null) ...[
                 const SizedBox(height: 8),
                 Text(
                   "On eDonate since $memberSince",
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF9CA3AF),
+                  ),
                 ),
               ],
               const SizedBox(height: 16),
@@ -1068,9 +1255,14 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFFDC2626),
                     side: const BorderSide(color: Color(0xFFDC2626)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                  child: const Text("Close", style: TextStyle(fontWeight: FontWeight.w600)),
+                  child: const Text(
+                    "Close",
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
             ],
@@ -1227,7 +1419,9 @@ class _PostCardState extends State<PostCard> {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                                color: AppColors.primary.withOpacity(0.2), width: 2),
+                              color: AppColors.primary.withOpacity(0.2),
+                              width: 2,
+                            ),
                           ),
                           clipBehavior: Clip.antiAlias,
                           child: netImage(post.authorAvatar),
@@ -1245,8 +1439,11 @@ class _PostCardState extends State<PostCard> {
                               shape: BoxShape.circle,
                               border: Border.all(color: Colors.white, width: 2),
                             ),
-                            child: const Icon(Icons.water_drop,
-                                size: 8, color: Colors.white),
+                            child: const Icon(
+                              Icons.water_drop,
+                              size: 8,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                     ],
@@ -1277,8 +1474,11 @@ class _PostCardState extends State<PostCard> {
                         Row(
                           children: [
                             if (post.authorBadge != null) ...[
-                              const Icon(Icons.emoji_events,
-                                  size: 10, color: AppColors.primary),
+                              const Icon(
+                                Icons.emoji_events,
+                                size: 10,
+                                color: AppColors.primary,
+                              ),
                               const SizedBox(width: 4),
                               Text(
                                 post.authorBadge!,
@@ -1289,15 +1489,21 @@ class _PostCardState extends State<PostCard> {
                                 ),
                               ),
                               const SizedBox(width: 6),
-                              const Text("·",
-                                  style: TextStyle(
-                                      fontSize: 11, color: AppColors.muted)),
+                              const Text(
+                                "·",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.muted,
+                                ),
+                              ),
                               const SizedBox(width: 6),
                             ],
                             Text(
                               post.timeAgo,
                               style: const TextStyle(
-                                  fontSize: 11, color: AppColors.muted),
+                                fontSize: 11,
+                                color: AppColors.muted,
+                              ),
                             ),
                           ],
                         ),
@@ -1359,7 +1565,10 @@ class _PostCardState extends State<PostCard> {
                   onTap: _handleLike,
                   borderRadius: BorderRadius.circular(999),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -1370,8 +1579,7 @@ class _PostCardState extends State<PostCard> {
                           child: Icon(
                             liked ? Icons.favorite : Icons.favorite_border,
                             size: 17,
-                            color:
-                                liked ? AppColors.primary : AppColors.muted,
+                            color: liked ? AppColors.primary : AppColors.muted,
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -1419,7 +1627,10 @@ class _DonateBlockState extends State<_DonateBlock> {
       Icon(icon, size: 14, color: AppColors.primary),
       const SizedBox(width: 6),
       Expanded(
-        child: Text(text, style: const TextStyle(fontSize: 12, color: AppColors.foreground)),
+        child: Text(
+          text,
+          style: const TextStyle(fontSize: 12, color: AppColors.foreground),
+        ),
       ),
     ],
   );
@@ -1428,13 +1639,17 @@ class _DonateBlockState extends State<_DonateBlock> {
   Widget build(BuildContext context) {
     final post = widget.post;
     final hasDate = post.eventDate != null && post.eventDate!.isNotEmpty;
-    final hasLocation = post.eventLocation != null && post.eventLocation!.isNotEmpty;
+    final hasLocation =
+        post.eventLocation != null && post.eventLocation!.isNotEmpty;
 
     final detailRows = <Widget>[];
-    if (hasDate) detailRows.add(_detailRow(Icons.event_rounded, post.eventDate!));
+    if (hasDate)
+      detailRows.add(_detailRow(Icons.event_rounded, post.eventDate!));
     if (hasLocation) {
       if (detailRows.isNotEmpty) detailRows.add(const SizedBox(height: 6));
-      detailRows.add(_detailRow(Icons.location_on_rounded, post.eventLocation!));
+      detailRows.add(
+        _detailRow(Icons.location_on_rounded, post.eventLocation!),
+      );
     }
 
     return Padding(
@@ -1449,12 +1664,14 @@ class _DonateBlockState extends State<_DonateBlock> {
             onTapUp: (_) => setState(() => _scale = 1.0),
             onTapCancel: () => setState(() => _scale = 1.0),
             onTap: () {
-              Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => BookScreen(
-                  showBackButton: true,
-                  preselectedFacilityId: post.donationFacilityId,
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => BookScreen(
+                    showBackButton: true,
+                    preselectedFacilityId: post.donationFacilityId,
+                  ),
                 ),
-              ));
+              );
             },
             child: AnimatedScale(
               scale: _scale,
@@ -1485,7 +1702,11 @@ class _DonateBlockState extends State<_DonateBlock> {
                     SizedBox(width: 8),
                     Text(
                       "Donate Now",
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
                     ),
                     SizedBox(width: 2),
                     Icon(Icons.chevron_right, size: 18, color: Colors.white),
@@ -1516,7 +1737,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
 
   String _verificationStatus = 'unverified';
   bool _checkingVerification = true;
-  bool _manualRefreshing = false;
+  bool _verifiedCardDismissed = false;
 
   List<Post> _posts = [];
   bool _loadingPosts = true;
@@ -1572,13 +1793,19 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
 
   Future<void> _fetchVerificationStatus() async {
     final prefs = await SharedPreferences.getInstance();
-    final donorId = int.tryParse(prefs.getString('donorId') ?? '') ?? 0;
+    final donorIdString = prefs.getString('donorId');
+    final donorId = int.tryParse(donorIdString ?? '') ?? 0;
     if (!mounted) return;
+
+    final dismissed = donorIdString == null || donorIdString.isEmpty
+        ? false
+        : prefs.getBool('verified_card_dismissed_$donorIdString') ?? false;
 
     if (donorId <= 0) {
       setState(() {
         _verificationStatus = 'unverified';
         _checkingVerification = false;
+        _verifiedCardDismissed = dismissed;
       });
       return;
     }
@@ -1598,18 +1825,53 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
         final data = jsonDecode(response.body);
         if (data is Map && data['status'] == 'success') {
           setState(() {
-            _verificationStatus = (data['verification_status'] as String?) ?? _verificationStatus;
+            _verificationStatus =
+                (data['verification_status'] as String?) ?? _verificationStatus;
             _checkingVerification = false;
+            _verifiedCardDismissed = dismissed;
           });
           return;
         }
       }
       // Unexpected shape/non-200 — keep whatever status we last knew about
       // rather than flashing the unverified card on a network hiccup.
-      setState(() => _checkingVerification = false);
+      setState(() {
+        _checkingVerification = false;
+        _verifiedCardDismissed = dismissed;
+      });
     } catch (_) {
-      if (mounted) setState(() => _checkingVerification = false);
+      if (mounted) {
+        setState(() {
+          _checkingVerification = false;
+          _verifiedCardDismissed = dismissed;
+        });
+      }
     }
+  }
+
+  Future<void> _dismissVerifiedCard() async {
+    final prefs = await SharedPreferences.getInstance();
+    final donorId = prefs.getString('donorId');
+    if (donorId == null || donorId.isEmpty) return;
+    HapticFeedback.selectionClick();
+    await prefs.setBool('verified_card_dismissed_$donorId', true);
+    if (!mounted) return;
+    setState(() => _verifiedCardDismissed = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Verification card hidden'),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        action: SnackBarAction(
+          label: 'UNDO',
+          onPressed: () async {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.remove('verified_card_dismissed_$donorId');
+            if (mounted) setState(() => _verifiedCardDismissed = false);
+          },
+        ),
+      ),
+    );
   }
 
   void _scrollToVerifyCta() {
@@ -1622,17 +1884,10 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
   }
 
   Future<void> _openVerifyScreen() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const VerifyScreen()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const VerifyScreen()));
     if (mounted) _fetchVerificationStatus();
-  }
-
-  Future<void> _onManualRefresh() async {
-    if (_manualRefreshing) return;
-    setState(() => _manualRefreshing = true);
-    await Future.wait([_loadPosts(), _fetchVerificationStatus()]);
-    if (mounted) setState(() => _manualRefreshing = false);
   }
 
   Future<void> _loadPosts() async {
@@ -1668,7 +1923,8 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
             _buildHeader(context),
             Expanded(
               child: RefreshIndicator(
-                onRefresh: () => Future.wait([_loadPosts(), _fetchVerificationStatus()]),
+                onRefresh: () =>
+                    Future.wait([_loadPosts(), _fetchVerificationStatus()]),
                 child: ListView(
                   controller: _scrollController,
                   padding: const EdgeInsets.only(bottom: 110),
@@ -1706,7 +1962,9 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     final bg = isPending ? const Color(0xFFFFFBEB) : const Color(0xFFF3F4F6);
     final border = isPending ? const Color(0xFFFDE68A) : AppColors.border;
     final fg = isPending ? const Color(0xFFB45309) : AppColors.muted;
-    final icon = isPending ? Icons.hourglass_top_rounded : Icons.info_outline_rounded;
+    final icon = isPending
+        ? Icons.hourglass_top_rounded
+        : Icons.info_outline_rounded;
     final text = isPending
         ? "Home unlocks once your ID is verified"
         : "Verify your ID to unlock the rest of the app";
@@ -1769,13 +2027,13 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
           child: GestureDetector(
             onTap: () {
               if (_isLoggedIn) {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const HomeScreen()),
-                );
+                Navigator.of(
+                  context,
+                ).push(MaterialPageRoute(builder: (_) => const HomeScreen()));
               } else {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                );
+                Navigator.of(
+                  context,
+                ).push(MaterialPageRoute(builder: (_) => const LoginScreen()));
               }
             },
             child: Container(
@@ -1809,7 +2067,11 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
                     ),
                   ),
                   const SizedBox(width: 2),
-                  const Icon(Icons.chevron_right, size: 18, color: Colors.white),
+                  const Icon(
+                    Icons.chevron_right,
+                    size: 18,
+                    color: Colors.white,
+                  ),
                 ],
               ),
             ),
@@ -1820,13 +2082,17 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
   }
 
   bool get _canDonate =>
-      _isLoggedIn && !_checkingVerification && _verificationStatus == 'verified';
+      _isLoggedIn &&
+      !_checkingVerification &&
+      _verificationStatus == 'verified';
 
   Widget _buildPostsList() {
     if (_loadingPosts) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 40),
-        child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+        child: Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
       );
     }
 
@@ -1843,10 +2109,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
               style: const TextStyle(fontSize: 13, color: AppColors.muted),
             ),
             const SizedBox(height: 12),
-            OutlinedButton(
-              onPressed: _loadPosts,
-              child: const Text("Retry"),
-            ),
+            OutlinedButton(onPressed: _loadPosts, child: const Text("Retry")),
           ],
         ),
       );
@@ -1948,118 +2211,123 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
             ],
           ),
           const Spacer(),
-          _buildHeaderRefreshButton(),
+          _buildHeaderProfileButton(),
         ],
       ),
     );
   }
 
-  Widget _buildHeaderRefreshButton() {
+  Widget _buildHeaderProfileButton() {
     return SizedBox(
       width: 36,
       height: 36,
       child: IconButton(
         padding: EdgeInsets.zero,
-        tooltip: 'Refresh',
-        onPressed: _manualRefreshing ? null : _onManualRefresh,
-        icon: _manualRefreshing
-            ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: AppColors.muted,
-                ),
-              )
-            : const Icon(Icons.refresh_rounded, color: AppColors.muted, size: 20),
+        tooltip: 'Profile',
+        onPressed: () => Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => const HistoryScreen())),
+        icon: const Icon(
+          Icons.person_outline_rounded,
+          color: AppColors.muted,
+          size: 20,
+        ),
       ),
     );
   }
 
   Widget _buildSignInCta(BuildContext context) {
-  // Avoid flashing the CTA before we've checked login state
-  if (!_checkedLogin) return const SizedBox.shrink();
+    // Avoid flashing the CTA before we've checked login state
+    if (!_checkedLogin) return const SizedBox.shrink();
 
-  return Container(
-    margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(16),
-      gradient: const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [AppColors.primary, AppColors.primaryDark],
-      ),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _isLoggedIn
-                        ? "WELCOME BACK${_userName != null ? ', ${_userName!.split(' ').first.toUpperCase()}' : ''}"
-                        : "YOUR BLOOD CAN SAVE 3 LIVES",
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _isLoggedIn ? "Ready to Save a Life?" : "Become a Donor Today",
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      height: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _isLoggedIn
-                        ? "View your donation history, track your impact, and manage your profile."
-                        : "Sign in to schedule your donation, track your impact, and earn badges.",
-                    style: const TextStyle(
-                      color: Color(0xFFFECACA),
-                      fontSize: 11,
-                      height: 1.3,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(Icons.water_drop,
-                size: 40, color: Colors.white.withOpacity(0.3)),
-          ],
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.primary, AppColors.primaryDark],
         ),
-        const SizedBox(height: 14),
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              _statChip(Icons.people, "128K donors"),
-              _dot(),
-              _statChip(Icons.favorite, "50K+ lives saved"),
-              _dot(),
-              _statChip(Icons.emoji_events, "Free health check"),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _isLoggedIn
+                          ? "WELCOME BACK${_userName != null ? ', ${_userName!.split(' ').first.toUpperCase()}' : ''}"
+                          : "YOUR BLOOD CAN SAVE 3 LIVES",
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _isLoggedIn
+                          ? "Ready to Save a Life?"
+                          : "Become a Donor Today",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _isLoggedIn
+                          ? "View your donation history, track your impact, and manage your profile."
+                          : "Sign in to schedule your donation, track your impact, and earn badges.",
+                      style: const TextStyle(
+                        color: Color(0xFFFECACA),
+                        fontSize: 11,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.water_drop,
+                size: 40,
+                color: Colors.white.withOpacity(0.3),
+              ),
             ],
           ),
-        ),
-      ],
-    ),
-  );
-}
+          const SizedBox(height: 14),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _statChip(Icons.people, "128K donors"),
+                _dot(),
+                _statChip(Icons.favorite, "50K+ lives saved"),
+                _dot(),
+                _statChip(Icons.emoji_events, "Free health check"),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildVerifyIdCta(BuildContext context) {
     if (_checkingVerification) return const SizedBox.shrink();
+    if (_verificationStatus == 'verified' && _verifiedCardDismissed) {
+      return const SizedBox.shrink();
+    }
 
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 300),
@@ -2075,6 +2343,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
         key: ValueKey(_verificationStatus),
         status: _verificationStatus,
         onTap: _openVerifyScreen,
+        onDismiss: _dismissVerifiedCard,
       ),
     );
   }
@@ -2085,7 +2354,10 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       children: [
         Icon(icon, size: 11, color: Colors.white70),
         const SizedBox(width: 4),
-        Text(label, style: const TextStyle(fontSize: 11, color: Colors.white70)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11, color: Colors.white70),
+        ),
       ],
     );
   }
@@ -2101,7 +2373,6 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       ),
     );
   }
-
 }
 
 // ── Verification status card ────────────────────────────────────────────────
@@ -2109,8 +2380,14 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
 class _VerificationCard extends StatelessWidget {
   final String status;
   final VoidCallback onTap;
+  final VoidCallback onDismiss;
 
-  const _VerificationCard({super.key, required this.status, required this.onTap});
+  const _VerificationCard({
+    super.key,
+    required this.status,
+    required this.onTap,
+    required this.onDismiss,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -2159,7 +2436,10 @@ class _VerificationCard extends StatelessWidget {
       minimumSize: Size.zero,
       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
     ),
-    child: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+    child: Text(
+      label,
+      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+    ),
   );
 
   Widget _filledButton(String label) => ElevatedButton(
@@ -2173,7 +2453,10 @@ class _VerificationCard extends StatelessWidget {
       minimumSize: Size.zero,
       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
     ),
-    child: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+    child: Text(
+      label,
+      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+    ),
   );
 
   Widget _card({
@@ -2227,7 +2510,10 @@ class _VerificationCard extends StatelessWidget {
                   ),
                   Text(
                     subtitle,
-                    style: const TextStyle(fontSize: 12, color: AppColors.muted),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.muted,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -2258,65 +2544,113 @@ class _VerificationCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: const Color(0xFFBBF7D0), width: 1.5),
         ),
-        child: Row(
+        child: Stack(
           children: [
-            TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0.9, end: 1.0),
-              duration: const Duration(milliseconds: 400),
-              curve: Curves.easeOutBack,
-              builder: (_, scale, child) => Transform.scale(scale: scale, child: child),
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: const BoxDecoration(color: Color(0xFFDCFCE7), shape: BoxShape.circle),
-                alignment: Alignment.center,
-                child: const Icon(Icons.verified_user_rounded, size: 20, color: Color(0xFF16A34A)),
-              ),
+            Padding(
+              padding: const EdgeInsets.only(right: 26),
+              child: _verifiedCardRow(),
             ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Identity Verified",
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.foreground,
+            Positioned(
+              top: -4,
+              right: -8,
+              child: Tooltip(
+                message: 'Dismiss',
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(999),
+                  onTap: onDismiss,
+                  child: Container(
+                    width: 26,
+                    height: 26,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: .75),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.close_rounded,
+                      size: 15,
+                      color: Color(0xFF15803D),
                     ),
                   ),
-                  Text(
-                    "Your account has full access to eDonate",
-                    style: TextStyle(fontSize: 12, color: AppColors.muted),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF16A34A),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.check_rounded, size: 14, color: Colors.white),
-                  SizedBox(width: 4),
-                  Text(
-                    "Verified",
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
-                  ),
-                ],
+                ),
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _verifiedCardRow() {
+    return Row(
+      children: [
+        TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.9, end: 1.0),
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeOutBack,
+          builder: (_, scale, child) =>
+              Transform.scale(scale: scale, child: child),
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: const BoxDecoration(
+              color: Color(0xFFDCFCE7),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: const Icon(
+              Icons.verified_user_rounded,
+              size: 20,
+              color: Color(0xFF16A34A),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Identity Verified",
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.foreground,
+                ),
+              ),
+              Text(
+                "Your account has full access to eDonate",
+                style: TextStyle(fontSize: 12, color: AppColors.muted),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFF16A34A),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.check_rounded, size: 14, color: Colors.white),
+              SizedBox(width: 4),
+              Text(
+                "Verified",
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

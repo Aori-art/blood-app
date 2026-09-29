@@ -113,17 +113,34 @@ class _OtpScreenState extends State<OtpScreen>
         focusNode: _focusNodes[index],
         textAlign: TextAlign.center,
         keyboardType: TextInputType.number,
-        maxLength: 1,
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
         style: const TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w800,
             color: kTextPrimary),
         onChanged: (val) {
+          if (val.length > 1) {
+            final digits = val.replaceAll(RegExp(r'\D'), '');
+            final code = digits.substring(0, digits.length > 6 ? 6 : digits.length);
+            for (int i = 0; i < 6; i++) {
+              _controllers[i].text = i < code.length ? code[i] : '';
+            }
+            for (final f in _focusNodes) {
+              f.unfocus();
+            }
+            return;
+          }
+
           if (val.isNotEmpty && index < 5) {
             _focusNodes[index + 1].requestFocus();
           } else if (val.isEmpty && index > 0) {
             _focusNodes[index - 1].requestFocus();
+          }
+
+          if (_controllers[index].text.length > 1) {
+            _controllers[index].text = _controllers[index]
+                .text
+                .substring(_controllers[index].text.length - 1);
           }
         },
         decoration: InputDecoration(

@@ -12,9 +12,19 @@ class CapitalizeFirstLetterFormatter extends TextInputFormatter {
   TextEditingValue formatEditUpdate(
       TextEditingValue oldValue, TextEditingValue newValue) {
     if (newValue.text.isEmpty) return newValue;
-    final text = newValue.text.toLowerCase();
-    return newValue.copyWith(
-        text: text[0].toUpperCase() + text.substring(1));
+    final lower = newValue.text.toLowerCase();
+    final buffer = StringBuffer();
+    bool capitalizeNext = true;
+    for (final ch in lower.split('')) {
+      if (capitalizeNext && ch != ' ') {
+        buffer.write(ch.toUpperCase());
+        capitalizeNext = false;
+      } else {
+        buffer.write(ch);
+      }
+      if (ch == ' ') capitalizeNext = true;
+    }
+    return newValue.copyWith(text: buffer.toString());
   }
 }
 
@@ -25,7 +35,7 @@ class MiddleInitialFormatter extends TextInputFormatter {
     if (newValue.text.isEmpty) return newValue;
     String text = newValue.text.replaceAll('.', '');
     if (text.length > 1) text = text[0];
-    text = '${text.toUpperCase()}.';
+    text = text.toUpperCase();
     return TextEditingValue(
         text: text, selection: TextSelection.collapsed(offset: text.length));
   }
@@ -175,10 +185,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 FieldLabel('Middle Initial'),
                                 AppTextField(
                                   controller: _midCtrl,
-                                  hint: 'D.',
+                                  hint: 'D',
                                   inputFormatters: [
                                     FilteringTextInputFormatter.allow(
-                                        RegExp(r'[a-zA-Z.]')),
+                                        RegExp(r'[a-zA-Z]')),
                                     MiddleInitialFormatter(),
                                   ],
                                 ),
@@ -276,22 +286,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: 14),
 
-                      FieldLabel('Gender'),
+                      FieldLabel('Sex'),
                       AppDropdown<String>(
                         value: _gender,
-                        hint: 'Select Gender',
+                        hint: 'Select Sex',
                         onChanged: (v) => setState(() => _gender = v),
                         items: const [
                           DropdownMenuItem(
                               value: 'Male', child: Text('Male')),
                           DropdownMenuItem(
                               value: 'Female', child: Text('Female')),
-                          DropdownMenuItem(
-                              value: 'Non-binary',
-                              child: Text('Non-binary')),
-                          DropdownMenuItem(
-                              value: 'Prefer not to say',
-                              child: Text('Prefer not to say')),
                         ],
                       ),
                       const SizedBox(height: 32),

@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'anim.dart';
 import 'book.dart';
 import 'config.dart';
 import 'home.dart' show kBottomNavBarHeight;
@@ -72,7 +74,9 @@ class _CheckScreenState extends State<CheckScreen>
   bool _started = false, _loading = true, _checking = true, _submitting = false;
   String _status = 'not_checked';
   String? _reason, _recommendation, _nextDate;
-  bool _canBook = false, _canRetake = true;
+  String? _retakeDate;
+  int _retakeDaysRemaining = 0;
+  bool _canBook = false, _canRetake = false;
 
   @override
   void initState() {
@@ -190,8 +194,17 @@ class _CheckScreenState extends State<CheckScreen>
     _reason = d['result_reason']?.toString();
     _recommendation = d['recommendation_message']?.toString();
     _nextDate = d['next_eligible_date']?.toString();
+    final retakeDate = d['retake_available_date']?.toString();
+    _retakeDate = retakeDate?.isEmpty == true ? null : retakeDate;
+    _retakeDaysRemaining = (d['retake_days_remaining'] as num?)?.toInt() ?? 0;
     _canBook = d['can_book'] == true || d['can_book'].toString() == '1';
     _canRetake = d['can_retake'] == true || d['can_retake'].toString() == '1';
+  }
+
+  String _retakeWhen(int days) {
+    if (days <= 0) return 'today';
+    if (days == 1) return 'tomorrow';
+    return 'in $days days';
   }
 
   bool get _result => const {
@@ -328,6 +341,10 @@ class _CheckScreenState extends State<CheckScreen>
           result['message']?.toString() ?? 'Screening evaluated successfully.',
         );
         await _fetchStatus();
+      } else if (d?['code'] == 'RETAKE_NOT_AVAILABLE') {
+        _error(d?['message']?.toString() ?? "You can't retake the check yet.");
+        setState(() => _started = false);
+        await _fetchStatus();
       } else {
         _error(d?['message']?.toString() ?? 'Unable to submit screening.');
       }
@@ -394,30 +411,36 @@ class _CheckScreenState extends State<CheckScreen>
       body: SafeArea(
         child: Column(
           children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(22),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFF750000), Color(0xFFFF4E4E)],
-                ),
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(24),
+                bottomRight: Radius.circular(24),
               ),
-              child: const Column(
-                children: [
-                  Text(
-                    'Eligibility Check',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 21,
-                      fontWeight: FontWeight.bold,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(22),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF750000), Color(0xFFFF4E4E)],
+                  ),
+                ),
+                child: const Column(
+                  children: [
+                    Text(
+                      'Eligibility Check',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 21,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    'Answer all questions honestly',
-                    style: TextStyle(color: Colors.white70),
-                  ),
-                ],
+                    SizedBox(height: 4),
+                    Text(
+                      'Answer all questions honestly',
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                  ],
+                ),
               ),
             ),
             Expanded(
@@ -637,11 +660,16 @@ class _CheckScreenState extends State<CheckScreen>
             const SizedBox(height: 8),
             ClipRRect(
               borderRadius: BorderRadius.circular(99),
-              child: LinearProgressIndicator(
-                value: (_page + 1) / _questions.length,
-                minHeight: 6,
-                backgroundColor: const Color(0xFFE5E7EB),
-                valueColor: const AlwaysStoppedAnimation(Color(0xFFDC2626)),
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: (_page + 1) / _questions.length),
+                duration: const Duration(milliseconds: 350),
+                curve: Curves.easeOutCubic,
+                builder: (_, value, _) => LinearProgressIndicator(
+                  value: value,
+                  minHeight: 6,
+                  backgroundColor: const Color(0xFFE5E7EB),
+                  valueColor: const AlwaysStoppedAnimation(Color(0xFFDC2626)),
+                ),
               ),
             ),
           ],
@@ -701,78 +729,83 @@ class _CheckScreenState extends State<CheckScreen>
   Widget _question(Question q) => ListView(
     padding: const EdgeInsets.all(16),
     children: [
-      Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
-          boxShadow: const [
-            BoxShadow(
-              color: Colors.black12,
-              blurRadius: 6,
-              offset: Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF1F1),
-                borderRadius: BorderRadius.circular(20),
+      FadeSlideIn(
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black12,
+                blurRadius: 6,
+                offset: Offset(0, 3),
               ),
-              child: Text(
-                'Question ${_page + 1}',
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF1F1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'Question ${_page + 1}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFFDC2626),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                q.question,
                 style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFFDC2626),
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF111827),
+                  height: 1.4,
                 ),
               ),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              q.question,
-              style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF111827),
-                height: 1.4,
+              if (q.extraData?.isNotEmpty == true) _extraList(q.extraData!),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: _answerButton(
+                      'Yes',
+                      Icons.check_circle_rounded,
+                      q.answer == 'yes',
+                      const Color(0xFF16A34A),
+                      const Color(0xFFF0FDF4),
+                      const Color(0xFFBBF7D0),
+                      () => _answer(q, 'yes'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _answerButton(
+                      'No',
+                      Icons.cancel_rounded,
+                      q.answer == 'no',
+                      const Color(0xFFDC2626),
+                      const Color(0xFFFFF1F1),
+                      const Color(0xFFFECACA),
+                      () => _answer(q, 'no'),
+                    ),
+                  ),
+                ],
               ),
-            ),
-            if (q.extraData?.isNotEmpty == true) _extraList(q.extraData!),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: _answerButton(
-                    'Yes',
-                    Icons.check_circle_rounded,
-                    q.answer == 'yes',
-                    const Color(0xFF16A34A),
-                    const Color(0xFFF0FDF4),
-                    const Color(0xFFBBF7D0),
-                    () => _answer(q, 'yes'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _answerButton(
-                    'No',
-                    Icons.cancel_rounded,
-                    q.answer == 'no',
-                    const Color(0xFFDC2626),
-                    const Color(0xFFFFF1F1),
-                    const Color(0xFFFECACA),
-                    () => _answer(q, 'no'),
-                  ),
-                ),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
       AnimatedSize(
@@ -821,8 +854,12 @@ class _CheckScreenState extends State<CheckScreen>
     Color background,
     Color border,
     VoidCallback onTap,
-  ) => GestureDetector(
-    onTap: onTap,
+  ) => PressableScale(
+    scale: 0.97,
+    onTap: () {
+      HapticFeedback.selectionClick();
+      onTap();
+    },
     child: AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       padding: const EdgeInsets.symmetric(vertical: 14),
@@ -1135,6 +1172,8 @@ class _CheckScreenState extends State<CheckScreen>
     final eligible = _status == 'eligible',
         deferred = _status == 'temporary_deferred',
         legacy = _status == 'pending' || _status == 'for_review';
+    final showRetakeCountdown =
+        !eligible && !_canRetake && !legacy && _retakeDate != null;
     final color = eligible
         ? const Color(0xFF16A34A)
         : deferred || legacy
@@ -1252,7 +1291,8 @@ class _CheckScreenState extends State<CheckScreen>
                       ],
                     ),
                   ),
-                  if (_nextDate?.isNotEmpty == true)
+                  if (_nextDate?.isNotEmpty == true &&
+                      !(showRetakeCountdown && _nextDate == _retakeDate))
                     Padding(
                       padding: const EdgeInsets.only(top: 16),
                       child: Text(
@@ -1319,11 +1359,117 @@ class _CheckScreenState extends State<CheckScreen>
                         child: const Text('Take Eligibility Check Again'),
                       ),
                     ),
+                  if (showRetakeCountdown) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: color.withValues(alpha: .18)),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black12,
+                            blurRadius: 6,
+                            offset: Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 36,
+                                height: 36,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: color.withValues(alpha: .12),
+                                ),
+                                child: Icon(
+                                  Icons.event_repeat_rounded,
+                                  size: 20,
+                                  color: color,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              const Text(
+                                'Retake Available',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF111827),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            _formatDate(_retakeDate!),
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF111827),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'You can take the check again '
+                            '${_retakeWhen(_retakeDaysRemaining)}.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: color,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            deferred
+                                ? 'You can take the check again once your deferral period ends.'
+                                : 'This short waiting period lets your health settle before '
+                                      "you're screened again.",
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF6B7280),
+                              height: 1.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        onPressed: null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFE5E7EB),
+                          foregroundColor: const Color(0xFF6B7280),
+                          disabledBackgroundColor: const Color(0xFFE5E7EB),
+                          disabledForegroundColor: const Color(0xFF6B7280),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        icon: const Icon(Icons.lock_clock_rounded, size: 18),
+                        label: Text(
+                          'Available ${_retakeWhen(_retakeDaysRemaining)}',
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   TextButton.icon(
                     onPressed: _refresh,
                     icon: const Icon(Icons.refresh_rounded, size: 18),
-                    label: const Text('Refresh status'),
+                    label: Text(
+                      !eligible && !_canRetake && _retakeDaysRemaining == 0
+                          ? 'Check again'
+                          : 'Refresh status',
+                    ),
                   ),
                 ],
               ),

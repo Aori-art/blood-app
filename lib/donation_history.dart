@@ -6,7 +6,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'anim.dart';
 import 'book.dart';
 import 'config.dart';
+import 'digital_id.dart';
+import 'digital_id_service.dart';
 import 'home.dart' show kBottomNavBarHeight;
+import 'shared_design.dart';
 
 class DonationHistoryScreen extends StatefulWidget {
   const DonationHistoryScreen({super.key});
@@ -29,11 +32,27 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
   // alerts.dart's _NotificationCard (_expandedId on the parent State).
   int? _expandedDonationId;
 
+  DigitalIdData? _digitalId;
+
   @override
   void initState() {
     super.initState();
     fetchDonationHistory();
     _fetchAppointmentStatus();
+    _loadDigitalId();
+  }
+
+  Future<void> _loadDigitalId() async {
+    final prefs = await SharedPreferences.getInstance();
+    final donorId = prefs.getString('donorId');
+    if (donorId == null || donorId.isEmpty) return;
+    try {
+      final data = await DigitalIdService.fetch(donorId);
+      if (mounted) setState(() => _digitalId = data);
+    } catch (_) {
+      // Keep whatever was last known — this button should never show an
+      // error state, it just quietly doesn't update.
+    }
   }
 
   Future<void> fetchDonationHistory() async {
@@ -48,7 +67,8 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
     try {
       final response = await http.get(
         Uri.parse(
-            "${AppConfig.baseUrl}/get_donation_history.php?donor_id=$donorId"),
+          "${AppConfig.baseUrl}/get_donation_history.php?donor_id=$donorId",
+        ),
       );
 
       if (response.statusCode == 200) {
@@ -139,15 +159,29 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
       isLoading = true;
       _checkingAppointment = true;
     });
-    await Future.wait([fetchDonationHistory(), _fetchAppointmentStatus()]);
+    await Future.wait([
+      fetchDonationHistory(),
+      _fetchAppointmentStatus(),
+      _loadDigitalId(),
+    ]);
   }
 
   String formatDate(String date) {
     try {
       final d = DateTime.parse(date);
       const months = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
       ];
       return "${months[d.month - 1]} ${d.day}, ${d.year}";
     } catch (e) {
@@ -160,8 +194,18 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
     try {
       final d = DateTime.parse(raw);
       const months = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
       ];
       int hour = d.hour;
       final period = hour >= 12 ? "PM" : "AM";
@@ -261,20 +305,32 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
         Stack(
           clipBehavior: Clip.none,
           children: [
-            Icon(icon, color: c),
+            Container(
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: c.withValues(alpha: .10),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: c, size: 18),
+            ),
             if (onTap != null)
               Positioned(
-                right: -7,
+                right: -4,
                 top: -4,
                 child: Icon(Icons.refresh_rounded, size: 13, color: c),
               ),
           ],
         ),
-        const SizedBox(height: 4),
-        Text(value, style: TextStyle(fontWeight: FontWeight.bold, color: c)),
+        const SizedBox(height: 6),
+        Text(
+          value,
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: c),
+        ),
         Text(
           label,
-          style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+          style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
         ),
       ],
     );
@@ -283,47 +339,101 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
         : GestureDetector(onTap: onTap, child: content);
   }
 
-  Widget _statDivider() => Container(
-    width: 1,
-    height: 34,
-    color: const Color(0xFFDC2626).withValues(alpha: .15),
-  );
+  Widget _timelineItem({required Color dotColor, required Widget child}) =>
+      IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 24,
+              child: Column(
+                children: [
+                  const SizedBox(height: 14),
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: dotColor,
+                    ),
+                  ),
+                  Expanded(
+                    child: Container(width: 2, color: const Color(0xFFF3F4F6)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(child: child),
+          ],
+        ),
+      );
+
+  Widget _statDivider() =>
+      Container(width: 1, height: 34, color: const Color(0xFFE5E7EB));
 
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF9FAFB),
       body: Column(
         children: [
           // 🔥 HEADER (IMPROVED)
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.only(
-              top: screenHeight * 0.06,
-              bottom: screenHeight * 0.03,
+          ClipRRect(
+            borderRadius: const BorderRadius.only(
+              bottomLeft: Radius.circular(24),
+              bottomRight: Radius.circular(24),
             ),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF750000), Color(0xFFFF4E4E)],
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.only(
+                top: screenHeight * 0.06,
+                bottom: screenHeight * 0.03,
               ),
-            ),
-            child: Column(
-              children: const [
-                Text(
-                  "Donation History",
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF750000), Color(0xFFFF4E4E)],
                 ),
-                SizedBox(height: 4),
-                Text(
-                  "Your journey of saving lives",
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
-                ),
-              ],
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  const Column(
+                    children: [
+                      Text(
+                        "Donation History",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        "Your journey of saving lives",
+                        style: TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                  if (_digitalId != null)
+                    Positioned(
+                      right: 16,
+                      top: 0,
+                      child: HeaderIconButton(
+                        icon: Icons.badge_rounded,
+                        tooltip: 'Digital Donor ID',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const DigitalIdScreen(),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
 
@@ -341,37 +451,38 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
                         ),
                       )
                     : donations.isEmpty
-                        ? Center(
-                            child: TweenAnimationBuilder<double>(
-                              tween: Tween(begin: 0.0, end: 1.0),
-                              duration: const Duration(milliseconds: 450),
-                              curve: Curves.easeOut,
-                              builder: (_, v, child) => Opacity(
-                                opacity: v,
-                                child: Transform.translate(
-                                  offset: Offset(0, (1 - v) * 12),
-                                  child: child,
-                                ),
+                    ? Center(
+                        child: TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0.0, end: 1.0),
+                          duration: const Duration(milliseconds: 450),
+                          curve: Curves.easeOut,
+                          builder: (_, v, child) => Opacity(
+                            opacity: v,
+                            child: Transform.translate(
+                              offset: Offset(0, (1 - v) * 12),
+                              child: child,
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.water_drop_outlined,
+                                size: 48,
+                                color: Colors.grey.shade300,
                               ),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.water_drop_outlined,
-                                    size: 48,
-                                    color: Colors.grey.shade300,
-                                  ),
-                                  const SizedBox(height: 12),
-                                  const Text(
-                                    "No donation history found.",
-                                    style: TextStyle(color: Colors.grey),
-                                  ),
-                                  const SizedBox(height: 20),
-                                  SizedBox(
-                                    width: double.infinity,
-                                    height: 48,
-                                    child: ElevatedButton.icon(
-                                      onPressed: () => Navigator.of(
+                              const SizedBox(height: 12),
+                              const Text(
+                                "No donation history found.",
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                              const SizedBox(height: 20),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 48,
+                                child: ElevatedButton.icon(
+                                  onPressed: () =>
+                                      Navigator.of(
                                         context,
                                         rootNavigator: true,
                                       ).push(
@@ -381,161 +492,158 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
                                           ),
                                         ),
                                       ),
-                                      icon: const Icon(
-                                        Icons.calendar_month_rounded,
-                                        size: 18,
-                                      ),
-                                      label: const Text(
-                                        "Book an Appointment",
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(
-                                          0xFFDC2626,
-                                        ),
-                                        foregroundColor: Colors.white,
-                                        elevation: 0,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(14),
-                                        ),
-                                      ),
+                                  icon: const Icon(
+                                    Icons.calendar_month_rounded,
+                                    size: 18,
+                                  ),
+                                  label: const Text(
+                                    "Book an Appointment",
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
-                                ],
-                              ),
-                            ),
-                          )
-                        : Column(
-                            children: [
-                              // 🔥 SUMMARY CARD
-                              FadeSlideIn(
-                                index: 0,
-                                child: Container(
-                                  padding: const EdgeInsets.all(14),
-                                  margin:
-                                      const EdgeInsets.only(bottom: 15),
-                                  decoration: BoxDecoration(
-                                    gradient: const LinearGradient(
-                                      colors: [
-                                        Color(0xFFFFEBEE),
-                                        Color(0xFFFFCDD2)
-                                      ],
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFDC2626),
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
                                     ),
-                                    borderRadius:
-                                        BorderRadius.circular(12),
-                                    border: Border.all(
-                                        color: Colors.red.shade200),
                                   ),
-                                  child: Column(
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: summaryItem(
-                                                Icons.water_drop,
-                                                _completedCount.toString(),
-                                                "Donations"),
-                                          ),
-                                          _statDivider(),
-                                          Expanded(
-                                            child: summaryItem(
-                                                Icons.trending_up,
-                                                "$_completedUnits",
-                                                "Units"),
-                                          ),
-                                          _statDivider(),
-                                          Expanded(
-                                            child: summaryItem(
-                                                Icons.calendar_today,
-                                                _statusTileValue,
-                                                "Status",
-                                                color: _statusTileColor,
-                                                onTap: _appointmentCheckFailed
-                                                    ? _retryAppointmentStatus
-                                                    : null),
-                                          ),
-                                        ],
-                                      ),
-                                      if (_completedCount > 0) ...[
-                                        const SizedBox(height: 10),
-                                        const Text(
-                                          "Every donation can help save up to 3 lives 🩸",
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: Color(0xFF6B7280),
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                              ),
-
-                              // 🔥 LIST
-                              Expanded(
-                                child: ListView.builder(
-                                  physics:
-                                      const AlwaysScrollableScrollPhysics(),
-                                  padding: EdgeInsets.only(
-                                    bottom: kBottomNavBarHeight +
-                                        MediaQuery.of(context).padding.bottom,
-                                  ),
-                                  itemCount: donations.length,
-                                  itemBuilder: (context, index) {
-                                    final item =
-                                        donations[index] as Map;
-                                    final id = int.tryParse(
-                                            item['donation_id']
-                                                    ?.toString() ??
-                                                '') ??
-                                        -(index + 1);
-                                    final status =
-                                        item['donation_status']
-                                            ?.toString();
-
-                                    return FadeSlideIn(
-                                      index: index + 1,
-                                      child: _DonationCard(
-                                        item: item,
-                                        fallbackNumber:
-                                            donations.length - index,
-                                        isExpanded:
-                                            _expandedDonationId == id,
-                                        status: status,
-                                        deferredReason: item['deferred_reason']
-                                            ?.toString(),
-                                        statusColor:
-                                            _donationStatusColor(status),
-                                        statusBg:
-                                            _donationStatusBg(status),
-                                        statusLabel:
-                                            _donationStatusLabel(status),
-                                        formattedDate: formatDate(
-                                            item["donation_date"] ?? ""),
-                                        formattedTimestamp:
-                                            _formatTimestamp(
-                                                item['created_at']
-                                                    ?.toString()),
-                                        onTap: () {
-                                          setState(() {
-                                            _expandedDonationId =
-                                                _expandedDonationId == id
-                                                    ? null
-                                                    : id;
-                                          });
-                                        },
-                                      ),
-                                    );
-                                  },
                                 ),
                               ),
                             ],
                           ),
+                        ),
+                      )
+                    : Column(
+                        children: [
+                          // 🔥 SUMMARY CARD
+                          FadeSlideIn(
+                            index: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(14),
+                              margin: const EdgeInsets.only(bottom: 15),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: const Color(0xFFE5E7EB),
+                                ),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Colors.black12,
+                                    blurRadius: 6,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: summaryItem(
+                                          Icons.water_drop,
+                                          _completedCount.toString(),
+                                          "Donations",
+                                        ),
+                                      ),
+                                      _statDivider(),
+                                      Expanded(
+                                        child: summaryItem(
+                                          Icons.trending_up,
+                                          "$_completedUnits",
+                                          "Units",
+                                        ),
+                                      ),
+                                      _statDivider(),
+                                      Expanded(
+                                        child: summaryItem(
+                                          Icons.calendar_today,
+                                          _statusTileValue,
+                                          "Status",
+                                          color: _statusTileColor,
+                                          onTap: _appointmentCheckFailed
+                                              ? _retryAppointmentStatus
+                                              : null,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (_completedCount > 0) ...[
+                                    const SizedBox(height: 10),
+                                    const Text(
+                                      "Every donation can help save up to 3 lives 🩸",
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Color(0xFF6B7280),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          // 🔥 LIST
+                          Expanded(
+                            child: ListView.builder(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: EdgeInsets.only(
+                                bottom:
+                                    kBottomNavBarHeight +
+                                    MediaQuery.of(context).padding.bottom,
+                              ),
+                              itemCount: donations.length,
+                              itemBuilder: (context, index) {
+                                final item = donations[index] as Map;
+                                final id =
+                                    int.tryParse(
+                                      item['donation_id']?.toString() ?? '',
+                                    ) ??
+                                    -(index + 1);
+                                final status = item['donation_status']
+                                    ?.toString();
+
+                                return _timelineItem(
+                                  dotColor: _donationStatusColor(status),
+                                  child: FadeSlideIn(
+                                    index: index + 1,
+                                    child: _DonationCard(
+                                      item: item,
+                                      fallbackNumber: donations.length - index,
+                                      isExpanded: _expandedDonationId == id,
+                                      status: status,
+                                      deferredReason: item['deferred_reason']
+                                          ?.toString(),
+                                      statusColor: _donationStatusColor(status),
+                                      statusBg: _donationStatusBg(status),
+                                      statusLabel: _donationStatusLabel(status),
+                                      formattedDate: formatDate(
+                                        item["donation_date"] ?? "",
+                                      ),
+                                      formattedTimestamp: _formatTimestamp(
+                                        item['created_at']?.toString(),
+                                      ),
+                                      onTap: () {
+                                        setState(() {
+                                          _expandedDonationId =
+                                              _expandedDonationId == id
+                                              ? null
+                                              : id;
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
               ),
             ),
           ),
@@ -583,8 +691,8 @@ class _DonationCard extends StatelessWidget {
     final normalizedStatus = (status ?? '').toLowerCase();
     final showDeferredReason =
         (normalizedStatus == 'deferred' || normalizedStatus == 'failed') &&
-            deferredReason != null &&
-            deferredReason!.isNotEmpty;
+        deferredReason != null &&
+        deferredReason!.isNotEmpty;
 
     IconData leadingIcon;
     switch (normalizedStatus) {
@@ -809,10 +917,7 @@ class _DonationCard extends StatelessWidget {
                               "$units unit(s)",
                             ),
                             if (bloodType != null && bloodType.isNotEmpty)
-                              _footerStat(
-                                Icons.bloodtype_rounded,
-                                bloodType,
-                              ),
+                              _footerStat(Icons.bloodtype_rounded, bloodType),
                             _footerStat(
                               Icons.access_time_rounded,
                               formattedTimestamp,

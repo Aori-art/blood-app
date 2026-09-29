@@ -9,14 +9,23 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'alerts.dart';
 import 'anim.dart';
+import 'blood_requests/blood_request_api.dart';
+import 'blood_requests/blood_request_detail_screen.dart';
+import 'blood_requests/blood_request_models.dart';
+import 'blood_requests/blood_request_widgets.dart';
+import 'blood_requests/blood_requests_screen.dart';
+import 'blood_requests/request_blood_screen.dart';
 import 'book.dart';
 import 'check.dart';
 import 'config.dart';
+import 'digital_id.dart';
+import 'digital_id_service.dart';
 import 'history.dart';
 import 'newsfeed.dart';
 import 'donation_history.dart';
 import 'notification_service.dart';
 import 'shared_design.dart';
+import 'verify.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -260,73 +269,64 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isSelected = selectedIndex == index;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          onTap(index);
-        },
-        borderRadius: BorderRadius.circular(14),
-        splashColor: const Color(0xFFDC2626).withOpacity(0.12),
-        highlightColor: const Color(0xFFDC2626).withOpacity(0.06),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 260),
-            curve: Curves.easeOutBack,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-            decoration: BoxDecoration(
-              gradient: isSelected
-                  ? const LinearGradient(
-                      colors: [Color(0xFFFFE4E4), Color(0xFFFFF1F1)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    )
-                  : null,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TweenAnimationBuilder<double>(
-                  tween: Tween(begin: 1.0, end: isSelected ? 1.18 : 1.0),
-                  duration: const Duration(milliseconds: 380),
-                  curve: Curves.elasticOut,
-                  builder: (context, scale, child) =>
-                      Transform.scale(scale: scale, child: child),
-                  child: Icon(
-                    icon,
-                    size: 22,
-                    color: isSelected
-                        ? const Color(0xFFDC2626)
-                        : const Color(0xFF9CA3AF),
+    return Tooltip(
+      message: label,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onTap(index);
+          },
+          borderRadius: BorderRadius.circular(14),
+          splashColor: const Color(0xFFDC2626).withOpacity(0.12),
+          highlightColor: const Color(0xFFDC2626).withOpacity(0.06),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutBack,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              decoration: BoxDecoration(
+                gradient: isSelected
+                    ? const LinearGradient(
+                        colors: [Color(0xFFFFE4E4), Color(0xFFFFF1F1)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : null,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 1.0, end: isSelected ? 1.18 : 1.0),
+                    duration: const Duration(milliseconds: 380),
+                    curve: Curves.elasticOut,
+                    builder: (context, scale, child) =>
+                        Transform.scale(scale: scale, child: child),
+                    child: Icon(
+                      icon,
+                      size: 22,
+                      color: isSelected
+                          ? const Color(0xFFDC2626)
+                          : const Color(0xFF9CA3AF),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 3),
-                AnimatedDefaultTextStyle(
-                  duration: const Duration(milliseconds: 200),
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                    color: isSelected
-                        ? const Color(0xFFDC2626)
-                        : const Color(0xFF9CA3AF),
+                  const SizedBox(height: 5),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOut,
+                    height: 3,
+                    width: isSelected ? 14 : 0,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDC2626),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
                   ),
-                  child: Text(label),
-                ),
-                const SizedBox(height: 3),
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.easeOut,
-                  height: 3,
-                  width: isSelected ? 14 : 0,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFDC2626),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -522,6 +522,14 @@ class _HomeContentState extends State<HomeContent> {
   List<Map<String, dynamic>> appointments = [];
   bool isAppointmentsLoading = true;
 
+  BloodRequestSummary? _brSummary;
+  bool _brLoading = true;
+  bool _brError = false;
+
+  DigitalIdData? _digitalId;
+  bool _digitalIdLoaded = false;
+  bool _digitalIdMasked = false;
+
   @override
   void initState() {
     super.initState();
@@ -529,6 +537,44 @@ class _HomeContentState extends State<HomeContent> {
     loadProfileData();
     loadEligibilityData();
     loadAppointments();
+    loadBloodRequestSummary();
+    loadDigitalId();
+  }
+
+  Future<void> loadDigitalId() async {
+    final prefs = await SharedPreferences.getInstance();
+    final donorId = prefs.getString('donorId');
+    if (donorId == null || donorId.isEmpty) {
+      if (mounted) setState(() => _digitalIdLoaded = true);
+      return;
+    }
+    try {
+      final masked = await DigitalIdService.isMasked(donorId);
+      final data = await DigitalIdService.fetch(donorId);
+      if (!mounted) return;
+      setState(() {
+        _digitalId = data;
+        _digitalIdMasked = masked;
+        _digitalIdLoaded = true;
+      });
+    } catch (_) {
+      // Keep whatever was last known — this card should never show an
+      // error state, it just quietly doesn't update.
+      if (mounted) setState(() => _digitalIdLoaded = true);
+    }
+  }
+
+  Future<void> _openDigitalId() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const DigitalIdScreen()),
+    );
+    if (!mounted) return;
+    final prefs = await SharedPreferences.getInstance();
+    final donorId = prefs.getString('donorId');
+    if (donorId == null || donorId.isEmpty) return;
+    final masked = await DigitalIdService.isMasked(donorId);
+    if (mounted) setState(() => _digitalIdMasked = masked);
   }
 
   Future<void> _refreshHomeData() async {
@@ -537,6 +583,7 @@ class _HomeContentState extends State<HomeContent> {
         isProfileLoading = true;
         isEligibilityLoading = true;
         isAppointmentsLoading = true;
+        _brLoading = true;
       });
     }
 
@@ -545,7 +592,159 @@ class _HomeContentState extends State<HomeContent> {
       loadProfileData(),
       loadEligibilityData(),
       loadAppointments(),
+      loadBloodRequestSummary(),
     ]);
+  }
+
+  Future<void> loadBloodRequestSummary() async {
+    final prefs = await SharedPreferences.getInstance();
+    final donorId = prefs.getString('donorId');
+    if (donorId == null || donorId.isEmpty) {
+      if (mounted)
+        setState(() {
+          _brLoading = false;
+          _brError = true;
+        });
+      return;
+    }
+    try {
+      final summary = await BloodRequestApi.fetchSummary(donorId);
+      if (!mounted) return;
+      setState(() {
+        _brSummary = summary;
+        _brLoading = false;
+        _brError = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _brLoading = false;
+        _brError = true;
+      });
+    }
+  }
+
+  Future<void> _openBloodRequestsHub({int tab = 0}) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => BloodRequestsScreen(initialTab: tab)),
+    );
+    if (mounted) await loadBloodRequestSummary();
+  }
+
+  Future<void> _openBloodRequestDetail(int requestId) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BloodRequestDetailScreen(requestId: requestId),
+      ),
+    );
+    if (mounted) await loadBloodRequestSummary();
+  }
+
+  Future<void> _openRequestBlood() async {
+    final summary = _brSummary;
+    if (summary != null && !summary.canRequest) {
+      await _showRequestBlockedSheet(summary.requestBlock);
+      return;
+    }
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const RequestBloodScreen()),
+    );
+    if (mounted) await loadBloodRequestSummary();
+  }
+
+  Future<void> _showRequestBlockedSheet(VolunteerBlock? block) async {
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD1D5DB),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const Text(
+              'Unable to Request Blood',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF111827),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              block?.message ?? 'You cannot create a request right now.',
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF6B7280),
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 20),
+            if (block?.action == 'verify')
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(sheetContext);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const VerifyScreen()),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFDC2626),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: const Text(
+                    'Verify Now',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              )
+            else
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(sheetContext),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF6B7280),
+                    side: const BorderSide(color: Color(0xFFE5E7EB)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: const Text(
+                    'OK',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> loadUserName() async {
@@ -804,10 +1003,698 @@ class _HomeContentState extends State<HomeContent> {
     }
   }
 
+  Widget _headerInitial(String firstName) => Text(
+    firstName.isNotEmpty ? firstName[0].toUpperCase() : 'U',
+    style: const TextStyle(
+      color: Colors.white,
+      fontSize: 20,
+      fontWeight: FontWeight.bold,
+    ),
+  );
+
   void _navigateToHistory() {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const HistoryScreen()),
+    );
+  }
+
+  // ── Digital Donor ID card ────────────────────────────────────────────────
+
+  Widget _digitalIdCard() {
+    final data = _digitalId;
+    if (data == null) return const SizedBox.shrink();
+    final donor = data.donor;
+    final code = _digitalIdMasked ? data.card.codeMasked : data.card.code;
+
+    return PressableScale(
+      onTap: _openDigitalId,
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF7F1D1D), Color(0xFFDC2626), Color(0xFFEF4444)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFDC2626).withValues(alpha: .3),
+              blurRadius: 14,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -14,
+              bottom: -14,
+              child: CustomPaint(
+                size: const Size(90, 108),
+                painter: _MiniCardDropPainter(),
+              ),
+            ),
+            const _LightSweep(),
+            Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                  child: ClipOval(
+                    child: donor.photoUrl != null
+                        ? Image.network(
+                            donor.photoUrl!,
+                            fit: BoxFit.cover,
+                            width: 44,
+                            height: 44,
+                            errorBuilder: (_, _, _) =>
+                                _initialsCircle(donor.fullName),
+                          )
+                        : _initialsCircle(donor.fullName),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'DIGITAL DONOR ID',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white70,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        donor.fullName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      Text(
+                        code,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontFamily: 'monospace',
+                          color: Colors.white,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    donor.bloodType ?? '—',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFDC2626),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Icon(Icons.chevron_right_rounded, color: Colors.white),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _initialsCircle(String name) => Container(
+    color: Colors.white,
+    alignment: Alignment.center,
+    child: Text(
+      _initialsFor(name),
+      style: const TextStyle(
+        color: Color(0xFFDC2626),
+        fontWeight: FontWeight.w800,
+        fontSize: 16,
+      ),
+    ),
+  );
+
+  String _initialsFor(String name) {
+    final parts = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts[0][0].toUpperCase();
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+
+  // ── Blood Requests card ─────────────────────────────────────────────────
+
+  Widget _bloodRequestsCardShell(Widget child) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(18),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: const [
+        BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 3)),
+      ],
+    ),
+    child: child,
+  );
+
+  Widget _brHeaderRow() => Row(
+    children: [
+      Container(
+        width: 36,
+        height: 36,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF1F1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: const Icon(
+          Icons.bloodtype_rounded,
+          color: Color(0xFFDC2626),
+          size: 20,
+        ),
+      ),
+      const SizedBox(width: 10),
+      const Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Blood Requests',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF111827),
+              ),
+            ),
+            Text(
+              'Request blood or help a patient in need',
+              style: TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+            ),
+          ],
+        ),
+      ),
+      TextButton(
+        onPressed: () => _openBloodRequestsHub(),
+        style: TextButton.styleFrom(
+          foregroundColor: const Color(0xFFDC2626),
+          padding: EdgeInsets.zero,
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'View all',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+            Icon(Icons.chevron_right_rounded, size: 16),
+          ],
+        ),
+      ),
+    ],
+  );
+
+  Widget _brUrgentBanner(BloodRequestSummary summary) {
+    final n = summary.urgentMatchingCount;
+    final top = summary.topUrgent;
+    return PressableScale(
+      onTap: top != null
+          ? () => _openBloodRequestDetail(top.requestId)
+          : () => _openBloodRequestsHub(),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF750000), Color(0xFFFF4E4E)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            const _PulsingDot(),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    n == 1
+                        ? '1 urgent request needs your blood type'
+                        : '$n urgent requests need your blood type',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                  if (top != null)
+                    Text(
+                      [
+                        top.facilityName,
+                        top.timeLeftLabel,
+                      ].where((e) => e != null && e.isNotEmpty).join(' · '),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Colors.white70,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: Colors.white),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _brRequestTile() => PressableScale(
+    onTap: _openRequestBlood,
+    child: Container(
+      height: 118,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFDC2626), Color(0xFF991B1B)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFDC2626).withValues(alpha: .3),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: Colors.white24,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+          ),
+          const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Request Blood',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+              ),
+              SizedBox(height: 2),
+              Text(
+                'For you or a loved one',
+                style: TextStyle(fontSize: 11, color: Colors.white70),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _brHelpTile(BloodRequestSummary summary) => PressableScale(
+    onTap: () => _openBloodRequestsHub(),
+    child: Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          height: 118,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF7F7),
+            border: Border.all(color: const Color(0xFFFECACA), width: 1.5),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFFE4E4),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.volunteer_activism_rounded,
+                  color: Color(0xFFDC2626),
+                  size: 20,
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Help a Patient',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF111827),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    summary.matchingCount > 0
+                        ? '${summary.matchingCount} match your type'
+                        : summary.openCount > 0
+                        ? '${summary.openCount} open request${summary.openCount == 1 ? '' : 's'}'
+                        : 'No requests right now',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF6B7280),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        if (summary.openCount > 0)
+          Positioned(
+            right: -6,
+            top: -6,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFDC2626),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: Colors.white, width: 1.5),
+              ),
+              child: Text(
+                '${summary.openCount}',
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
+
+  Widget _brYourRequestSection(BloodRequestSummary summary) {
+    final r = summary.myActiveRequest!;
+    return GestureDetector(
+      onTap: () => _openBloodRequestDetail(r.requestId),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                'YOUR REQUEST',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF9CA3AF),
+                  letterSpacing: 0.8,
+                ),
+              ),
+              if (summary.myActiveCount > 1) ...[
+                const SizedBox(width: 6),
+                Text(
+                  '+${summary.myActiveCount - 1} more',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: Color(0xFF9CA3AF),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              BloodDropBadge(bloodType: r.bloodType, size: 38),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      r.reference,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF111827),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    RequestStatusChip(status: r.status, label: r.statusLabel),
+                  ],
+                ),
+              ),
+              SizedBox(
+                width: 96,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${r.volunteersCount}/${r.requiredDonors} donors',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF111827),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    DonorProgressBar(
+                      volunteers: r.volunteersCount,
+                      required: r.requiredDonors,
+                      showLabel: false,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _brYourCommitmentSection(BloodRequestSummary summary) {
+    final r = summary.myCommitment!;
+    return GestureDetector(
+      onTap: () => _openBloodRequestDetail(r.requestId),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0FDF4),
+          border: Border.all(color: const Color(0xFFBBF7D0)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.favorite_rounded,
+              size: 18,
+              color: Color(0xFF16A34A),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "You're donating for ${r.reference}",
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF166534),
+                    ),
+                  ),
+                  Text(
+                    [
+                      r.facility?.name,
+                      r.neededBy != null
+                          ? 'needed by ${brShortDate(r.neededBy)}'
+                          : null,
+                    ].where((e) => e != null && e.isNotEmpty).join(' · '),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF15803D),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: Color(0xFF16A34A)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _brHeaderRowSkeleton() => Row(
+    children: [
+      Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3F4F6),
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+      const SizedBox(width: 10),
+      const Expanded(
+        child: Text(
+          'Blood Requests',
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF111827),
+          ),
+        ),
+      ),
+    ],
+  );
+
+  Widget _brSkeletonTile() => Container(
+    height: 118,
+    decoration: BoxDecoration(
+      color: const Color(0xFFF3F4F6),
+      borderRadius: BorderRadius.circular(14),
+    ),
+  );
+
+  Widget _brLoadingBody() => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      _brHeaderRowSkeleton(),
+      const SizedBox(height: 14),
+      Row(
+        children: [
+          Expanded(child: _brSkeletonTile()),
+          const SizedBox(width: 12),
+          Expanded(child: _brSkeletonTile()),
+        ],
+      ),
+    ],
+  );
+
+  Widget _brErrorBody() => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      _brHeaderRowSkeleton(),
+      const SizedBox(height: 14),
+      Row(
+        children: [
+          const Icon(
+            Icons.wifi_off_rounded,
+            size: 16,
+            color: Color(0xFF9CA3AF),
+          ),
+          const SizedBox(width: 8),
+          const Text(
+            "Couldn't load blood requests",
+            style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+          ),
+          const Spacer(),
+          TextButton(
+            onPressed: loadBloodRequestSummary,
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFFDC2626),
+              padding: EdgeInsets.zero,
+            ),
+            child: const Text(
+              'Retry',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    ],
+  );
+
+  Widget _bloodRequestsCard() {
+    if (_brLoading) return _bloodRequestsCardShell(_brLoadingBody());
+    final summary = _brSummary;
+    if (_brError || summary == null)
+      return _bloodRequestsCardShell(_brErrorBody());
+
+    return _bloodRequestsCardShell(
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _brHeaderRow(),
+          if (summary.urgentMatchingCount > 0) ...[
+            const SizedBox(height: 14),
+            _brUrgentBanner(summary),
+          ],
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(child: _brRequestTile()),
+              const SizedBox(width: 12),
+              Expanded(child: _brHelpTile(summary)),
+            ],
+          ),
+          if (summary.myActiveRequest != null) ...[
+            const Divider(height: 28, color: Color(0xFFF3F4F6)),
+            _brYourRequestSection(summary),
+          ],
+          if (summary.myCommitment != null) ...[
+            const SizedBox(height: 10),
+            _brYourCommitmentSection(summary),
+          ],
+        ],
+      ),
     );
   }
 
@@ -892,16 +1779,18 @@ class _HomeContentState extends State<HomeContent> {
                         child: CircleAvatar(
                           radius: 22,
                           backgroundColor: Colors.white24,
-                          child: Text(
-                            firstName.isNotEmpty
-                                ? firstName[0].toUpperCase()
-                                : 'U',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                          child: _digitalId?.donor.photoUrl != null
+                              ? ClipOval(
+                                  child: Image.network(
+                                    _digitalId!.donor.photoUrl!,
+                                    fit: BoxFit.cover,
+                                    width: 44,
+                                    height: 44,
+                                    errorBuilder: (_, _, _) =>
+                                        _headerInitial(firstName),
+                                  ),
+                                )
+                              : _headerInitial(firstName),
                         ),
                       ),
                     ),
@@ -965,8 +1854,12 @@ class _HomeContentState extends State<HomeContent> {
                       ),
                     ),
                     const SizedBox(height: 16),
+                    if (_digitalIdLoaded && _digitalId != null) ...[
+                      FadeSlideIn(index: 1, child: _digitalIdCard()),
+                      const SizedBox(height: 16),
+                    ],
                     FadeSlideIn(
-                      index: 1,
+                      index: 2,
                       child: Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(18),
@@ -1056,8 +1949,10 @@ class _HomeContentState extends State<HomeContent> {
                       ),
                     ),
                     const SizedBox(height: 16),
+                    FadeSlideIn(index: 3, child: _bloodRequestsCard()),
+                    const SizedBox(height: 16),
                     FadeSlideIn(
-                      index: 2,
+                      index: 4,
                       child: Row(
                         children: [
                           Expanded(
@@ -1086,7 +1981,7 @@ class _HomeContentState extends State<HomeContent> {
                     ),
                     const SizedBox(height: 16),
                     FadeSlideIn(
-                      index: 3,
+                      index: 5,
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -1121,7 +2016,7 @@ class _HomeContentState extends State<HomeContent> {
                       )
                     else if (appointments.isEmpty)
                       FadeSlideIn(
-                        index: 4,
+                        index: 6,
                         child: Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(20),
@@ -1166,13 +2061,13 @@ class _HomeContentState extends State<HomeContent> {
                     else
                       ...appointments.map(
                         (appt) => FadeSlideIn(
-                          index: 4,
+                          index: 6,
                           child: _appointmentCard(appt),
                         ),
                       ),
                     const SizedBox(height: 16),
                     FadeSlideIn(
-                      index: 5,
+                      index: 7,
                       child: Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(20),
@@ -1227,7 +2122,7 @@ class _HomeContentState extends State<HomeContent> {
                     ),
                     const SizedBox(height: 12),
                     FadeSlideIn(
-                      index: 6,
+                      index: 8,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -1485,4 +2380,135 @@ class _HomeContentState extends State<HomeContent> {
       ),
     );
   }
+}
+
+// Faint droplet watermark for the Digital ID mini card (Section 3.2).
+class _MiniCardDropPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: .08)
+      ..style = PaintingStyle.fill;
+    final w = size.width, h = size.height;
+    final path = Path()
+      ..moveTo(w * 0.5, 0)
+      ..cubicTo(w * 0.5, 0, w * 0.12, h * 0.42, w * 0.12, h * 0.66)
+      ..cubicTo(w * 0.12, h * 0.87, w * 0.28, h, w * 0.5, h)
+      ..cubicTo(w * 0.72, h, w * 0.88, h * 0.87, w * 0.88, h * 0.66)
+      ..cubicTo(w * 0.88, h * 0.42, w * 0.5, 0, w * 0.5, 0)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _MiniCardDropPainter oldDelegate) => false;
+}
+
+// One-time light sweep across the Digital ID mini card when it first appears.
+class _LightSweep extends StatefulWidget {
+  const _LightSweep();
+
+  @override
+  State<_LightSweep> createState() => _LightSweepState();
+}
+
+class _LightSweepState extends State<_LightSweep>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _position;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    _position = Tween<double>(
+      begin: -0.4,
+      end: 1.4,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (mounted) _ctrl.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Positioned.fill(
+    child: IgnorePointer(
+      child: AnimatedBuilder(
+        animation: _position,
+        builder: (context, child) => Align(
+          alignment: Alignment(_position.value * 2 - 1, 0),
+          child: FractionallySizedBox(
+            widthFactor: 0.3,
+            heightFactor: 1,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    Colors.white.withValues(alpha: 0),
+                    Colors.white.withValues(alpha: .18),
+                    Colors.white.withValues(alpha: 0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+// Small pulsing dot for the Blood Requests card's urgent banner — mirrors
+// UrgencyChip's critical-urgency pulse in blood_request_widgets.dart.
+class _PulsingDot extends StatefulWidget {
+  const _PulsingDot();
+
+  @override
+  State<_PulsingDot> createState() => _PulsingDotState();
+}
+
+class _PulsingDotState extends State<_PulsingDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _ctrl,
+    builder: (_, child) =>
+        Opacity(opacity: 0.35 + (_ctrl.value * 0.65), child: child),
+    child: Container(
+      width: 10,
+      height: 10,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white,
+      ),
+    ),
+  );
 }

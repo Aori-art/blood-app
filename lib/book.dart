@@ -2,12 +2,21 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'anim.dart';
 import 'check.dart';
 import 'config.dart';
+import 'home.dart' show kBottomNavBarHeight;
+import 'shared_design.dart';
+
+// Shared soft shadow used across every card in this file (5.1 consistency
+// pass) — black at ~4% alpha, blur 10, offset (0, 3).
+const List<BoxShadow> kBookSoftShadow = [
+  BoxShadow(color: Color(0x0A000000), blurRadius: 10, offset: Offset(0, 3)),
+];
 
 class BookScreen extends StatefulWidget {
   final bool showBackButton;
@@ -35,6 +44,8 @@ class _BookScreenState extends State<BookScreen>
   String? _eligibilityRecommendation;
   String? _nextEligibleDate;
   bool _canRetake = false;
+  String? _retakeDate;
+  int _retakeDaysRemaining = 0;
   bool _checkingEligibility = true;
 
   // Source of truth for "does the donor have an active appointment" — the
@@ -59,6 +70,11 @@ class _BookScreenState extends State<BookScreen>
   bool _loadingFacilities = true;
   bool _facilitiesError = false;
   bool _appliedPreselect = false;
+  bool _showAllFacilities = false;
+  final _facilitySearchCtrl = TextEditingController();
+  String _facilitySearchQuery = '';
+
+  final _dateStripCtrl = ScrollController();
 
   Map<String, dynamic>? get _selectedFacility {
     if (selectedFacilityId == null) return null;
@@ -92,7 +108,21 @@ class _BookScreenState extends State<BookScreen>
   @override
   void dispose() {
     _pulseController.dispose();
+    _dateStripCtrl.dispose();
+    _facilitySearchCtrl.dispose();
     super.dispose();
+  }
+
+  // Mirrors _buildBody()'s branching to decide, without building the widget,
+  // whether the booking/reschedule form is what's currently on screen — used
+  // to decide whether the sticky bottom bar and step indicator should show.
+  bool get _showingBookingForm {
+    if (_checkingEligibility || _checkingDonation) return false;
+    if (_showDonationSuccess && _latestDonation != null) return false;
+    if ((_eligibilityStatus ?? 'not_checked') != 'eligible') return false;
+    if (_checkingAppointment || _appointmentError) return false;
+    if (_currentAppointment != null && !_isRescheduling) return false;
+    return true;
   }
 
   Future<void> _loadStatuses() async {
@@ -141,6 +171,10 @@ class _BookScreenState extends State<BookScreen>
           _canRetake =
               data['can_retake'] == true ||
               data['can_retake'].toString() == '1';
+          final retakeDate = data['retake_available_date']?.toString();
+          _retakeDate = retakeDate?.isEmpty == true ? null : retakeDate;
+          _retakeDaysRemaining =
+              (data['retake_days_remaining'] as num?)?.toInt() ?? 0;
           _checkingEligibility = false;
         });
       } else {
@@ -298,7 +332,9 @@ class _BookScreenState extends State<BookScreen>
               !_isRescheduling &&
               selectedFacilityId == null) {
             final exists = facilities.any(
-              (f) => (f['facility_id'] as num?)?.toInt() == widget.preselectedFacilityId,
+              (f) =>
+                  (f['facility_id'] as num?)?.toInt() ==
+                  widget.preselectedFacilityId,
             );
             if (exists) preselect = widget.preselectedFacilityId;
           }
@@ -372,9 +408,25 @@ class _BookScreenState extends State<BookScreen>
     );
 
     if (picked != null) {
-      setState(() {
-        selectedDate = picked;
-      });
+      setState(() => selectedDate = picked);
+      final today = DateTime.now();
+      final tomorrow = DateTime(
+        today.year,
+        today.month,
+        today.day,
+      ).add(const Duration(days: 1));
+      final index = DateTime(
+        picked.year,
+        picked.month,
+        picked.day,
+      ).difference(tomorrow).inDays;
+      if (index >= 0 && index < 14 && _dateStripCtrl.hasClients) {
+        _dateStripCtrl.animateTo(
+          (index * 70).toDouble(),
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
     }
   }
 
@@ -512,8 +564,10 @@ class _BookScreenState extends State<BookScreen>
       prefillDate = null;
     }
 
-    final appointmentCenterName =
-        appointment['donation_center']?.toString().trim().toLowerCase();
+    final appointmentCenterName = appointment['donation_center']
+        ?.toString()
+        .trim()
+        .toLowerCase();
     int? prefillFacilityId;
     if (appointmentCenterName != null && appointmentCenterName.isNotEmpty) {
       for (final f in _facilities) {
@@ -824,64 +878,21 @@ class _BookScreenState extends State<BookScreen>
   }
 
   bool get _allSelected =>
-      selectedDate != null && selectedFacilityId != null && selectedTime != null;
+      selectedDate != null &&
+      selectedFacilityId != null &&
+      selectedTime != null;
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final screenHeight = size.height;
+    final showingForm = _showingBookingForm;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       body: Column(
         children: [
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.only(
-              top: screenHeight * 0.06,
-              bottom: screenHeight * 0.03,
-            ),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF750000), Color(0xFFFF4E4E)],
-              ),
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                const Column(
-                  children: [
-                    Text(
-                      "Book Appointment",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      "Schedule your blood donation",
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
-                    ),
-                  ],
-                ),
-                if (widget.showBackButton)
-                  Positioned(
-                    left: 0,
-                    top: 0,
-                    child: IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(
-                        Icons.arrow_back_ios_new,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
+          _header(screenHeight, showingForm),
           Expanded(
             child: RefreshIndicator(
               color: const Color(0xFFDC2626),
@@ -899,20 +910,304 @@ class _BookScreenState extends State<BookScreen>
               ),
             ),
           ),
+          if (showingForm) _stickyBottomBar(isReschedule: _isRescheduling),
         ],
+      ),
+    );
+  }
+
+  Widget _header(double screenHeight, bool showSteps) => ClipRRect(
+    borderRadius: const BorderRadius.only(
+      bottomLeft: Radius.circular(24),
+      bottomRight: Radius.circular(24),
+    ),
+    child: Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(
+        20,
+        screenHeight * 0.06,
+        20,
+        showSteps ? 16 : screenHeight * 0.03,
+      ),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(colors: kHeaderGradient),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (widget.showBackButton) ...[
+                HeaderIconButton(
+                  icon: Icons.arrow_back_rounded,
+                  tooltip: 'Back',
+                  onTap: () => Navigator.of(context).pop(),
+                ),
+                const SizedBox(width: 14),
+              ],
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Book Appointment",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      "Schedule your blood donation",
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              HeaderIconButton(
+                icon: Icons.refresh_rounded,
+                tooltip: 'Refresh',
+                onTap: _refreshStatuses,
+              ),
+            ],
+          ),
+          if (showSteps) ...[const SizedBox(height: 14), _stepIndicatorRow()],
+        ],
+      ),
+    ),
+  );
+
+  Widget _stepIndicatorRow() {
+    final steps = [
+      ('Date', selectedDate != null),
+      ('Center', selectedFacilityId != null),
+      ('Time', selectedTime != null),
+    ];
+    return Row(
+      children: steps
+          .map(
+            (s) => Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: s.$2
+                      ? Colors.white
+                      : Colors.white.withValues(alpha: .18),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (s.$2) ...[
+                      const Icon(
+                        Icons.check_rounded,
+                        size: 12,
+                        color: kCrimson,
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                    Text(
+                      s.$1,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: s.$2 ? kCrimson : Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  String _formatMonthDay(DateTime d) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${months[d.month - 1]} ${d.day}';
+  }
+
+  Widget _stickyBottomBar({required bool isReschedule}) {
+    final navBarPad = widget.showBackButton ? 0.0 : kBottomNavBarHeight;
+    final completedCount = [
+      selectedDate,
+      selectedFacilityId,
+      selectedTime,
+    ].where((e) => e != null).length;
+    final stepN = (completedCount + 1).clamp(1, 3);
+
+    Widget left;
+    if (isReschedule) {
+      left = Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton(
+          onPressed: _isSubmitting ? null : _cancelReschedule,
+          style: TextButton.styleFrom(
+            foregroundColor: kTextMuted,
+            padding: EdgeInsets.zero,
+          ),
+          child: const Text(
+            'Cancel',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+        ),
+      );
+    } else if (_allSelected) {
+      left = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '${_formatMonthDay(selectedDate!)} · $selectedTime',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: kTextPrimary,
+            ),
+          ),
+          Text(
+            _selectedFacility?['facility_name']?.toString() ?? '',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 11, color: kTextMuted),
+          ),
+        ],
+      );
+    } else {
+      left = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Step $stepN of 3',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: kTextPrimary,
+            ),
+          ),
+          const Text(
+            'Select a date, center and time',
+            style: TextStyle(fontSize: 11, color: kTextMuted),
+          ),
+        ],
+      );
+    }
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: kBorder)),
+      ),
+      child: SafeArea(
+        top: false,
+        minimum: EdgeInsets.only(bottom: navBarPad),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Row(
+            children: [
+              Expanded(child: left),
+              const SizedBox(width: 12),
+              _confirmButton(isReschedule: isReschedule),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _confirmButton({required bool isReschedule}) {
+    final enabled = _allSelected && !_isSubmitting;
+    return AnimatedBuilder(
+      animation: _pulseController,
+      builder: (_, child) {
+        final scale = enabled ? 1.0 + (_pulseController.value * 0.02) : 1.0;
+        return Transform.scale(scale: scale, child: child);
+      },
+      child: ElevatedButton(
+        onPressed: enabled
+            ? (isReschedule ? _confirmAndReschedule : _submitBooking)
+            : null,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          disabledBackgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          elevation: 0,
+          padding: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+        child: Container(
+          height: 50,
+          constraints: const BoxConstraints(minWidth: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            gradient: enabled
+                ? const LinearGradient(
+                    colors: [Color(0xFFDC2626), Color(0xFF991B1B)],
+                  )
+                : null,
+            color: enabled ? null : const Color(0xFFE5E7EB),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: _isSubmitting
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: Colors.white,
+                  ),
+                )
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      isReschedule ? 'Confirm Reschedule' : 'Confirm Booking',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: enabled ? Colors.white : const Color(0xFF9CA3AF),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 18,
+                      color: enabled ? Colors.white : const Color(0xFF9CA3AF),
+                    ),
+                  ],
+                ),
+        ),
       ),
     );
   }
 
   Widget _buildBody() {
     if (_checkingEligibility || _checkingDonation) {
-      return const Center(
-        key: ValueKey('loading'),
-        child: Padding(
-          padding: EdgeInsets.only(top: 80),
-          child: CircularProgressIndicator(color: Color(0xFFDC2626)),
-        ),
-      );
+      return const _BookingSkeleton(key: ValueKey('loading'));
     }
 
     if (_showDonationSuccess && _latestDonation != null) {
@@ -934,6 +1229,8 @@ class _BookScreenState extends State<BookScreen>
         recommendation: _eligibilityRecommendation,
         nextEligibleDate: _nextEligibleDate,
         canRetake: _canRetake,
+        retakeDate: _retakeDate,
+        retakeDaysRemaining: _retakeDaysRemaining,
         onGoToCheck: () {
           Navigator.of(
             context,
@@ -1021,49 +1318,32 @@ class _BookScreenState extends State<BookScreen>
           child: _sectionCard(
             icon: Icons.calendar_today,
             title: "Select Date",
-            child: InkWell(
-              onTap: _pickDate,
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF9FAFB),
-                  border: Border.all(color: const Color(0xFFD1D5DB)),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.calendar_month_outlined,
-                      color: Color(0xFF9CA3AF),
-                      size: 18,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        selectedDate == null
-                            ? "Choose a date"
-                            : _formatDate(selectedDate!),
-                        style: TextStyle(
-                          color: selectedDate == null
-                              ? const Color(0xFF9CA3AF)
-                              : const Color(0xFF111827),
-                          fontSize: 14,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _dateStrip(),
+                if (selectedDate != null) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.event_available_rounded,
+                        size: 16,
+                        color: kCrimson,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        _formatDate(selectedDate!),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: kTextPrimary,
                         ),
                       ),
-                    ),
-                    const Icon(
-                      Icons.expand_more,
-                      color: Color(0xFF9CA3AF),
-                      size: 20,
-                    ),
-                  ],
-                ),
-              ),
+                    ],
+                  ),
+                ],
+              ],
             ),
           ),
         ),
@@ -1082,145 +1362,11 @@ class _BookScreenState extends State<BookScreen>
           child: _sectionCard(
             icon: Icons.access_time,
             title: "Choose Time Slot",
-            child: _styledDropdown<String>(
-              value: selectedTime,
-              hint: "Select a time",
-              items: timeSlots,
-              onChanged: (val) {
-                setState(() => selectedTime = val);
-              },
-            ),
+            child: _timeSlotContent(),
           ),
         ),
         const SizedBox(height: 16),
-        if (_allSelected)
-          TweenAnimationBuilder<double>(
-            key: const ValueKey('booking_summary'),
-            tween: Tween(begin: 0.9, end: 1.0),
-            duration: const Duration(milliseconds: 350),
-            curve: Curves.easeOutBack,
-            builder: (_, scale, child) =>
-                Transform.scale(scale: scale, child: child),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFF0FDF4), Color(0xFFDCFCE7)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                border: Border.all(color: const Color(0xFFBBF7D0), width: 2),
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 4,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.check_circle,
-                        color: Color(0xFF16A34A),
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        isReschedule
-                            ? "New Schedule Summary"
-                            : "Booking Summary",
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          color: Color(0xFF111827),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  _summaryRow("Date", _formatDateShort(selectedDate!)),
-                  const SizedBox(height: 6),
-                  _summaryRow("Time", selectedTime!),
-                  const SizedBox(height: 6),
-                  _summaryRow("Center", _selectedFacility!['facility_name'].toString()),
-                ],
-              ),
-            ),
-          ),
-        const SizedBox(height: 20),
-        AnimatedBuilder(
-          animation: _pulseController,
-          builder: (_, child) {
-            final scale = _allSelected
-                ? 1.0 + (_pulseController.value * 0.03)
-                : 1.0;
-            return Transform.scale(scale: scale, child: child);
-          },
-          child: SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: (_allSelected && !_isSubmitting)
-                  ? (isReschedule ? _confirmAndReschedule : _submitBooking)
-                  : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFDC2626),
-                disabledBackgroundColor: const Color(0xFFF87171),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
-              ),
-              child: _isSubmitting
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: Colors.white,
-                      ),
-                    )
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          isReschedule
-                              ? "Confirm Reschedule"
-                              : "Confirm Booking",
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.arrow_forward, size: 18),
-                      ],
-                    ),
-            ),
-          ),
-        ),
-        if (isReschedule) ...[
-          const SizedBox(height: 8),
-          Center(
-            child: TextButton(
-              onPressed: _isSubmitting ? null : _cancelReschedule,
-              child: const Text(
-                "Cancel",
-                style: TextStyle(
-                  color: Color(0xFF6B7280),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-        ],
+        if (_allSelected) _bookingSummaryTicket(isReschedule: isReschedule),
         const SizedBox(height: 8),
         Text(
           isReschedule
@@ -1243,11 +1389,9 @@ class _BookScreenState extends State<BookScreen>
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: const Color(0xFFE5E7EB), width: 2),
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
-        ],
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: kBookSoftShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1273,39 +1417,158 @@ class _BookScreenState extends State<BookScreen>
     );
   }
 
-  Widget _styledDropdown<T>({
-    required T? value,
-    required String hint,
-    required List<T> items,
-    required ValueChanged<T?> onChanged,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF9FAFB),
-        border: Border.all(color: const Color(0xFFD1D5DB)),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: DropdownButton<T>(
-        value: value,
-        isExpanded: true,
-        hint: Text(
-          hint,
-          style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
-        ),
-        underline: const SizedBox(),
-        icon: const Icon(Icons.expand_more, color: Color(0xFF9CA3AF)),
-        style: const TextStyle(color: Color(0xFF111827), fontSize: 14),
-        items: items
-            .map(
-              (e) => DropdownMenuItem<T>(value: e, child: Text(e.toString())),
-            )
-            .toList(),
-        onChanged: onChanged,
+  // ─── 5.3 Date strip ──────────────────────────────────────────────────────
+
+  bool _isSameDate(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  Widget _dateStrip() {
+    final today = DateTime.now();
+    final start = DateTime(
+      today.year,
+      today.month,
+      today.day,
+    ).add(const Duration(days: 1));
+    final days = List.generate(14, (i) => start.add(Duration(days: i)));
+    return SizedBox(
+      height: 80,
+      child: ListView.builder(
+        controller: _dateStripCtrl,
+        scrollDirection: Axis.horizontal,
+        itemCount: days.length + 1,
+        itemBuilder: (context, index) {
+          if (index == days.length) {
+            return Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: _moreDateTile(),
+            );
+          }
+          final d = days[index];
+          final selected =
+              selectedDate != null && _isSameDate(selectedDate!, d);
+          return Padding(
+            padding: EdgeInsets.only(left: index == 0 ? 0 : 8),
+            child: _dateTile(d, selected, index),
+          );
+        },
       ),
     );
   }
+
+  Widget _dateTile(DateTime d, bool selected, int index) {
+    const weekdaysShort = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const monthsShort = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final weekdayLabel = index == 0 ? 'Tmrw' : weekdaysShort[d.weekday - 1];
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        setState(() => selectedDate = d);
+      },
+      child: AnimatedScale(
+        scale: selected ? 1.05 : 1.0,
+        duration: const Duration(milliseconds: 150),
+        child: Container(
+          width: 62,
+          height: 80,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            gradient: selected
+                ? const LinearGradient(
+                    colors: [Color(0xFFDC2626), Color(0xFF991B1B)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : null,
+            color: selected ? null : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: selected ? null : Border.all(color: kBorder),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: kCrimson.withValues(alpha: .3),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                weekdayLabel,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: selected ? Colors.white70 : kTextMuted,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '${d.day}',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: selected ? Colors.white : kTextPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                monthsShort[d.month - 1],
+                style: TextStyle(
+                  fontSize: 10,
+                  color: selected ? Colors.white70 : kTextMuted,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _moreDateTile() => GestureDetector(
+    onTap: _pickDate,
+    child: Container(
+      width: 62,
+      height: 80,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: kBorder),
+      ),
+      child: const Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.calendar_month_rounded, size: 20, color: kCrimson),
+          SizedBox(height: 6),
+          Text(
+            'More',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: kTextPrimary,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  // ─── 5.4 Donation center ─────────────────────────────────────────────────
 
   Widget _donationCenterContent() {
     if (_loadingFacilities) {
@@ -1321,7 +1584,10 @@ class _BookScreenState extends State<BookScreen>
         child: const SizedBox(
           width: 16,
           height: 16,
-          child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFDC2626)),
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: Color(0xFFDC2626),
+          ),
         ),
       );
     }
@@ -1329,7 +1595,11 @@ class _BookScreenState extends State<BookScreen>
     if (_facilitiesError) {
       return Row(
         children: [
-          const Icon(Icons.wifi_off_rounded, color: Color(0xFF9CA3AF), size: 18),
+          const Icon(
+            Icons.wifi_off_rounded,
+            color: Color(0xFF9CA3AF),
+            size: 18,
+          ),
           const SizedBox(width: 8),
           const Expanded(
             child: Text(
@@ -1347,7 +1617,10 @@ class _BookScreenState extends State<BookScreen>
             },
             child: const Text(
               "Retry",
-              style: TextStyle(color: Color(0xFFDC2626), fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: Color(0xFFDC2626),
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -1361,84 +1634,216 @@ class _BookScreenState extends State<BookScreen>
       );
     }
 
-    final selected = _selectedFacility;
+    final query = _facilitySearchQuery.trim().toLowerCase();
+    final filtered = query.isEmpty
+        ? _facilities
+        : _facilities.where((f) {
+            final name = (f['facility_name']?.toString() ?? '').toLowerCase();
+            final barangay = (f['barangay_name']?.toString() ?? '')
+                .toLowerCase();
+            return name.contains(query) || barangay.contains(query);
+          }).toList();
+
+    final showSearch = _facilities.length > 6;
+    final needsExpand = filtered.length > 4;
+    List<Map<String, dynamic>> visible;
+    if (!needsExpand || _showAllFacilities) {
+      visible = filtered;
+    } else {
+      visible = filtered.take(4).toList();
+      final selectedInVisible = visible.any(
+        (f) => (f['facility_id'] as num?)?.toInt() == selectedFacilityId,
+      );
+      if (selectedFacilityId != null && !selectedInVisible) {
+        final matches = filtered.where(
+          (f) => (f['facility_id'] as num?)?.toInt() == selectedFacilityId,
+        );
+        if (matches.isNotEmpty) visible = [...visible.take(3), matches.first];
+      }
+    }
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _facilityDropdown(),
-        if (selected != null) ...[
-          const SizedBox(height: 12),
-          _facilityDetailsBox(selected),
-        ],
+        if (showSearch) ...[_facilitySearchField(), const SizedBox(height: 10)],
+        AnimatedSize(
+          duration: const Duration(milliseconds: 250),
+          alignment: Alignment.topCenter,
+          child: Column(
+            children: visible
+                .map(
+                  (f) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _facilityCard(f),
+                  ),
+                )
+                .toList(),
+          ),
+        ),
+        if (needsExpand && !_showAllFacilities)
+          TextButton(
+            onPressed: () => setState(() => _showAllFacilities = true),
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: Size.zero,
+            ),
+            child: Text(
+              'Show all ${filtered.length} centers',
+              style: const TextStyle(
+                color: kCrimson,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+          ),
       ],
     );
   }
 
-  Widget _facilityDropdown() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF9FAFB),
-        border: Border.all(color: const Color(0xFFD1D5DB)),
+  Widget _facilitySearchField() => TextField(
+    controller: _facilitySearchCtrl,
+    onChanged: (v) => setState(() => _facilitySearchQuery = v),
+    style: const TextStyle(fontSize: 13),
+    decoration: InputDecoration(
+      hintText: 'Search by name or barangay',
+      hintStyle: const TextStyle(fontSize: 13, color: kTextMuted),
+      prefixIcon: const Icon(Icons.search_rounded, size: 18, color: kTextMuted),
+      isDense: true,
+      filled: true,
+      fillColor: kInputFill,
+      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+      border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: kBorder),
       ),
-      child: DropdownButton<int>(
-        value: selectedFacilityId,
-        isExpanded: true,
-        itemHeight: 60,
-        menuMaxHeight: 360,
-        hint: const Text(
-          "Select a center",
-          style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
-        ),
-        underline: const SizedBox(),
-        icon: const Icon(Icons.expand_more, color: Color(0xFF9CA3AF)),
-        style: const TextStyle(color: Color(0xFF111827), fontSize: 14),
-        selectedItemBuilder: (context) => _facilities.map((f) {
-          return Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              f['facility_name']?.toString() ?? '',
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 14, color: Color(0xFF111827)),
-            ),
-          );
-        }).toList(),
-        items: _facilities.map((f) {
-          final id = (f['facility_id'] as num?)?.toInt();
-          final name = f['facility_name']?.toString() ?? '';
-          final typeLabel = f['facility_type_label']?.toString();
-          final barangay = f['barangay_name']?.toString();
-          final subtitle = [
-            if (typeLabel != null && typeLabel.isNotEmpty) typeLabel,
-            if (barangay != null && barangay.isNotEmpty) barangay,
-          ].join(' · ');
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: kBorder),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: kCrimson, width: 1.5),
+      ),
+    ),
+  );
 
-          return DropdownMenuItem<int>(
-            value: id,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
+  Widget _facilityCard(Map<String, dynamic> f) {
+    final id = (f['facility_id'] as num?)?.toInt();
+    final selected = selectedFacilityId != null && selectedFacilityId == id;
+    final name = f['facility_name']?.toString() ?? '';
+    final typeLabel = f['facility_type_label']?.toString();
+    final barangay = f['barangay_name']?.toString();
+    final subtitle = [
+      if (typeLabel != null && typeLabel.isNotEmpty) typeLabel,
+      if (barangay != null && barangay.isNotEmpty) barangay,
+    ].join(' · ');
+
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        setState(() => selectedFacilityId = id);
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFFFFF7F7) : Colors.white,
+          border: Border.all(
+            color: selected ? kCrimson : const Color(0xFFE5E7EB),
+            width: selected ? 1.5 : 1,
+          ),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Text(
-                  name,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 14, color: Color(0xFF111827)),
+                Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    _facilityTypeIcon(f['facility_type']?.toString()),
+                    color: const Color(0xFF2563EB),
+                    size: 20,
+                  ),
                 ),
-                if (subtitle.isNotEmpty)
-                  Text(subtitle, style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: kTextPrimary,
+                        ),
+                      ),
+                      if (subtitle.isNotEmpty)
+                        Text(
+                          subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: kTextMuted,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 22,
+                  height: 22,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: selected ? kCrimson : Colors.transparent,
+                    border: selected
+                        ? null
+                        : Border.all(
+                            color: const Color(0xFFD1D5DB),
+                            width: 1.5,
+                          ),
+                  ),
+                  child: selected
+                      ? const Icon(
+                          Icons.check_rounded,
+                          size: 14,
+                          color: Colors.white,
+                        )
+                      : null,
+                ),
               ],
             ),
-          );
-        }).toList(),
-        onChanged: (val) => setState(() => selectedFacilityId = val),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 250),
+              alignment: Alignment.topCenter,
+              child: selected
+                  ? Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: _facilityDetailsBox(f),
+                    )
+                  : const SizedBox(width: double.infinity),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _facilityDetailsBox(Map<String, dynamic> facility) {
-    final facilityType = facility['facility_type']?.toString();
-    final typeLabel = facility['facility_type_label']?.toString();
     final address = facility['address']?.toString();
     final contact = facility['contact_number']?.toString();
 
@@ -1451,85 +1856,560 @@ class _BookScreenState extends State<BookScreen>
         subParts.add(v);
       }
     }
+    final addressLine = [
+      if (address != null && address.isNotEmpty) address,
+      if (subParts.isNotEmpty) subParts.join(', '),
+    ].join(', ');
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEFF6FF),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (typeLabel != null && typeLabel.isNotEmpty) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(999),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (addressLine.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.location_on_rounded,
+                  size: 12,
+                  color: kCrimson,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    addressLine,
+                    style: const TextStyle(fontSize: 12, color: kTextPrimary),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        if (contact != null && contact.isNotEmpty)
+          Row(
+            children: [
+              const Icon(Icons.call_rounded, size: 12, color: kCrimson),
+              const SizedBox(width: 6),
+              Text(
+                contact,
+                style: const TextStyle(fontSize: 12, color: kTextPrimary),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
+            ],
+          ),
+      ],
+    );
+  }
+
+  // ─── 5.5 Time slots ──────────────────────────────────────────────────────
+
+  bool _endsWithAM(String slot) => slot.trim().endsWith('AM');
+
+  String _compactSlotLabel(String slot) {
+    final parts = slot.split(' - ');
+    if (parts.length != 2) return slot;
+    final start = parts[0].trim();
+    final end = parts[1].trim();
+    final startPeriod = start.endsWith('AM') ? 'AM' : 'PM';
+    final endPeriod = end.endsWith('AM') ? 'AM' : 'PM';
+    if (startPeriod == endPeriod) {
+      final startTime = start.replaceAll(RegExp(r'\s*(AM|PM)$'), '');
+      return '$startTime – $end';
+    }
+    return '$start – $end';
+  }
+
+  Widget _timeSlotContent() {
+    final morning = timeSlots.where(_endsWithAM).toList();
+    final afternoon = timeSlots.where((s) => !_endsWithAM(s)).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (morning.isNotEmpty) ...[
+          _timeGroupHeader(
+            Icons.wb_sunny_rounded,
+            const Color(0xFFD97706),
+            'Morning',
+          ),
+          const SizedBox(height: 8),
+          _timeChipGrid(morning),
+        ],
+        if (afternoon.isNotEmpty) ...[
+          if (morning.isNotEmpty) const SizedBox(height: 14),
+          _timeGroupHeader(
+            Icons.wb_twilight_rounded,
+            const Color(0xFFEA580C),
+            'Afternoon',
+          ),
+          const SizedBox(height: 8),
+          _timeChipGrid(afternoon),
+        ],
+      ],
+    );
+  }
+
+  Widget _timeGroupHeader(IconData icon, Color color, String label) => Row(
+    children: [
+      Icon(icon, size: 14, color: color),
+      const SizedBox(width: 6),
+      Text(
+        label,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: kTextMuted,
+        ),
+      ),
+    ],
+  );
+
+  Widget _timeChipGrid(List<String> slots) => LayoutBuilder(
+    builder: (context, constraints) {
+      final chipWidth = (constraints.maxWidth - 8) / 2;
+      return Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: slots.map((slot) {
+          final selected = selectedTime == slot;
+          return SizedBox(
+            width: chipWidth,
+            height: 44,
+            child: GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                setState(() => selectedTime = slot);
+              },
+              child: Container(
+                decoration: BoxDecoration(
+                  color: selected ? kCrimson : Colors.white,
+                  border: Border.all(
+                    color: selected ? kCrimson : const Color(0xFFE5E7EB),
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                alignment: Alignment.center,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (selected) ...[
+                      const Icon(
+                        Icons.check_rounded,
+                        size: 14,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                    Text(
+                      _compactSlotLabel(slot),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: selected ? Colors.white : kTextPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      );
+    },
+  );
+
+  // ─── 5.6 Booking summary ticket ──────────────────────────────────────────
+
+  Widget _bookingSummaryTicket({required bool isReschedule}) {
+    final d = selectedDate!;
+    const monthsShort = [
+      'JAN',
+      'FEB',
+      'MAR',
+      'APR',
+      'MAY',
+      'JUN',
+      'JUL',
+      'AUG',
+      'SEP',
+      'OCT',
+      'NOV',
+      'DEC',
+    ];
+    const weekdaysShort = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+
+    return TweenAnimationBuilder<double>(
+      key: const ValueKey('booking_summary'),
+      tween: Tween(begin: 0.9, end: 1.0),
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutBack,
+      builder: (_, scale, child) => Transform.scale(scale: scale, child: child),
+      child: _TicketCard(
+        top: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 58,
+              height: 64,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF1F1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              alignment: Alignment.center,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(_facilityTypeIcon(facilityType), size: 12, color: const Color(0xFF2563EB)),
-                  const SizedBox(width: 4),
                   Text(
-                    typeLabel,
-                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF2563EB)),
+                    monthsShort[d.month - 1],
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: kCrimson,
+                    ),
+                  ),
+                  Text(
+                    '${d.day}',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                      color: kTextPrimary,
+                    ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 8),
-          ],
-          if (address != null && address.isNotEmpty) ...[
-            const Text("Address", style: TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
-            const SizedBox(height: 2),
-            Text(address, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
-            if (subParts.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(subParts.join(', '), style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
-            ],
-          ],
-          if (contact != null && contact.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                const Icon(Icons.call_rounded, size: 12, color: Color(0xFF2563EB)),
-                const SizedBox(width: 6),
-                Text(contact, style: const TextStyle(fontSize: 11, color: Color(0xFF2563EB))),
-              ],
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.confirmation_number_rounded,
+                        size: 16,
+                        color: Color(0xFF16A34A),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        isReschedule
+                            ? 'New Schedule Summary'
+                            : 'Booking Summary',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: kTextPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    _selectedFacility?['facility_name']?.toString() ?? '',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: kTextPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.schedule_rounded,
+                        size: 13,
+                        color: kTextMuted,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        selectedTime!,
+                        style: const TextStyle(fontSize: 12, color: kTextMuted),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    weekdaysShort[d.weekday - 1],
+                    style: const TextStyle(fontSize: 11, color: kTextMuted),
+                  ),
+                ],
+              ),
             ),
           ],
-        ],
+        ),
+        bottom: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Icon(
+              Icons.info_outline_rounded,
+              size: 14,
+              color: Color(0xFF2563EB),
+            ),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Arrive 10 minutes early and bring a valid ID.',
+                style: TextStyle(fontSize: 11.5, color: Color(0xFF1D4ED8)),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
+}
 
-  Widget _summaryRow(String label, String value) {
-    return Row(
+// ── LOADING SKELETON (5.1) ──────────────────────────────────────────────────
+
+class _BookingSkeleton extends StatefulWidget {
+  const _BookingSkeleton({super.key});
+
+  @override
+  State<_BookingSkeleton> createState() => _BookingSkeletonState();
+}
+
+class _BookingSkeletonState extends State<_BookingSkeleton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _opacity;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    )..repeat(reverse: true);
+    _opacity = Tween<double>(
+      begin: 0.5,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Widget _block(double height) => Container(
+    width: double.infinity,
+    height: height,
+    decoration: BoxDecoration(
+      color: const Color(0xFFF3F4F6),
+      borderRadius: BorderRadius.circular(16),
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) => FadeTransition(
+    opacity: _opacity,
+    child: Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Column(
+        children: [
+          _block(96),
+          const SizedBox(height: 16),
+          _block(150),
+          const SizedBox(height: 16),
+          _block(120),
+        ],
+      ),
+    ),
+  );
+}
+
+// ── TICKET CARD (shared by the booking summary and appointment views) ──────
+
+class _TicketCard extends StatelessWidget {
+  final Widget top;
+  final Widget bottom;
+  final Color? topBandColor;
+
+  const _TicketCard({
+    required this.top,
+    required this.bottom,
+    this.topBandColor,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: const Color(0xFFE5E7EB)),
+      boxShadow: kBookSoftShadow,
+    ),
+    child: Column(
       children: [
-        Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            textAlign: TextAlign.right,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF111827),
+        if (topBandColor != null)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: topBandColor!.withValues(alpha: .10),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
             ),
-          ),
+            child: top,
+          )
+        else
+          Padding(padding: const EdgeInsets.all(16), child: top),
+        const _TicketDashedDivider(),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: bottom,
         ),
       ],
-    );
+    ),
+  );
+}
+
+class _TicketDashedDivider extends StatelessWidget {
+  const _TicketDashedDivider();
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: 16,
+    child: Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.centerLeft,
+      children: [
+        Positioned.fill(child: CustomPaint(painter: _DashedLinePainter())),
+        const Positioned(left: -8, child: _TicketNotch()),
+        const Positioned(right: -8, child: _TicketNotch()),
+      ],
+    ),
+  );
+}
+
+class _TicketNotch extends StatelessWidget {
+  const _TicketNotch();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 16,
+    height: 16,
+    decoration: const BoxDecoration(
+      shape: BoxShape.circle,
+      color: Color(0xFFF9FAFB),
+    ),
+  );
+}
+
+class _DashedLinePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFFE5E7EB)
+      ..strokeWidth = 1;
+    const dash = 6.0, gap = 4.0;
+    final y = size.height / 2;
+    double x = 0;
+    while (x < size.width) {
+      final end = (x + dash).clamp(0.0, size.width);
+      canvas.drawLine(Offset(x, y), Offset(end, y), paint);
+      x += dash + gap;
+    }
   }
+
+  @override
+  bool shouldRepaint(covariant _DashedLinePainter oldDelegate) => false;
+}
+
+Widget _appointmentDateBlock(
+  String? rawDate,
+  String Function(String?) formatDate,
+) {
+  const monthsShort = [
+    'JAN',
+    'FEB',
+    'MAR',
+    'APR',
+    'MAY',
+    'JUN',
+    'JUL',
+    'AUG',
+    'SEP',
+    'OCT',
+    'NOV',
+    'DEC',
+  ];
+  DateTime? d;
+  if (rawDate != null) {
+    try {
+      d = DateTime.parse(rawDate);
+    } catch (_) {}
+  }
+  return Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Container(
+        width: 58,
+        height: 64,
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF1F1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        alignment: Alignment.center,
+        child: d == null
+            ? const Icon(Icons.calendar_today_rounded, color: Color(0xFFDC2626))
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    monthsShort[d.month - 1],
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFDC2626),
+                    ),
+                  ),
+                  Text(
+                    '${d.day}',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF111827),
+                    ),
+                  ),
+                ],
+              ),
+      ),
+      const SizedBox(width: 14),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'Date',
+              style: TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              formatDate(rawDate),
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF111827),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
 }
 
 // ── APPOINTMENT MANAGEMENT VIEW ────────────────────────────────────────────
@@ -1559,9 +2439,10 @@ class _AppointmentManagementView extends StatelessWidget {
     final status = appointment['status']?.toString();
     final color = statusColor(status);
     final subtitle = supportingText(status);
-    final isConfirmed = const ['approved', 'confirmed'].contains(
-      (status ?? '').toLowerCase(),
-    );
+    final isConfirmed = const [
+      'approved',
+      'confirmed',
+    ].contains((status ?? '').toLowerCase());
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1597,22 +2478,9 @@ class _AppointmentManagementView extends StatelessWidget {
         const SizedBox(height: 16),
         FadeSlideIn(
           index: 1,
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border.all(color: const Color(0xFFE5E7EB), width: 2),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: const [
-                BoxShadow(
-                  color: Colors.black12,
-                  blurRadius: 4,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
+          child: _TicketCard(
+            topBandColor: color,
+            top: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
@@ -1621,7 +2489,7 @@ class _AppointmentManagementView extends StatelessWidget {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.12),
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Row(
@@ -1650,7 +2518,11 @@ class _AppointmentManagementView extends StatelessWidget {
                     ),
                   ),
                 ],
-                const Divider(height: 24, color: Color(0xFFF3F4F6)),
+              ],
+            ),
+            bottom: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 if (isConfirmed) ...[
                   Container(
                     width: double.infinity,
@@ -1684,14 +2556,11 @@ class _AppointmentManagementView extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                 ],
-                _infoRow(
-                  icon: Icons.calendar_today_rounded,
-                  label: "Date",
-                  value: formatDate(
-                    appointment['appointment_date']?.toString(),
-                  ),
+                _appointmentDateBlock(
+                  appointment['appointment_date']?.toString(),
+                  formatDate,
                 ),
-                const Divider(height: 24, color: Color(0xFFF3F4F6)),
+                const SizedBox(height: 14),
                 _infoRow(
                   icon: Icons.access_time_rounded,
                   label: "Time",
@@ -1704,6 +2573,33 @@ class _AppointmentManagementView extends StatelessWidget {
                   icon: Icons.location_on_rounded,
                   label: "Donation Center",
                   value: appointment['donation_center']?.toString() ?? "N/A",
+                ),
+                const Divider(height: 24, color: Color(0xFFF3F4F6)),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.confirmation_number_outlined,
+                      size: 16,
+                      color: Color(0xFF9CA3AF),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      appointment['appointment_id'] != null
+                          ? 'Appointment #${appointment['appointment_id']}'
+                          : 'Appointment',
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF111827),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Show this at the donation center',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
                 ),
               ],
             ),
@@ -1915,7 +2811,11 @@ class _DonationSuccessView extends StatelessWidget {
         const SizedBox(height: 10),
         const Text(
           "Your donation was completed successfully. One donation can help save up to 3 lives.",
-          style: TextStyle(fontSize: 13, color: Color(0xFF6B7280), height: 1.55),
+          style: TextStyle(
+            fontSize: 13,
+            color: Color(0xFF6B7280),
+            height: 1.55,
+          ),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 16),
@@ -1929,7 +2829,11 @@ class _DonationSuccessView extends StatelessWidget {
           child: const Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.check_circle_rounded, size: 15, color: Color(0xFF16A34A)),
+              Icon(
+                Icons.check_circle_rounded,
+                size: 15,
+                color: Color(0xFF16A34A),
+              ),
               SizedBox(width: 7),
               Text(
                 "Donation Completed",
@@ -1964,18 +2868,20 @@ class _DonationSuccessView extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: const Color(0xFFE5E7EB), width: 2),
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
-        ],
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: kBookSoftShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
             children: [
-              Icon(Icons.event_repeat_rounded, color: Color(0xFFDC2626), size: 20),
+              Icon(
+                Icons.event_repeat_rounded,
+                color: Color(0xFFDC2626),
+                size: 20,
+              ),
               SizedBox(width: 8),
               Text(
                 "Next Donation",
@@ -1991,7 +2897,11 @@ class _DonationSuccessView extends StatelessWidget {
           if (elig == null)
             const Text(
               "We'll let you know when you can donate again.",
-              style: TextStyle(fontSize: 13, color: Color(0xFF6B7280), height: 1.5),
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF6B7280),
+                height: 1.5,
+              ),
             )
           else ...[
             Text(
@@ -2005,7 +2915,9 @@ class _DonationSuccessView extends StatelessWidget {
             if (daysRemaining != null) ...[
               const SizedBox(height: 4),
               Text(
-                daysRemaining == 1 ? "1 day to go" : "$daysRemaining days to go",
+                daysRemaining == 1
+                    ? "1 day to go"
+                    : "$daysRemaining days to go",
                 style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -2030,11 +2942,17 @@ class _DonationSuccessView extends StatelessWidget {
                 children: [
                   Text(
                     "Donated ${formatDate(donationDate)}",
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF9CA3AF),
+                    ),
                   ),
                   Text(
                     "Eligible ${formatDate(nextEligibleDate)}",
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF9CA3AF),
+                    ),
                   ),
                 ],
               ),
@@ -2061,14 +2979,22 @@ class _DonationSuccessView extends StatelessWidget {
     }
 
     if (donationDateRaw != null && donationDateRaw.isNotEmpty) {
-      addRow(Icons.calendar_today_rounded, "Donation Date", formatDate(donationDateRaw));
+      addRow(
+        Icons.calendar_today_rounded,
+        "Donation Date",
+        formatDate(donationDateRaw),
+      );
     }
     if (bloodTypeRaw != null && bloodTypeRaw.isNotEmpty) {
       addRow(Icons.bloodtype_rounded, "Blood Type", bloodTypeRaw);
     }
     if (unitsRaw != null) {
       final n = (unitsRaw as num).toInt();
-      addRow(Icons.water_drop_rounded, "Units Donated", "$n unit${n == 1 ? '' : 's'}");
+      addRow(
+        Icons.water_drop_rounded,
+        "Units Donated",
+        "$n unit${n == 1 ? '' : 's'}",
+      );
     }
     if (centerRaw != null && centerRaw.isNotEmpty) {
       addRow(Icons.location_on_rounded, "Donation Center", centerRaw);
@@ -2082,18 +3008,20 @@ class _DonationSuccessView extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: const Color(0xFFE5E7EB), width: 2),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
         borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
-        ],
+        boxShadow: kBookSoftShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
             children: [
-              Icon(Icons.receipt_long_rounded, color: Color(0xFFDC2626), size: 20),
+              Icon(
+                Icons.receipt_long_rounded,
+                color: Color(0xFFDC2626),
+                size: 20,
+              ),
               SizedBox(width: 8),
               Text(
                 "Donation Details",
@@ -2128,12 +3056,20 @@ class _DonationSuccessView extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.favorite_rounded, color: Color(0xFF2563EB), size: 18),
+          const Icon(
+            Icons.favorite_rounded,
+            color: Color(0xFF2563EB),
+            size: 18,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(fontSize: 12, color: Color(0xFF1D4ED8), height: 1.5),
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF1D4ED8),
+                height: 1.5,
+              ),
             ),
           ),
         ],
@@ -2157,7 +3093,11 @@ class _DonationSuccessView extends StatelessWidget {
       children: [
         const Row(
           children: [
-            Icon(Icons.health_and_safety_rounded, color: Color(0xFFDC2626), size: 20),
+            Icon(
+              Icons.health_and_safety_rounded,
+              color: Color(0xFFDC2626),
+              size: 20,
+            ),
             SizedBox(width: 8),
             Text(
               "Aftercare Tips",
@@ -2172,7 +3112,9 @@ class _DonationSuccessView extends StatelessWidget {
         const SizedBox(height: 12),
         _aftercareRow("Drink extra fluids for the next 24–48 hours."),
         _aftercareRow("Avoid heavy lifting or strenuous exercise today."),
-        _aftercareRow("Eat iron-rich foods like leafy greens, beans, and lean meat."),
+        _aftercareRow(
+          "Eat iron-rich foods like leafy greens, beans, and lean meat.",
+        ),
       ],
     ),
   );
@@ -2182,12 +3124,20 @@ class _DonationSuccessView extends StatelessWidget {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(Icons.check_circle_rounded, size: 16, color: Color(0xFF16A34A)),
+        const Icon(
+          Icons.check_circle_rounded,
+          size: 16,
+          color: Color(0xFF16A34A),
+        ),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(fontSize: 13, color: Color(0xFF111827), height: 1.4),
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF111827),
+              height: 1.4,
+            ),
           ),
         ),
       ],
@@ -2209,11 +3159,9 @@ class _AppointmentFetchError extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: const Color(0xFFE5E7EB), width: 2),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
         borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
-        ],
+        boxShadow: kBookSoftShadow,
       ),
       child: Column(
         children: [
@@ -2268,6 +3216,8 @@ class _EligibilityGate extends StatelessWidget {
   final String? recommendation;
   final String? nextEligibleDate;
   final bool canRetake;
+  final String? retakeDate;
+  final int retakeDaysRemaining;
 
   const _EligibilityGate({
     super.key,
@@ -2276,11 +3226,39 @@ class _EligibilityGate extends StatelessWidget {
     required this.recommendation,
     required this.nextEligibleDate,
     required this.canRetake,
+    required this.retakeDate,
+    required this.retakeDaysRemaining,
   });
 
   bool get _isNotEligible => status == 'not_eligible';
   bool get _isDeferred => status == 'temporary_deferred';
   bool get _isNotChecked => status == 'not_checked';
+
+  String _retakeWhen(int days) {
+    if (days <= 0) return 'today';
+    if (days == 1) return 'tomorrow';
+    return 'in $days days';
+  }
+
+  String _formatLongDate(String value) {
+    final date = DateTime.tryParse(value);
+    if (date == null) return value;
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2322,154 +3300,220 @@ class _EligibilityGate extends StatelessWidget {
         ? "Status: Temporarily Deferred"
         : "Status: Pending Review";
 
+    final bool showRetakePill =
+        (_isNotEligible || _isDeferred) && !canRetake && retakeDate != null;
+
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 100,
-            height: 100,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: accentBg,
-              border: Border.all(color: accentBorder, width: 3),
-              boxShadow: [
-                BoxShadow(
-                  color: accent.withValues(alpha: 0.15),
-                  blurRadius: 24,
-                  offset: const Offset(0, 8),
+      child: FadeSlideIn(
+        index: 0,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+            boxShadow: kBookSoftShadow,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: accentBg,
+                  border: Border.all(color: accentBorder, width: 3),
+                  boxShadow: [
+                    BoxShadow(
+                      color: accent.withValues(alpha: 0.15),
+                      blurRadius: 24,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            child: Icon(icon, size: 46, color: accent),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 21,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF111827),
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 10),
-          Text(
-            message,
-            style: const TextStyle(
-              fontSize: 13,
-              color: Color(0xFF6B7280),
-              height: 1.55,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          if (_isDeferred &&
-              nextEligibleDate != null &&
-              nextEligibleDate!.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: Text(
-                'Next Eligible Date: $nextEligibleDate',
-                style: TextStyle(color: accent, fontWeight: FontWeight.w600),
+                child: Icon(icon, size: 46, color: accent),
               ),
-            ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
-            decoration: BoxDecoration(
-              color: accentBg,
-              borderRadius: BorderRadius.circular(99),
-              border: Border.all(color: accentBorder),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  _isNotEligible
-                      ? Icons.cancel_rounded
-                      : Icons.schedule_rounded,
-                  size: 15,
-                  color: accent,
+              const SizedBox(height: 24),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 21,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF111827),
                 ),
-                const SizedBox(width: 7),
-                Text(
-                  badgeLabel,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: accent,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                message,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF6B7280),
+                  height: 1.55,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              if (showRetakePill)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: accentBg,
+                      border: Border.all(color: accentBorder),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.event_repeat_rounded,
+                          size: 15,
+                          color: accent,
+                        ),
+                        const SizedBox(width: 7),
+                        Text(
+                          'Retake the check on ${_formatLongDate(retakeDate!)} · '
+                          '${_retakeWhen(retakeDaysRemaining)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: accent,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else if (_isDeferred &&
+                  nextEligibleDate != null &&
+                  nextEligibleDate!.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Text(
+                    'Next Eligible Date: $nextEligibleDate',
+                    style: TextStyle(
+                      color: accent,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFBFDBFE)),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(
-                  Icons.info_outline_rounded,
-                  color: Color(0xFF2563EB),
-                  size: 18,
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 9,
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    _isNotEligible
-                        ? "Complete the eligibility screening in the Check tab. Once you're eligible, you'll be able to book an appointment."
-                        : "Once your screening has been reviewed, this page will update automatically and you'll be able to book an appointment.",
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF1D4ED8),
-                      height: 1.5,
+                decoration: BoxDecoration(
+                  color: accentBg,
+                  borderRadius: BorderRadius.circular(99),
+                  border: Border.all(color: accentBorder),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _isNotEligible
+                          ? Icons.cancel_rounded
+                          : Icons.schedule_rounded,
+                      size: 15,
+                      color: accent,
+                    ),
+                    const SizedBox(width: 7),
+                    Text(
+                      badgeLabel,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: accent,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFBFDBFE)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.info_outline_rounded,
+                      color: Color(0xFF2563EB),
+                      size: 18,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        showRetakePill
+                            ? "Once your retake date arrives, take the eligibility check again from the Check tab. You'll be able to book once you're eligible."
+                            : _isNotEligible
+                            ? "Complete the eligibility screening in the Check tab. Once you're eligible, you'll be able to book an appointment."
+                            : "Once your screening has been reviewed, this page will update automatically and you'll be able to book an appointment.",
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF1D4ED8),
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_isNotChecked ||
+                  (_isNotEligible && canRetake) ||
+                  (_isDeferred && canRetake)) ...[
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: onGoToCheck,
+                    icon: const Icon(
+                      Icons.assignment_turned_in_outlined,
+                      size: 19,
+                    ),
+                    label: Text(
+                      _isNotChecked
+                          ? "Take Eligibility Check"
+                          : "Take Eligibility Check Again",
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFDC2626),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                     ),
                   ),
                 ),
               ],
-            ),
-          ),
-          if (_isNotChecked ||
-              (_isNotEligible && canRetake) ||
-              (_isDeferred && canRetake)) ...[
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton.icon(
-                onPressed: onGoToCheck,
-                icon: const Icon(Icons.assignment_turned_in_outlined, size: 19),
-                label: Text(
-                  _isNotChecked
-                      ? "Take Eligibility Check"
-                      : "Take Eligibility Check Again",
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFDC2626),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
+              const SizedBox(height: 10),
+              const Text(
+                "Pull down to refresh this page after your status changes.",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
               ),
-            ),
-          ],
-          const SizedBox(height: 10),
-          const Text(
-            "Pull down to refresh this page after your status changes.",
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

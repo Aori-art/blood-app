@@ -56,7 +56,7 @@ class _RegisterStep2State extends State<RegisterStep2> {
   final _streetCtrl = TextEditingController();
 
   static const _bloodTypes = [
-    'O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'
+    'O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'Unknown'
   ];
 
   List<_LocationOption> _provinces = [];

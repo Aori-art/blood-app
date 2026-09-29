@@ -530,59 +530,65 @@ class _AlertsScreenState extends State<AlertsScreen> {
           end: Alignment.bottomRight,
         ),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Notifications',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: -0.3,
-                  ),
+          Column(
+            children: [
+              const Text(
+                'Notifications',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: -0.3,
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  _unreadCount > 0
-                      ? '$_unreadCount unread message${_unreadCount > 1 ? 's' : ''}'
-                      : 'All caught up!',
-                  style: const TextStyle(color: Colors.white70, fontSize: 12),
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                _unreadCount > 0
+                    ? '$_unreadCount unread message${_unreadCount > 1 ? 's' : ''}'
+                    : 'All caught up!',
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+            ],
           ),
           // Mark all read button — in header, top-right
           if (_unreadCount > 0 && !_isLoading && _errorMessage == null)
-            GestureDetector(
-              onTap: _markAllAsRead,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 7,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.18),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white38),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.done_all_rounded, color: Colors.white, size: 14),
-                    SizedBox(width: 5),
-                    Text(
-                      'Mark all read',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
+            Positioned(
+              right: 0,
+              top: 0,
+              bottom: 0,
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: GestureDetector(
+                  onTap: _markAllAsRead,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 7,
                     ),
-                  ],
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.18),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white38),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.done_all_rounded, color: Colors.white, size: 14),
+                        SizedBox(width: 5),
+                        Text(
+                          'Mark all read',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),

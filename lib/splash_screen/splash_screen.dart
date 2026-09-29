@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:blood/login.dart';
-import 'package:blood/home.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:blood/newsfeed.dart';
 
@@ -148,8 +146,9 @@ class _SplashScreenState extends State<SplashScreen>
   Navigator.pushReplacement(
     context,
     PageRouteBuilder(
-      pageBuilder: (_, animation, __) =>
-          widget.isLoggedIn ? const NewsfeedPage() : const LoginScreen(),
+      // Signed in and signed out both land on the newsfeed now — it already
+      // supports a signed-out state with its own sign-in CTA.
+      pageBuilder: (_, animation, __) => const NewsfeedPage(),
       transitionsBuilder: (_, animation, __, child) {
         return FadeTransition(opacity: animation, child: child);
       },

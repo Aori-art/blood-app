@@ -102,8 +102,11 @@ Future<void> main() async {
   final SharedPreferences prefs =
       await SharedPreferences.getInstance();
 
-  final bool isLoggedIn =
-      prefs.getBool('isLoggedIn') ?? false;
+  // Matches _NewsfeedPageState._checkLoginStatus()'s rule exactly so the
+  // splash routing and the newsfeed's signed-in UI can never disagree.
+  final bool loggedIn = prefs.getBool('isLoggedIn') ?? false;
+  final String? donorId = prefs.getString('donorId');
+  final bool isLoggedIn = loggedIn && donorId != null && donorId.isNotEmpty;
 
   runApp(
     MyApp(
