@@ -50,5 +50,7 @@
     <key>NSAllowsArbitraryLoads</key>
     <true/>
 </dict>
+	<key>NSCameraUsageDescription</key>
+	<string>eDonate uses your camera to take photos of your ID for verification.</string>
 </dict>
 </plist>

@@ -7,7 +7,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'config.dart';
-import 'id_camera_capture.dart';
 import 'shared_design.dart';
 
 enum _IdSide { front, back }
@@ -25,6 +24,8 @@ class _VerifyScreenState extends State<VerifyScreen>
     with TickerProviderStateMixin {
   static const List<Map<String, String>> _documentTypes = [
     {'value': 'national_id', 'label': 'National ID'},
+    {'value': 'drivers_license', 'label': "Driver's License"},
+    {'value': 'sss_id', 'label': 'SSS ID'},
     {'value': 'school_id', 'label': 'School ID'},
     {'value': 'company_id', 'label': 'Company ID'},
     {'value': 'barangay_certificate', 'label': 'Barangay Certificate'},
@@ -133,8 +134,10 @@ class _VerifyScreenState extends State<VerifyScreen>
   Future<void> _pickImage(_IdSide side) async {
     try {
       final picked = await ImagePicker().pickImage(
-        source: ImageSource.gallery,
+        source: ImageSource.camera,
+        preferredCameraDevice: CameraDevice.rear,
         imageQuality: 85,
+        maxWidth: 2000,
       );
       if (picked != null && mounted) {
         setState(() {
@@ -146,7 +149,11 @@ class _VerifyScreenState extends State<VerifyScreen>
         });
       }
     } catch (_) {
-      _showSnack('Unable to open your gallery. Please try again.', isError: true);
+      _showSnack(
+        'Unable to open your camera. Please allow camera access in your '
+        'phone settings and try again.',
+        isError: true,
+      );
     }
   }
 
@@ -701,91 +708,10 @@ class _VerifyScreenState extends State<VerifyScreen>
     );
   }
 
-  Future<void> _openCameraCapture() async {
-    final result = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => IdCameraCaptureScreen(
-          documentTypes: _documentTypes,
-          backOptionalTypes: _backOptionalTypes,
-          donorId: _donorId,
-        ),
-      ),
-    );
-    if (result == true) {
-      _showSnack('Your ID was submitted for verification.');
-      await _fetchStatus();
-    }
-  }
-
-  Widget _cameraCaptureEntryCard() => InkWell(
-    onTap: _openCameraCapture,
-    borderRadius: BorderRadius.circular(16),
-    child: Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: kBorder, width: 1.5),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              color: Color(0xFFFFF1F1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.camera_alt_rounded, color: kCrimson, size: 22),
-          ),
-          const SizedBox(width: 14),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Verify with Your Camera',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: kTextPrimary),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Guided step-by-step ID capture',
-                  style: TextStyle(fontSize: 12, color: kTextMuted),
-                ),
-              ],
-            ),
-          ),
-          const Icon(Icons.chevron_right_rounded, color: kTextMuted),
-        ],
-      ),
-    ),
-  );
-
-  Widget _orDivider(String label) => Row(
-    children: [
-      const Expanded(child: Divider(color: kBorder)),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        child: Text(label, style: const TextStyle(fontSize: 11, color: kTextMuted)),
-      ),
-      const Expanded(child: Divider(color: kBorder)),
-    ],
-  );
-
   Widget _uploadFormBody() => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       _infoBanner(),
-      const SizedBox(height: 18),
-      _cameraCaptureEntryCard(),
-      const SizedBox(height: 18),
-      _orDivider('or upload manually'),
       const SizedBox(height: 18),
       _documentTypeCard(),
       const SizedBox(height: 18),
@@ -825,7 +751,7 @@ class _VerifyScreenState extends State<VerifyScreen>
           child: Text(
             "To keep eDonate safe for both donors and recipients, please "
             "upload a clear photo of a valid government-issued ID (e.g. "
-            "Driver's License, Passport, or National ID).",
+            "National ID, Driver's License, SSS ID, or Passport).",
             style: TextStyle(
               color: Color(0xFF1D4ED8),
               fontSize: 13,
@@ -916,8 +842,9 @@ class _VerifyScreenState extends State<VerifyScreen>
           const SizedBox(height: 6),
           Text(
             backOptional
-                ? 'Upload the front of your document. The back is optional.'
-                : 'Upload clear photos of the front and back of your ID.',
+                ? 'Take a clear photo of the front of your document. The '
+                      'back is optional.'
+                : 'Take clear photos of the front and back of your ID.',
             style: const TextStyle(fontSize: 11, color: kTextMuted),
           ),
           const SizedBox(height: 12),
@@ -996,15 +923,15 @@ class _VerifyScreenState extends State<VerifyScreen>
               color: Color(0xFFFFF1F1),
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              isFront ? Icons.credit_card_rounded : Icons.flip_rounded,
+            child: const Icon(
+              Icons.photo_camera_rounded,
               color: kCrimson,
               size: 20,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            isFront ? 'Tap to add front' : 'Tap to add back',
+            isFront ? 'Tap to take front photo' : 'Tap to take back photo',
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontWeight: FontWeight.w600,
@@ -1014,7 +941,7 @@ class _VerifyScreenState extends State<VerifyScreen>
           ),
           const SizedBox(height: 4),
           const Text(
-            'JPG or PNG',
+            'Opens your camera',
             style: TextStyle(fontSize: 10, color: kTextMuted),
           ),
         ],
@@ -1065,10 +992,10 @@ class _VerifyScreenState extends State<VerifyScreen>
           child: const Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.edit_rounded, size: 11, color: Colors.white),
+              Icon(Icons.camera_alt_rounded, size: 13, color: Colors.white),
               SizedBox(width: 3),
               Text(
-                'Change',
+                'Retake',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 10,
@@ -1097,7 +1024,7 @@ class _VerifyScreenState extends State<VerifyScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Before you upload',
+          'Before you take the photos',
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 14,
@@ -1106,6 +1033,7 @@ class _VerifyScreenState extends State<VerifyScreen>
         ),
         const SizedBox(height: 12),
         _requirementRow('Your ID is valid and not expired'),
+        _requirementRow('Place your ID on a flat, well-lit surface'),
         _requirementRow('Photos of both the front and back of your ID'),
         _requirementRow('All four corners are visible in each photo'),
         _requirementRow('Text and photo are clear and readable'),
