@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config.dart';
+import 'mascot_stage_art.dart';
 
 int _int(dynamic v) {
   if (v is num) return v.toInt();
@@ -73,6 +74,56 @@ class Milestone {
   };
 }
 
+/// One entry of the server's `frames` list: every frame that exists, with how
+/// to unlock it. The picker renders this list, never a hardcoded one.
+class FrameInfo {
+  final String key;
+  final String label;
+  final String description;
+
+  /// 'streak' (reach [unlockDays]) or 'verified' (get the ID verified).
+  final String unlockType;
+  final int? unlockDays;
+  final bool unlocked;
+
+  const FrameInfo({
+    required this.key,
+    required this.label,
+    required this.description,
+    required this.unlockType,
+    required this.unlockDays,
+    required this.unlocked,
+  });
+
+  bool get isVerifiedFrame => unlockType == 'verified';
+
+  factory FrameInfo.fromJson(Map<String, dynamic> json) {
+    final unlock = json['unlock'];
+    String type = 'streak';
+    int? days;
+    if (unlock is Map) {
+      type = _nullableString(unlock['type']) ?? 'streak';
+      if (unlock['days'] != null) days = _int(unlock['days']);
+    }
+    return FrameInfo(
+      key: _nullableString(json['key']) ?? '',
+      label: _nullableString(json['label']) ?? '',
+      description: _nullableString(json['description']) ?? '',
+      unlockType: type,
+      unlockDays: days,
+      unlocked: json['unlocked'] == true,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'key': key,
+    'label': label,
+    'description': description,
+    'unlock': {'type': unlockType, if (unlockDays != null) 'days': unlockDays},
+    'unlocked': unlocked,
+  };
+}
+
 class StreakData {
   final int current;
   final int longest;
@@ -83,6 +134,8 @@ class StreakData {
   final List<String> unlockedFrames;
   final Milestone? nextMilestone;
   final List<Milestone> ladder;
+  final bool isVerified;
+  final List<FrameInfo> frames;
 
   const StreakData({
     required this.current,
@@ -94,7 +147,16 @@ class StreakData {
     required this.unlockedFrames,
     required this.nextMilestone,
     required this.ladder,
+    this.isVerified = false,
+    this.frames = const [],
   });
+
+  FrameInfo? frameByKey(String key) {
+    for (final f in frames) {
+      if (f.key == key) return f;
+    }
+    return null;
+  }
 
   /// Parses the success body shared by all three endpoints. Returns null when
   /// the body has no usable `streak` object.
@@ -104,6 +166,7 @@ class StreakData {
     final next = body['next_milestone'];
     final ladder = body['ladder'];
     final frames = body['unlocked_frames'];
+    final frameList = body['frames'];
     return StreakData(
       current: _int(streak['current']),
       longest: _int(streak['longest']),
@@ -121,6 +184,14 @@ class StreakData {
           ? ladder
                 .whereType<Map>()
                 .map((e) => Milestone.fromJson(Map<String, dynamic>.from(e)))
+                .toList()
+          : const [],
+      isVerified: body['is_verified'] == true,
+      frames: frameList is List
+          ? frameList
+                .whereType<Map>()
+                .map((e) => FrameInfo.fromJson(Map<String, dynamic>.from(e)))
+                .where((f) => f.key.isNotEmpty)
                 .toList()
           : const [],
     );
@@ -141,6 +212,8 @@ class StreakData {
     'unlocked_frames': unlockedFrames,
     'next_milestone': nextMilestone?.toJson(),
     'ladder': ladder.map((m) => m.toJson()).toList(),
+    'is_verified': isVerified,
+    'frames': frames.map((f) => f.toJson()).toList(),
   };
 
   StreakData withFrame(String? frame) => StreakData(
@@ -153,6 +226,8 @@ class StreakData {
     unlockedFrames: unlockedFrames,
     nextMilestone: nextMilestone,
     ladder: ladder,
+    isVerified: isVerified,
+    frames: frames,
   );
 }
 
@@ -161,6 +236,45 @@ class StreakActionResult {
   final String? code;
   final String? message;
   const StreakActionResult({required this.ok, this.code, this.message});
+}
+
+enum CelebrationKind { frame, badge, evolution }
+
+/// Something worth a full-screen celebration: a new frame or badge, and/or
+/// the mascot evolving.
+class StreakCelebration {
+  final CelebrationKind kind;
+
+  /// Frame key or badge key (empty for a pure evolution).
+  final String key;
+  final String label;
+  final String description;
+
+  /// Streak when it happened.
+  final int streak;
+  final MascotStage oldStage;
+  final MascotStage newStage;
+
+  const StreakCelebration({
+    required this.kind,
+    required this.key,
+    required this.label,
+    required this.description,
+    required this.streak,
+    required this.oldStage,
+    required this.newStage,
+  });
+
+  String get id =>
+      '${kind == CelebrationKind.badge
+          ? 'badge'
+          : kind == CelebrationKind.evolution
+          ? 'evolution'
+          : 'frame'}:$key';
+
+  bool get isVerifiedFrame =>
+      kind == CelebrationKind.frame && key == 'verified';
+  bool get evolved => newStage.index > oldStage.index;
 }
 
 /// App-wide streak state. All streak rules live on the server; this only
@@ -172,12 +286,15 @@ class StreakController extends ChangeNotifier {
   static const _kBubbleEnabled = 'streak_bubble_enabled';
   static const _kBubbleDx = 'streak_bubble_dx';
   static const _kBubbleDy = 'streak_bubble_dy';
+  static const _kChatEnabled = 'streak_chat_enabled';
   static const _kCachePrefix = 'streak_cache_';
+  static const _kSeenPrefix = 'streak_seen_frames_';
   static const double defaultBubbleDy = 0.35;
   static const Duration _resumeThrottle = Duration(minutes: 30);
 
   StreakData? data;
   bool showBubblePref = true;
+  bool chatEnabled = true;
   bool loggedIn = false;
 
   /// Screens where the bubble must not show hold this above zero.
@@ -185,6 +302,13 @@ class StreakController extends ChangeNotifier {
 
   /// One-shot: set when a new day was recorded, cleared by [consumeCelebrate].
   bool celebrate = false;
+
+  /// The number rolls from [celebrateFrom] to [celebrateTo] on a new day.
+  int celebrateFrom = 0;
+  int celebrateTo = 0;
+
+  /// Whether the latest check-in moved the mascot to a new stage.
+  bool evolvedNow = false;
 
   /// Display-only facts about the latest check-in.
   bool freezeUsedNow = false;
@@ -198,7 +322,9 @@ class StreakController extends ChangeNotifier {
   /// Bumped when the saved position is cleared so the bubble re-snaps.
   int bubbleResetCount = 0;
 
-  final List<Milestone> _rewardQueue = [];
+  final List<StreakCelebration> _celebrations = [];
+  Set<String>? _seenFrames;
+  String? _seenDonor;
   String? _dataDonorId;
   int _session = 0;
   bool _checkInBusy = false;
@@ -207,7 +333,7 @@ class StreakController extends ChangeNotifier {
   bool _notifyScheduled = false;
 
   String? get equippedFrame => loggedIn ? data?.equippedFrame : null;
-  bool get hasReward => _rewardQueue.isNotEmpty;
+  bool get hasCelebration => _celebrations.isNotEmpty;
 
   // ─── Setup ─────────────────────────────────────────────────────────────
 
@@ -216,6 +342,7 @@ class StreakController extends ChangeNotifier {
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     showBubblePref = prefs.getBool(_kBubbleEnabled) ?? true;
+    chatEnabled = prefs.getBool(_kChatEnabled) ?? true;
     final side = prefs.getString(_kBubbleDx);
     bubbleSide = side == 'left' ? 'left' : 'right';
     bubbleDy = (prefs.getDouble(_kBubbleDy) ?? defaultBubbleDy).clamp(0.0, 1.0);
@@ -382,6 +509,12 @@ class StreakController extends ChangeNotifier {
   }) {
     final parsed = StreakData.fromBody(body);
     if (parsed == null) return;
+
+    // What the mascot looked like before this payload (for evolution).
+    final previous = (_dataDonorId == id) ? data : null;
+    final isNewDay = fromCheckIn && body['is_new_checkin'] == true;
+    final lost = fromCheckIn && body['streak_lost'] == true;
+
     data = parsed;
     _dataDonorId = id;
     loggedIn = true;
@@ -389,25 +522,168 @@ class StreakController extends ChangeNotifier {
       prefs.setString('$_kCachePrefix$id', jsonEncode(parsed.toJson())),
     );
 
+    final newlyUnlocked = <Milestone>[];
     if (fromCheckIn) {
       freezeUsedNow = body['freeze_used'] == true;
-      streakLostNow = body['streak_lost'] == true;
+      streakLostNow = lost;
       previousStreak = _int(body['previous_streak']);
-      if (body['is_new_checkin'] == true) {
-        celebrate = true;
-        final unlocked = body['newly_unlocked'];
-        if (unlocked is List) {
-          for (final item in unlocked.whereType<Map>()) {
-            final reward = Milestone.fromJson(Map<String, dynamic>.from(item));
-            final queued = _rewardQueue.any(
-              (m) => m.key == reward.key && m.days == reward.days,
-            );
-            if (!queued) _rewardQueue.add(reward);
-          }
+      final unlocked = body['newly_unlocked'];
+      if (isNewDay && unlocked is List) {
+        for (final item in unlocked.whereType<Map>()) {
+          newlyUnlocked.add(
+            Milestone.fromJson(Map<String, dynamic>.from(item)),
+          );
         }
       }
+      if (isNewDay) {
+        celebrate = true;
+        celebrateTo = parsed.current;
+        celebrateFrom = parsed.current > 0 ? parsed.current - 1 : 0;
+      }
     }
+
+    _queueCelebrations(
+      prefs,
+      id,
+      parsed,
+      newlyUnlocked: newlyUnlocked,
+      previous: previous,
+      isNewDay: isNewDay,
+      lost: lost,
+    );
     notifyListeners();
+  }
+
+  // ─── Celebrations ──────────────────────────────────────────────────────
+
+  Set<String> _loadSeen(SharedPreferences prefs, String id) {
+    if (_seenFrames != null && _seenDonor == id) return _seenFrames!;
+    final stored = prefs.getStringList('$_kSeenPrefix$id');
+    _seenDonor = id;
+    _seenFrames = stored?.toSet();
+    return _seenFrames ?? <String>{};
+  }
+
+  void _queueCelebrations(
+    SharedPreferences prefs,
+    String id,
+    StreakData parsed, {
+    required List<Milestone> newlyUnlocked,
+    required StreakData? previous,
+    required bool isNewDay,
+    required bool lost,
+  }) {
+    _loadSeen(prefs, id);
+    final newlyKeys = {for (final m in newlyUnlocked) m.key};
+
+    // First load for this donor: everything already unlocked counts as seen
+    // (so a reinstall doesn't replay old celebrations), except the Verified
+    // frame and whatever was unlocked just now.
+    if (_seenFrames == null) {
+      _seenFrames = parsed.unlockedFrames
+          .where((k) => k != 'verified' && !newlyKeys.contains(k))
+          .toSet();
+      unawaited(prefs.setStringList('$_kSeenPrefix$id', _seenFrames!.toList()));
+    }
+    final seen = _seenFrames!;
+
+    // Evolution: compare the mascot before and after this check-in.
+    final newStage = mascotStageFor(parsed.current);
+    var oldStage = newStage;
+    if (isNewDay) {
+      final oldCurrent =
+          previous?.current ??
+          (lost
+              ? previousStreak
+              : (parsed.current > 0 ? parsed.current - 1 : 0));
+      oldStage = mascotStageFor(oldCurrent);
+    }
+    var evolutionPending = newStage.index > oldStage.index;
+    evolvedNow = evolutionPending;
+
+    final fresh = <StreakCelebration>[];
+    void add(StreakCelebration c) {
+      if (fresh.any((e) => e.id == c.id)) return;
+      if (_celebrations.any((e) => e.id == c.id)) return;
+      fresh.add(c);
+    }
+
+    StreakCelebration make(
+      CelebrationKind kind,
+      String key,
+      String label,
+      String description,
+    ) {
+      // The evolution plays with the first reward of the check-in.
+      final carries = evolutionPending && key != 'verified';
+      if (carries) evolutionPending = false;
+      return StreakCelebration(
+        kind: kind,
+        key: key,
+        label: label,
+        description: description,
+        streak: parsed.current,
+        oldStage: carries ? oldStage : newStage,
+        newStage: newStage,
+      );
+    }
+
+    for (final m in newlyUnlocked) {
+      add(
+        make(
+          m.isFrame ? CelebrationKind.frame : CelebrationKind.badge,
+          m.key,
+          m.label.isNotEmpty ? m.label : m.key,
+          m.description,
+        ),
+      );
+    }
+    for (final key in parsed.unlockedFrames) {
+      if (seen.contains(key)) continue;
+      final info = parsed.frameByKey(key);
+      add(
+        make(
+          CelebrationKind.frame,
+          key,
+          (info?.label.isNotEmpty ?? false) ? info!.label : key,
+          info?.description ?? '',
+        ),
+      );
+    }
+    if (evolutionPending) {
+      add(
+        StreakCelebration(
+          kind: CelebrationKind.evolution,
+          key: newStage.name,
+          label: newStage.stageName,
+          description: 'Your mascot evolved!',
+          streak: parsed.current,
+          oldStage: oldStage,
+          newStage: newStage,
+        ),
+      );
+    }
+    _celebrations.addAll(fresh);
+  }
+
+  /// The next celebration to show, or null. Takes it off the queue, and a
+  /// frame counts as seen from here on so it never plays twice.
+  StreakCelebration? takeCelebration() {
+    if (_celebrations.isEmpty) return null;
+    final next = _celebrations.removeAt(0);
+    if (next.kind == CelebrationKind.frame) markFrameSeen(next.key);
+    return next;
+  }
+
+  /// Called once a frame's celebration has been shown, so it never repeats.
+  void markFrameSeen(String key) {
+    final id = _seenDonor;
+    final seen = _seenFrames;
+    if (id == null || seen == null || !seen.add(key)) return;
+    unawaited(() async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('$_kSeenPrefix$id', seen.toList());
+    }());
   }
 
   String _dateKey(DateTime d) =>
@@ -420,9 +696,6 @@ class StreakController extends ChangeNotifier {
     celebrate = false;
     return true;
   }
-
-  Milestone? takeReward() =>
-      _rewardQueue.isEmpty ? null : _rewardQueue.removeAt(0);
 
   // ─── Where the bubble may show ─────────────────────────────────────────
 
@@ -457,6 +730,13 @@ class StreakController extends ChangeNotifier {
     await prefs.setBool(_kBubbleEnabled, value);
   }
 
+  Future<void> setChatEnabled(bool value) async {
+    chatEnabled = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kChatEnabled, value);
+  }
+
   /// Remembers where the bubble rests. Does not notify — the bubble already
   /// shows it.
   Future<void> saveBubblePosition(String side, double dy) async {
@@ -479,32 +759,42 @@ class StreakController extends ChangeNotifier {
 
   // ─── Sign-out ──────────────────────────────────────────────────────────
 
-  /// Forget everything — call on logout and after account deletion.
-  void reset() {
+  /// Forget everything — call on logout and after account deletion. The seen
+  /// frames are kept (so a re-login doesn't replay old celebrations) unless
+  /// [forgetSeen] is true, as it is when the account is deleted.
+  void reset({bool forgetSeen = false}) {
     _session++;
     data = null;
     _dataDonorId = null;
     loggedIn = false;
     celebrate = false;
+    celebrateFrom = 0;
+    celebrateTo = 0;
+    evolvedNow = false;
     freezeUsedNow = false;
     streakLostNow = false;
     previousStreak = 0;
-    _rewardQueue.clear();
+    _celebrations.clear();
+    _seenFrames = null;
+    _seenDonor = null;
     showBubblePref = true;
+    chatEnabled = true;
     bubbleSide = 'right';
     bubbleDy = defaultBubbleDy;
     bubbleResetCount++;
     _lastCheckInAt = null;
     _lastCheckInDate = null;
     notifyListeners();
-    unawaited(_clearStoredStreak());
+    unawaited(_clearStoredStreak(forgetSeen: forgetSeen));
   }
 
-  Future<void> _clearStoredStreak() async {
+  Future<void> _clearStoredStreak({required bool forgetSeen}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       for (final key in prefs.getKeys().toList()) {
-        if (key.startsWith('streak_')) await prefs.remove(key);
+        if (!key.startsWith('streak_')) continue;
+        if (!forgetSeen && key.startsWith(_kSeenPrefix)) continue;
+        await prefs.remove(key);
       }
     } catch (_) {}
   }

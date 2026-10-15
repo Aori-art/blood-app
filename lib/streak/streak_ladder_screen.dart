@@ -6,6 +6,7 @@ import 'avatar_frame.dart';
 import 'blood_bag_mascot.dart';
 import 'streak_controller.dart';
 import 'streak_hidden.dart';
+import 'streak_share.dart';
 
 const Color _kTrackGray = Color(0xFFE5E7EB);
 const List<BoxShadow> _kSoftShadow = [
@@ -41,6 +42,7 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
   // Frame key whose request is running ('' while removing a frame).
   String? _busyFrame;
   bool _refreshing = false;
+  bool _sharing = false;
 
   @override
   void initState() {
@@ -92,6 +94,23 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
+  }
+
+  Future<void> _share(BuildContext buttonContext, StreakData d) async {
+    if (_sharing) return;
+    final origin = shareOriginFor(buttonContext);
+    setState(() => _sharing = true);
+    try {
+      await shareStreak(
+        context,
+        streak: d.current,
+        stage: mascotStageFor(d.current),
+        origin: origin,
+      );
+    } catch (_) {
+      _snack("Couldn't create the share image. Please try again.");
+    }
+    if (mounted) setState(() => _sharing = false);
   }
 
   Future<void> _setFrame(String? key) async {
@@ -310,6 +329,25 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
                         color: kTextMuted,
                       ),
                     ),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF1F1),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        mascotStageFor(d.current).stageName,
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                          color: kCrimson,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -353,6 +391,43 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          Builder(
+            builder: (buttonContext) => SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: OutlinedButton(
+                onPressed: _sharing ? null : () => _share(buttonContext, d),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: kCrimson,
+                  side: const BorderSide(color: kCrimson, width: 1.3),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: _sharing
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.2,
+                          color: kCrimson,
+                        ),
+                      )
+                    : const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.ios_share_rounded, size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            'Share',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
           ),
           if (notice != null) ...[
             const SizedBox(height: 10),
@@ -473,11 +548,19 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
           const SizedBox(height: 12),
           ClipRRect(
             borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 10,
-              color: kCrimson,
-              backgroundColor: const Color(0xFFF3F4F6),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween<double>(begin: 0, end: progress),
+              duration:
+                  (MediaQuery.maybeOf(context)?.disableAnimations ?? false)
+                  ? Duration.zero
+                  : const Duration(milliseconds: 900),
+              curve: Curves.easeOutCubic,
+              builder: (context, value, _) => LinearProgressIndicator(
+                value: value,
+                minHeight: 10,
+                color: kCrimson,
+                backgroundColor: const Color(0xFFF3F4F6),
+              ),
             ),
           ),
           const SizedBox(height: 6),
@@ -847,6 +930,25 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
               value: _c.showBubblePref,
               activeThumbColor: kCrimson,
               onChanged: (v) => _c.setShowBubble(v),
+            ),
+          ],
+        ),
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Mascot chat',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: kTextPrimary,
+                ),
+              ),
+            ),
+            Switch(
+              value: _c.chatEnabled,
+              activeThumbColor: kCrimson,
+              onChanged: (v) => _c.setChatEnabled(v),
             ),
           ],
         ),

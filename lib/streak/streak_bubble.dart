@@ -3,15 +3,16 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../home.dart' show kBottomNavBarHeight;
 import '../main.dart' show appNavigatorKey;
 import '../shared_design.dart';
-import 'avatar_frame.dart';
 import 'blood_bag_mascot.dart';
+import 'mascot_chatter.dart';
+import 'milestone_celebration.dart';
 import 'streak_controller.dart';
 import 'streak_ladder_screen.dart';
+import 'streak_particles.dart';
 
 /// The assistive-touch style floating streak bubble. Mounted once, above the
 /// Navigator, so it navigates and shows sheets through [appNavigatorKey].
@@ -28,11 +29,29 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
   static const double _margin = 8;
   static const double _dragThreshold = 4;
 
+  /// Length of the "new day" animation around the bubble.
+  static const int _burstMs = 2500;
+
   final StreakController _c = StreakController.instance;
+  final MascotChatter _chatter = MascotChatter();
+  final math.Random _rand = math.Random();
 
   late final AnimationController _snap;
-  late final AnimationController _bounce;
+  late final AnimationController _burst;
   Animation<Offset>? _snapAnim;
+  late final List<Particle> _burstParticles = generateParticles(
+    seed: 11,
+    count: 14,
+    palette: const [kCrimson, Color(0xFFFF8FA3), Color(0xFFEF4444)],
+    shapes: const [ParticleShape.drop, ParticleShape.heart, ParticleShape.drop],
+    speedMin: 70,
+    speedMax: 170,
+    sizeMin: 5,
+    sizeMax: 8,
+    lifeMin: 1.3,
+    lifeMax: 1.9,
+    delayMax: 0.1,
+  );
 
   Size _screen = Size.zero;
   EdgeInsets _safe = EdgeInsets.zero;
@@ -47,10 +66,23 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
 
   bool _idle = false;
   bool _celebrating = false;
+  int _rollFrom = 0;
   Timer? _idleTimer;
   Timer? _celebrateTimer;
   int _seenReset = 0;
-  bool _rewardBusy = false;
+
+  // Mascot chat.
+  Timer? _chatTimer;
+  Timer? _chatHideTimer;
+  String? _chatText;
+  bool _chatShowing = false;
+  bool _foreground = true;
+  bool _wasVisible = false;
+  bool _lastChatEnabled = true;
+
+  // Full-screen celebrations.
+  bool _celebrationOpen = false;
+  bool _celebrationBusy = false;
 
   bool get _visible =>
       _c.loggedIn &&
@@ -68,14 +100,19 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
       vsync: this,
       duration: const Duration(milliseconds: 250),
     );
-    _bounce = AnimationController(
+    _burst = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: _burstMs),
     );
     WidgetsBinding.instance.addObserver(this);
     _seenReset = _c.bubbleResetCount;
+    _lastChatEnabled = _c.chatEnabled;
     _c.addListener(_onChanged);
-    if (_visible) _scheduleIdle();
+    _wasVisible = _visible;
+    if (_wasVisible) {
+      _scheduleIdle();
+      _scheduleChat(first: true);
+    }
   }
 
   @override
@@ -84,14 +121,25 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
     _c.removeListener(_onChanged);
     _idleTimer?.cancel();
     _celebrateTimer?.cancel();
+    _chatTimer?.cancel();
+    _chatHideTimer?.cancel();
     _snap.dispose();
-    _bounce.dispose();
+    _burst.dispose();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _c.onAppResumed();
+    if (state == AppLifecycleState.resumed) {
+      _foreground = true;
+      _c.onAppResumed();
+      if (_visible) _scheduleChat(first: true);
+    } else {
+      // Backgrounded: stop talking and don't start again until we're back.
+      _foreground = false;
+      _chatTimer?.cancel();
+      _hideChat(reschedule: false);
+    }
   }
 
   // ─── Reacting to the controller ─────────────────────────────────────────
@@ -104,7 +152,8 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
       _snapAnim = null;
       _dragging = false;
     }
-    if (_visible) {
+    final visible = _visible;
+    if (visible) {
       if (_c.celebrate) {
         _c.consumeCelebrate();
         _playCelebrate();
@@ -116,20 +165,52 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
       _idleTimer = null;
       _idle = false;
     }
+
+    // Chat: start when the bubble appears, stop when it goes away or the
+    // setting is switched off.
+    if (visible && !_wasVisible && _c.chatEnabled) {
+      _scheduleChat(first: true);
+    } else if (!visible && _wasVisible) {
+      _chatTimer?.cancel();
+      _hideChat(reschedule: false);
+    }
+    if (_c.chatEnabled != _lastChatEnabled) {
+      _lastChatEnabled = _c.chatEnabled;
+      if (_lastChatEnabled && visible) {
+        _scheduleChat(first: true);
+      } else {
+        _chatTimer?.cancel();
+        _hideChat(reschedule: false);
+      }
+    }
+    _wasVisible = visible;
+
     setState(() {});
-    _maybeShowReward();
+    _maybeShowCelebration();
   }
 
+  // The "new day" animation: number roll, rings, +1, particles, jump.
   void _playCelebrate() {
     _celebrateTimer?.cancel();
     _wake();
+    _hideChat(reschedule: false);
+    _chatTimer?.cancel();
     _celebrating = true;
-    if (!_reduceMotion) _bounce.forward(from: 0);
-    _celebrateTimer = Timer(const Duration(milliseconds: 2500), () {
+    _rollFrom = _c.celebrateFrom;
+    HapticFeedback.lightImpact();
+    _chatter.queueSpecial('Day {n}! You did it again!');
+    if (_c.evolvedNow) {
+      _chatter.queueSpecial('Look at me, I evolved into {stage}!');
+    }
+    if (!_reduceMotion) _burst.forward(from: 0);
+    _celebrateTimer = Timer(const Duration(milliseconds: _burstMs), () {
       if (!mounted) return;
       setState(() => _celebrating = false);
       _scheduleIdle();
-      _maybeShowReward();
+      // A queued special line comes out soon after the show.
+      _chatTimer?.cancel();
+      _chatTimer = Timer(const Duration(seconds: 3), _tryChat);
+      _maybeShowCelebration();
     });
   }
 
@@ -145,6 +226,49 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
   void _wake() {
     _idleTimer?.cancel();
     if (_idle) setState(() => _idle = false);
+  }
+
+  // ─── Mascot chat ────────────────────────────────────────────────────────
+
+  bool get _chatPossible =>
+      _visible && _c.chatEnabled && _foreground && !_celebrationOpen;
+
+  // First line ~6 s after the bubble appears, then every 40–90 s.
+  void _scheduleChat({bool first = false}) {
+    _chatTimer?.cancel();
+    if (!_chatPossible) return;
+    final delay = first
+        ? const Duration(seconds: 6)
+        : Duration(seconds: 40 + _rand.nextInt(51));
+    _chatTimer = Timer(delay, _tryChat);
+  }
+
+  void _tryChat() {
+    _chatTimer = null;
+    if (!mounted || !_chatPossible) return;
+    if (_dragging || _celebrating || _chatShowing || _c.hiddenCount > 0) {
+      _chatTimer = Timer(const Duration(seconds: 10), _tryChat);
+      return;
+    }
+    final data = _c.data;
+    if (data == null) return;
+    final text = _chatter.next(data);
+    if (text == null) {
+      _scheduleChat();
+      return;
+    }
+    setState(() {
+      _chatText = text;
+      _chatShowing = true;
+    });
+    _chatHideTimer?.cancel();
+    _chatHideTimer = Timer(const Duration(milliseconds: 4500), _hideChat);
+  }
+
+  void _hideChat({bool reschedule = true}) {
+    _chatHideTimer?.cancel();
+    if (_chatShowing && mounted) setState(() => _chatShowing = false);
+    if (reschedule && mounted) _scheduleChat();
   }
 
   // ─── Position ───────────────────────────────────────────────────────────
@@ -191,6 +315,8 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
       _snapAnim = null;
       _dragging = true;
       _didDrag = true;
+      // Never talk while being dragged.
+      _hideChat();
     }
     final target = _liveAtDown + (e.position - _downAt);
     _live = Offset(
@@ -349,43 +475,64 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
     }
   }
 
-  // Shows queued rewards, but never over a hidden/sensitive screen.
-  Future<void> _maybeShowReward() async {
-    if (_rewardBusy || !_c.hasReward || _celebrating) return;
-    if (!_c.loggedIn || _c.hiddenCount > 0) return;
-    _rewardBusy = true;
+  // ─── Full-screen celebrations ───────────────────────────────────────────
+
+  Offset _bubbleCenter() {
+    final size = _screen == Size.zero ? MediaQuery.sizeOf(context) : _screen;
+    final safe = _screen == Size.zero ? MediaQuery.paddingOf(context) : _safe;
+    return _rest(size, safe) + const Offset(_size / 2, _size / 2);
+  }
+
+  // Shows queued celebrations one at a time, but never over a hidden or
+  // sensitive screen — they wait in the queue until it's allowed.
+  Future<void> _maybeShowCelebration() async {
+    if (_celebrationBusy || !_c.hasCelebration || _celebrating) return;
+    if (!_c.loggedIn || _c.hiddenCount > 0 || !_foreground) return;
+    _celebrationBusy = true;
     try {
       await Future<void>.delayed(const Duration(milliseconds: 500));
-      final prefs = await SharedPreferences.getInstance();
-      final initials = streakInitials(prefs.getString('userName') ?? '');
       // Re-check: a sensitive screen may have opened while we waited.
-      if (!mounted || !_c.loggedIn || _c.hiddenCount > 0 || _celebrating) {
+      if (!mounted ||
+          !_c.loggedIn ||
+          _c.hiddenCount > 0 ||
+          _celebrating ||
+          !_foreground) {
         return;
       }
-      final ctx = appNavigatorKey.currentContext;
-      if (ctx == null || !ctx.mounted) return;
-      final reward = _c.takeReward();
-      if (reward == null) return;
-      await showDialog<void>(
-        context: ctx,
-        builder: (_) => _RewardDialog(reward: reward, initials: initials),
-      );
+      final event = _c.takeCelebration();
+      if (event == null) return;
+      _chatTimer?.cancel();
+      _hideChat(reschedule: false);
+      final origin = _bubbleCenter();
+      setState(() => _celebrationOpen = true);
+      await showMilestoneCelebration(event: event, origin: origin);
     } finally {
-      _rewardBusy = false;
+      _celebrationBusy = false;
+      if (mounted && _celebrationOpen) setState(() => _celebrationOpen = false);
     }
-    if (mounted) _maybeShowReward();
+    if (!mounted) return;
+    _chatTimer?.cancel();
+    _chatTimer = Timer(
+      _chatter.hasSpecial
+          ? const Duration(seconds: 3)
+          : const Duration(seconds: 30),
+      _tryChat,
+    );
+    _maybeShowCelebration();
   }
 
   // ─── Build ──────────────────────────────────────────────────────────────
 
-  double _bounceOffset() {
-    final v = _bounce.value;
-    return -12 * math.sin(math.pi * ((v * 2) % 1.0));
+  // Two quick hops at the start of the "new day" animation.
+  double _jumpOffset() {
+    final u = _burst.value * _burstMs / 800;
+    if (u >= 1) return 0;
+    return -12 * math.sin(math.pi * ((u * 2) % 1.0));
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_visible) {
+    if (!_visible || _celebrationOpen) {
       return const Positioned(
         left: 0,
         top: 0,
@@ -405,14 +552,16 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
             _screen = constraints.biggest;
             _safe = MediaQuery.paddingOf(context);
             return AnimatedBuilder(
-              animation: _snap,
+              animation: Listenable.merge([_snap, _burst]),
               builder: (context, _) {
                 final pos = _current(_screen, _safe);
                 final onRight = pos.dx + _size / 2 > _screen.width / 2;
                 return Stack(
                   clipBehavior: Clip.none,
                   children: [
+                    if (_celebrating && !_reduceMotion) _burstFx(pos),
                     _pill(pos, onRight),
+                    _chatBubble(pos, onRight),
                     Positioned(
                       left: pos.dx,
                       top: pos.dy,
@@ -420,11 +569,65 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
                       height: _size,
                       child: _bubble(),
                     ),
+                    if (_celebrating && !_reduceMotion) _plusOne(pos),
                   ],
                 );
               },
             );
           },
+        ),
+      ),
+    );
+  }
+
+  // Rings and particles around the bag (never blocks touches).
+  Widget _burstFx(Offset pos) {
+    const box = 200.0;
+    return Positioned(
+      left: pos.dx + _size / 2 - box / 2,
+      top: pos.dy + _size / 2 - box / 2,
+      width: box,
+      height: box,
+      child: IgnorePointer(
+        child: RepaintBoundary(
+          child: CustomPaint(
+            painter: _BurstPainter(
+              ms: _burst.value * _burstMs,
+              particles: _burstParticles,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // A "+1" that floats up from the bag and fades.
+  Widget _plusOne(Offset pos) {
+    final p = (_burst.value * _burstMs / 1300).clamp(0.0, 1.0);
+    if (p >= 1) return const SizedBox.shrink();
+    final rise = Curves.easeOutCubic.transform(p);
+    final opacity = p < 0.55 ? 1.0 : 1 - (p - 0.55) / 0.45;
+    return Positioned(
+      left: pos.dx - 10,
+      width: _size + 20,
+      top: pos.dy - 14 - 40 * rise,
+      child: IgnorePointer(
+        child: Opacity(
+          opacity: opacity,
+          child: const Center(
+            child: Text(
+              '+1',
+              style: TextStyle(
+                color: kCrimson,
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                shadows: [
+                  Shadow(color: Colors.white, blurRadius: 4),
+                  Shadow(color: Colors.white, blurRadius: 8),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -469,13 +672,61 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
     );
   }
 
+  // The speech bubble beside the mascot, on the side facing the screen centre.
+  Widget _chatBubble(Offset pos, bool onRight) {
+    final text = _chatText;
+    if (text == null) return const SizedBox.shrink();
+    final size = MascotSpeechBubble.measure(text);
+    final bagCenterY = pos.dy + _size / 2;
+    final minTop = _safe.top + 8;
+    final maxTop = math.max(
+      minTop,
+      _screen.height - _safe.bottom - 8 - size.height,
+    );
+    final top = (bagCenterY - size.height / 2).clamp(minTop, maxTop);
+    final left = onRight
+        ? math.max(8.0, pos.dx - 4 - size.width)
+        : math.min(_screen.width - size.width - 8, pos.dx + _size + 4);
+    return Positioned(
+      left: left,
+      top: top,
+      width: size.width,
+      height: size.height,
+      child: IgnorePointer(
+        ignoring: !_chatShowing,
+        child: AnimatedOpacity(
+          opacity: _chatShowing ? 1 : 0,
+          duration: const Duration(milliseconds: 220),
+          child: AnimatedScale(
+            scale: _chatShowing ? 1 : 0.85,
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutBack,
+            alignment: onRight ? Alignment.centerRight : Alignment.centerLeft,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _hideChat,
+              child: MascotSpeechBubble(
+                text: text,
+                tailOnRight: onRight,
+                tailTop: bagCenterY - top,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _bubble() {
     final streak = _c.data?.current ?? 0;
-    final mood = _dragging
+    final MascotMood mood = _dragging
         ? MascotMood.dragging
         : _celebrating
         ? MascotMood.celebrate
+        : _chatShowing
+        ? MascotMood.talking
         : (streak == 0 ? MascotMood.sleepy : MascotMood.idle);
+    final rolling = _celebrating && !_reduceMotion;
     return Listener(
       behavior: HitTestBehavior.opaque,
       onPointerDown: _pointerDown,
@@ -492,17 +743,17 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
           child: AnimatedScale(
             duration: const Duration(milliseconds: 300),
             scale: _idle ? 0.9 : 1,
-            child: AnimatedBuilder(
-              animation: _bounce,
-              builder: (_, child) => Transform.translate(
-                offset: Offset(0, _bounceOffset()),
-                child: child,
-              ),
+            child: Transform.translate(
+              offset: Offset(0, rolling ? _jumpOffset() : 0),
               child: BloodBagMascot(
                 size: _size,
                 streak: streak,
                 mood: mood,
                 look: _look,
+                rollFrom: rolling ? _rollFrom : null,
+                rollProgress: rolling
+                    ? (_burst.value * _burstMs / 600).clamp(0.0, 1.0)
+                    : 1,
               ),
             ),
           ),
@@ -512,171 +763,38 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
   }
 }
 
-/// "Reward unlocked!" popup. Frames can be equipped right away.
-class _RewardDialog extends StatefulWidget {
-  final Milestone reward;
-  final String initials;
+/// Two expanding rings plus a burst of drops and hearts.
+class _BurstPainter extends CustomPainter {
+  final double ms;
+  final List<Particle> particles;
 
-  const _RewardDialog({required this.reward, required this.initials});
+  const _BurstPainter({required this.ms, required this.particles});
 
   @override
-  State<_RewardDialog> createState() => _RewardDialogState();
-}
-
-class _RewardDialogState extends State<_RewardDialog> {
-  bool _busy = false;
-  String? _error;
-
-  Future<void> _equip() async {
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    final result = await StreakController.instance.setFrame(widget.reward.key);
-    if (!mounted) return;
-    if (result.ok) {
-      Navigator.pop(context);
-    } else {
-      setState(() {
-        _busy = false;
-        _error = result.message ?? "Couldn't equip it right now. Try again.";
-      });
-    }
-  }
-
-  Widget _preview() {
-    final reward = widget.reward;
-    if (reward.isFrame) {
-      return StreakAvatarFrame(
-        frameKey: reward.key,
-        radius: 34,
-        child: CircleAvatar(
-          radius: 34,
-          backgroundColor: kCrimson,
-          child: Text(
-            widget.initials,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    for (var i = 0; i < 2; i++) {
+      final p = ((ms - i * 250) / 1100).clamp(0.0, 1.0);
+      if (p <= 0 || p >= 1) continue;
+      final e = Curves.easeOutCubic.transform(p);
+      canvas.drawCircle(
+        center,
+        29 + 56 * e,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3.5 * (1 - e) + 1
+          ..color = kCrimson.withValues(alpha: 0.5 * (1 - e)),
       );
     }
-    final (icon, color) = badgeVisualFor(reward.key, reward.days);
-    return Container(
-      width: 76,
-      height: 76,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color.withValues(alpha: .14),
-      ),
-      child: Icon(icon, size: 40, color: color),
-    );
+    ParticlePainter(
+      particles: particles,
+      mode: ParticleMode.burst,
+      time: ms / 1000,
+      origin: center,
+      gravity: 240,
+    ).paint(canvas, size);
   }
 
   @override
-  Widget build(BuildContext context) {
-    final reward = widget.reward;
-    return PopScope(
-      canPop: !_busy,
-      child: AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 8),
-            _preview(),
-            const SizedBox(height: 16),
-            const Text(
-              'Reward unlocked!',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: kTextPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              reward.label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-                color: kCrimson,
-              ),
-            ),
-            if (reward.description.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                reward.description,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: kTextMuted,
-                  height: 1.4,
-                ),
-              ),
-            ],
-            if (_error != null) ...[
-              const SizedBox(height: 10),
-              Text(
-                _error!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12, color: kCrimson),
-              ),
-            ],
-          ],
-        ),
-        actionsAlignment: MainAxisAlignment.center,
-        actions: reward.isFrame
-            ? [
-                TextButton(
-                  onPressed: _busy ? null : () => Navigator.pop(context),
-                  child: const Text(
-                    'Later',
-                    style: TextStyle(color: kTextMuted),
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: _busy ? null : _equip,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kCrimson,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: _busy
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text('Equip now'),
-                ),
-              ]
-            : [
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kCrimson,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Text('Great!'),
-                ),
-              ],
-      ),
-    );
-  }
+  bool shouldRepaint(covariant _BurstPainter old) => old.ms != ms;
 }

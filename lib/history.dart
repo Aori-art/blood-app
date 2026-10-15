@@ -15,6 +15,7 @@ import 'privacy_security.dart';
 import 'privacy_statement.dart';
 import 'shared_design.dart';
 import 'streak/avatar_frame.dart';
+import 'streak/frame_picker.dart';
 import 'streak/streak_controller.dart';
 import 'streak/streak_ladder_screen.dart';
 import 'verify.dart';
@@ -518,6 +519,36 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
                 ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Builder(
+          builder: (context) => GestureDetector(
+            onTap: () =>
+                showFrameCatalogSheet(context, initials: initials(name)),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF1F1),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: const Color(0xFFFECACA)),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.auto_awesome_rounded, size: 14, color: kCrimson),
+                  SizedBox(width: 5),
+                  Text(
+                    'Edit Frame',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: kCrimson,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

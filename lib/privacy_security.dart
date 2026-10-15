@@ -123,7 +123,7 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
       final prefs = await SharedPreferences.getInstance();
       await clearSessionKeepConsent(prefs);
     } catch (_) {}
-    StreakController.instance.reset();
+    StreakController.instance.reset(forgetSeen: true);
     AppSession.homeInStack = false;
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

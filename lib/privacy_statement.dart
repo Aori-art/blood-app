@@ -19,11 +19,19 @@ const List<String> _kConsentKeys = [
   kPrivacyReceiptPendingKey,
 ];
 
+// Keys of this prefix hold which streak frames a donor has already seen
+// celebrated (just frame keys), so a re-login doesn't replay them. Account
+// deletion removes them afterwards (StreakController.reset(forgetSeen: true)).
+const String _kSeenFramesPrefix = 'streak_seen_frames_';
+
 // Replaces prefs.clear() everywhere a session ends (logout, account
 // deletion) so the user isn't asked to re-consent on every sign-in.
 Future<void> clearSessionKeepConsent(SharedPreferences prefs) async {
   final kept = <String, Object>{};
-  for (final key in _kConsentKeys) {
+  for (final key in prefs.getKeys()) {
+    if (!_kConsentKeys.contains(key) && !key.startsWith(_kSeenFramesPrefix)) {
+      continue;
+    }
     final value = prefs.get(key);
     if (value != null) kept[key] = value;
   }
@@ -34,6 +42,8 @@ Future<void> clearSessionKeepConsent(SharedPreferences prefs) async {
       await prefs.setString(entry.key, value);
     } else if (value is bool) {
       await prefs.setBool(entry.key, value);
+    } else if (value is List) {
+      await prefs.setStringList(entry.key, value.cast<String>());
     }
   }
 }
