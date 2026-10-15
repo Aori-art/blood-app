@@ -10,6 +10,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'config.dart';
 import 'home.dart';
 import 'login.dart';
+import 'privacy_statement.dart';
+import 'streak/streak_controller.dart';
+import 'streak/streak_hidden.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // eDonate PIN — a 4-digit PIN (like GCash's MPIN) that protects Home.
@@ -407,7 +410,12 @@ class _PinScreenState extends State<PinScreen> with TickerProviderStateMixin {
           pin: pin,
         );
       } else {
-        d = await PinApi.call('set', _donorId, pin: pin, currentPin: _currentPin);
+        d = await PinApi.call(
+          'set',
+          _donorId,
+          pin: pin,
+          currentPin: _currentPin,
+        );
       }
       if (!mounted) return;
       _stopBusy();
@@ -612,7 +620,8 @@ class _PinScreenState extends State<PinScreen> with TickerProviderStateMixin {
             .timeout(const Duration(seconds: 5));
       } catch (_) {}
     }
-    await prefs.clear();
+    await clearSessionKeepConsent(prefs);
+    StreakController.instance.reset();
     AppSession.homeInStack = false;
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
@@ -659,7 +668,10 @@ class _PinScreenState extends State<PinScreen> with TickerProviderStateMixin {
   // ── Build ──────────────────────────────────────────────────────────────
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      StreakBubbleHidden(child: _buildScreen(context));
+
+  Widget _buildScreen(BuildContext context) {
     final mq = MediaQuery.of(context);
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
@@ -1419,11 +1431,7 @@ class _ForgotPinSheetState extends State<_ForgotPinSheet> {
       _error = null;
     });
     try {
-      final d = await PinApi.call(
-        'reset',
-        widget.donorId,
-        password: password,
-      );
+      final d = await PinApi.call('reset', widget.donorId, password: password);
       if (!mounted) return;
       if (d['status'] == 'success') {
         Navigator.of(context).pop(_ResetOutcome(password: password));

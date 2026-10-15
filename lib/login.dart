@@ -1,5 +1,6 @@
 // login.dart
 // Place at: lib/login.dart
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -10,6 +11,8 @@ import 'newsfeed.dart';
 import 'screens/register/register1.dart';
 import 'shared_design.dart';
 import 'forgot_password.dart';
+import 'streak/streak_controller.dart';
+import 'streak/streak_hidden.dart';
 
 // Design tokens now come from shared_design.dart (kCrimson, kSurface, etc.)
 // so this screen matches the rest of the app instead of its own palette.
@@ -99,11 +102,13 @@ class _LoginScreenState extends State<LoginScreen>
           await prefs.setString('userName', data['user_name']);
         if (data['donor_id'] != null)
           await prefs.setString('donorId', data['donor_id'].toString());
+        // Count today's open for the new session (server is idempotent).
+        unawaited(StreakController.instance.checkIn());
         Navigator.pushAndRemoveUntil(
-  context,
-  MaterialPageRoute(builder: (_) => const NewsfeedPage()),
-  (route) => false,
-);
+          context,
+          MaterialPageRoute(builder: (_) => const NewsfeedPage()),
+          (route) => false,
+        );
       } else {
         _snack(data['message'] ?? 'Login failed.');
       }
@@ -146,7 +151,10 @@ class _LoginScreenState extends State<LoginScreen>
       );
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      StreakBubbleHidden(child: _buildScreen(context));
+
+  Widget _buildScreen(BuildContext context) {
     final h = MediaQuery.of(context).size.height;
 
     return Scaffold(
@@ -220,13 +228,17 @@ class _LoginScreenState extends State<LoginScreen>
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
-                                  builder: (_) => const NewsfeedPage()),
+                                builder: (_) => const NewsfeedPage(),
+                              ),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.arrow_back_rounded,
-                                    size: 14, color: _kTextMuted),
+                                Icon(
+                                  Icons.arrow_back_rounded,
+                                  size: 14,
+                                  color: _kTextMuted,
+                                ),
                                 const SizedBox(width: 4),
                                 Text(
                                   'Back to Feed',
@@ -410,4 +422,3 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 }
-

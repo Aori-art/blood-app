@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'config.dart';
 import 'shared_design.dart';
+import 'streak/streak_hidden.dart';
 
 enum _IdSide { front, back }
 
@@ -294,7 +295,10 @@ class _VerifyScreenState extends State<VerifyScreen>
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) =>
+      StreakBubbleHidden(child: _buildScreen(context));
+
+  Widget _buildScreen(BuildContext context) => Scaffold(
     backgroundColor: const Color(0xFFF9FAFB),
     body: SafeArea(
       child: Column(

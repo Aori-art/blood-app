@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -9,6 +11,12 @@ import 'config.dart';
 import 'firebase_options.dart';
 import 'notification_service.dart';
 import 'splash_screen/splash_screen.dart';
+import 'streak/streak_bubble.dart';
+import 'streak/streak_controller.dart';
+
+/// The floating streak bubble lives above the Navigator, so it reaches routes,
+/// dialogs and sheets through this key.
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 /// Handles FCM messages when the app is in the background.
 ///
@@ -17,24 +25,14 @@ import 'splash_screen/splash_screen.dart';
 /// - not anonymous
 /// - marked with @pragma('vm:entry-point')
 @pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(
-  RemoteMessage message,
-) async {
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  debugPrint(
-    'Background notification: ${message.notification?.title}',
-  );
+  debugPrint('Background notification: ${message.notification?.title}');
 
-  debugPrint(
-    'Background message body: ${message.notification?.body}',
-  );
+  debugPrint('Background message body: ${message.notification?.body}');
 
-  debugPrint(
-    'Background message data: ${message.data}',
-  );
+  debugPrint('Background message data: ${message.data}');
 }
 
 Future<void> main() async {
@@ -55,34 +53,23 @@ Future<void> main() async {
 
   // Initialize Firebase using the configuration generated
   // by "flutterfire configure".
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   // Register the background message handler.
-  FirebaseMessaging.onBackgroundMessage(
-    _firebaseMessagingBackgroundHandler,
-  );
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   // Ask the user for notification permission.
-  final NotificationSettings settings =
-      await FirebaseMessaging.instance.requestPermission(
-    alert: true,
-    badge: true,
-    sound: true,
-  );
+  final NotificationSettings settings = await FirebaseMessaging.instance
+      .requestPermission(alert: true, badge: true, sound: true);
 
-  debugPrint(
-    'Notification permission: ${settings.authorizationStatus}',
-  );
+  debugPrint('Notification permission: ${settings.authorizationStatus}');
 
   // Get the FCM device token.
   //
   // Later, home.dart / NotificationService will send this
   // token to your PHP backend together with the donor ID.
   try {
-    final String? token =
-        await FirebaseMessaging.instance.getToken();
+    final String? token = await FirebaseMessaging.instance.getToken();
 
     debugPrint('FCM TOKEN: $token');
   } catch (e) {
@@ -99,8 +86,7 @@ Future<void> main() async {
   FirebaseMessaging.instance.onTokenRefresh.listen(_handleTokenRefresh);
 
   // Check the existing login session.
-  final SharedPreferences prefs =
-      await SharedPreferences.getInstance();
+  final SharedPreferences prefs = await SharedPreferences.getInstance();
 
   // Matches _NewsfeedPageState._checkLoginStatus()'s rule exactly so the
   // splash routing and the newsfeed's signed-in UI can never disagree.
@@ -108,11 +94,13 @@ Future<void> main() async {
   final String? donorId = prefs.getString('donorId');
   final bool isLoggedIn = loggedIn && donorId != null && donorId.isNotEmpty;
 
-  runApp(
-    MyApp(
-      isLoggedIn: isLoggedIn,
-    ),
-  );
+  // Load the cached streak first so the bubble shows instantly, then ask the
+  // server to record today (idempotent, and silent if offline).
+  await StreakController.instance.init();
+
+  runApp(MyApp(isLoggedIn: isLoggedIn));
+
+  if (isLoggedIn) unawaited(StreakController.instance.checkIn());
 }
 
 Future<void> _handleTokenRefresh(String token) async {
@@ -139,55 +127,52 @@ Future<void> _handleTokenRefresh(String token) async {
 class MyApp extends StatelessWidget {
   final bool isLoggedIn;
 
-  const MyApp({
-    super.key,
-    required this.isLoggedIn,
-  });
+  const MyApp({super.key, required this.isLoggedIn});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: appNavigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'eDonate',
+
+      // The streak bubble sits above every route (it hides itself on
+      // sensitive screens via StreakBubbleHidden).
+      builder: (context, child) => Stack(
+        fit: StackFit.expand,
+        children: [
+          child ?? const SizedBox.shrink(),
+          const StreakBubbleOverlay(),
+        ],
+      ),
 
       theme: ThemeData(
         useMaterial3: true,
 
         primarySwatch: Colors.red,
 
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFDC2626),
-        ),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFDC2626)),
 
         splashFactory: InkSparkle.splashFactory,
 
-        visualDensity:
-            VisualDensity.adaptivePlatformDensity,
+        visualDensity: VisualDensity.adaptivePlatformDensity,
 
-        pageTransitionsTheme:
-            const PageTransitionsTheme(
+        pageTransitionsTheme: const PageTransitionsTheme(
           builders: {
-            TargetPlatform.android:
-                CupertinoPageTransitionsBuilder(),
+            TargetPlatform.android: CupertinoPageTransitionsBuilder(),
 
-            TargetPlatform.iOS:
-                CupertinoPageTransitionsBuilder(),
+            TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
 
-            TargetPlatform.windows:
-                CupertinoPageTransitionsBuilder(),
+            TargetPlatform.windows: CupertinoPageTransitionsBuilder(),
 
-            TargetPlatform.macOS:
-                CupertinoPageTransitionsBuilder(),
+            TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
 
-            TargetPlatform.linux:
-                CupertinoPageTransitionsBuilder(),
+            TargetPlatform.linux: CupertinoPageTransitionsBuilder(),
           },
         ),
       ),
 
-      home: SplashScreen(
-        isLoggedIn: isLoggedIn,
-      ),
+      home: SplashScreen(isLoggedIn: isLoggedIn),
     );
   }
 }

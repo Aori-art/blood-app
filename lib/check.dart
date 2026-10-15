@@ -7,6 +7,7 @@ import 'anim.dart';
 import 'book.dart';
 import 'config.dart';
 import 'home.dart' show kBottomNavBarHeight;
+import 'streak/streak_hidden.dart';
 
 class Question {
   Question({
@@ -398,7 +399,10 @@ class _CheckScreenState extends State<CheckScreen>
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      StreakBubbleHidden(child: _buildScreen(context));
+
+  Widget _buildScreen(BuildContext context) {
     if (_loading || _checking) {
       return const Scaffold(
         body: Center(

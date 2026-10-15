@@ -2,7 +2,11 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:blood/newsfeed.dart';
+import 'package:blood/privacy_consent.dart';
+import 'package:blood/privacy_statement.dart';
+import 'package:blood/streak/streak_hidden.dart';
 
 class SplashScreen extends StatefulWidget {
   final bool isLoggedIn;
@@ -141,20 +145,35 @@ class _SplashScreenState extends State<SplashScreen>
 
     getFCMToken();
 
-    Timer(const Duration(milliseconds: 3200), () {
+    Timer(const Duration(milliseconds: 3200), () async {
   if (!mounted) return;
+
+  // Privacy gate: anyone who hasn't accepted the current statement version
+  // sees the consent screen first. If preferences can't be read we assume
+  // no consent rather than skipping the gate.
+  var consented = false;
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    consented =
+        prefs.getString(kPrivacyConsentVersionKey) == kPrivacyPolicyVersion;
+  } catch (_) {}
+  if (!mounted) return;
+
   Navigator.pushReplacement(
     context,
     PageRouteBuilder(
       // Signed in and signed out both land on the newsfeed now — it already
       // supports a signed-out state with its own sign-in CTA.
-      pageBuilder: (_, animation, __) => const NewsfeedPage(),
+      pageBuilder: (_, animation, __) => consented
+          ? const NewsfeedPage()
+          : PrivacyConsentScreen(nextBuilder: (_) => const NewsfeedPage()),
       transitionsBuilder: (_, animation, __, child) {
         return FadeTransition(opacity: animation, child: child);
       },
       transitionDuration: const Duration(milliseconds: 500),
     ),
   );
+  if (consented) unawaited(retryPendingPrivacyReceipt());
 });
   }
 
@@ -178,7 +197,10 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      StreakBubbleHidden(child: _buildScreen(context));
+
+  Widget _buildScreen(BuildContext context) {
     final size = MediaQuery.of(context).size;
 
     return Scaffold(

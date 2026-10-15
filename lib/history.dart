@@ -12,7 +12,11 @@ import 'login.dart';
 import 'notification_settings.dart';
 import 'pin_screen.dart'; // PIN: logout reset
 import 'privacy_security.dart';
+import 'privacy_statement.dart';
 import 'shared_design.dart';
+import 'streak/avatar_frame.dart';
+import 'streak/streak_controller.dart';
+import 'streak/streak_ladder_screen.dart';
 import 'verify.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -155,7 +159,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
         debugPrint('Error removing FCM token on logout: ' + e.toString());
       }
     }
-    await prefs.clear();
+    await clearSessionKeepConsent(prefs);
+    StreakController.instance.reset();
     AppSession.homeInStack = false; // PIN: next Home visit asks for the PIN
     if (mounted)
       Navigator.pushAndRemoveUntil(
@@ -345,6 +350,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             if (changed == true) _load(progress: false);
                           }),
                           _menu(
+                            Icons.local_fire_department_rounded,
+                            'Daily Streak',
+                            () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const StreakLadderScreen(),
+                              ),
+                            ),
+                          ),
+                          _menu(
                             Icons.notifications,
                             'Notification Settings',
                             () => Navigator.push(
@@ -488,15 +503,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
     ),
     child: Column(
       children: [
-        CircleAvatar(
-          radius: 44,
-          backgroundColor: kCrimson,
-          child: Text(
-            initials(name),
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
+        ListenableBuilder(
+          listenable: StreakController.instance,
+          builder: (context, _) => StreakAvatarFrame(
+            frameKey: StreakController.instance.equippedFrame,
+            radius: 44,
+            child: CircleAvatar(
+              radius: 44,
+              backgroundColor: kCrimson,
+              child: Text(
+                initials(name),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ),
         ),

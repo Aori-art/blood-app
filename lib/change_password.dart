@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'config.dart';
 import 'profile_page_widgets.dart';
 import 'shared_design.dart';
+import 'streak/streak_hidden.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -100,7 +101,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => ProfilePage(
+  Widget build(BuildContext context) =>
+      StreakBubbleHidden(child: _buildScreen(context));
+
+  Widget _buildScreen(BuildContext context) => ProfilePage(
     title: 'Change Password',
     subtitle: 'Keep your eDonate account secure',
     child: Form(

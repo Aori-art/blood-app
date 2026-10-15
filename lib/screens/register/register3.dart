@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:blood/config.dart';
 import 'package:blood/shared_design.dart';
+import 'package:blood/streak/streak_hidden.dart';
 import 'otp.dart';
 
 class RegisterStep3 extends StatefulWidget {
@@ -133,7 +134,10 @@ class _RegisterStep3State extends State<RegisterStep3> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      StreakBubbleHidden(child: _buildScreen(context));
+
+  Widget _buildScreen(BuildContext context) {
     return Scaffold(
       body: GradientScreen(
         child: Column(

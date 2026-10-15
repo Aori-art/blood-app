@@ -25,6 +25,8 @@ import 'newsfeed.dart';
 import 'donation_history.dart';
 import 'notification_service.dart';
 import 'shared_design.dart';
+import 'streak/avatar_frame.dart';
+import 'streak/streak_controller.dart';
 import 'verify.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -1726,28 +1728,44 @@ class _HomeContentState extends State<HomeContent> {
               ),
               PressableScale(
                 onTap: _navigateToHistory,
-                child: Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white38, width: 2),
-                  ),
-                  child: CircleAvatar(
-                    radius: 22,
-                    backgroundColor: Colors.white24,
-                    child: _digitalId?.donor.photoUrl != null
-                        ? ClipOval(
-                            child: Image.network(
-                              _digitalId!.donor.photoUrl!,
-                              fit: BoxFit.cover,
-                              width: 44,
-                              height: 44,
-                              errorBuilder: (_, _, _) =>
-                                  _headerInitial(firstName),
-                            ),
-                          )
-                        : _headerInitial(firstName),
-                  ),
+                child: ListenableBuilder(
+                  listenable: StreakController.instance,
+                  builder: (context, _) {
+                    final frame = StreakController.instance.equippedFrame;
+                    final avatar = CircleAvatar(
+                      radius: 22,
+                      backgroundColor: Colors.white24,
+                      child: _digitalId?.donor.photoUrl != null
+                          ? ClipOval(
+                              child: Image.network(
+                                _digitalId!.donor.photoUrl!,
+                                fit: BoxFit.cover,
+                                width: 44,
+                                height: 44,
+                                errorBuilder: (_, _, _) =>
+                                    _headerInitial(firstName),
+                              ),
+                            )
+                          : _headerInitial(firstName),
+                    );
+                    // A framed avatar draws its own ring, so the plain white
+                    // outline is only used when no frame is equipped.
+                    if (frame != null && kStreakFrameKeys.contains(frame)) {
+                      return StreakAvatarFrame(
+                        frameKey: frame,
+                        radius: 22,
+                        child: avatar,
+                      );
+                    }
+                    return Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white38, width: 2),
+                      ),
+                      child: avatar,
+                    );
+                  },
                 ),
               ),
             ],

@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:blood/config.dart';
 import 'package:blood/login.dart';
 import 'package:blood/shared_design.dart';
+import 'package:blood/streak/streak_hidden.dart';
 
 class OtpScreen extends StatefulWidget {
   final String email;
@@ -164,7 +165,10 @@ class _OtpScreenState extends State<OtpScreen>
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      StreakBubbleHidden(child: _buildScreen(context));
+
+  Widget _buildScreen(BuildContext context) {
     final filledCount = _controllers.where((c) => c.text.isNotEmpty).length;
 
     return Scaffold(
