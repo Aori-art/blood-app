@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../shared_design.dart';
-import 'blood_bag_mascot.dart';
+import 'dugtong.dart';
 import 'streak_controller.dart';
 
 /// What a line can be filled in with.
@@ -82,7 +82,7 @@ final List<_Pool> _pools = [
       (c) => c.longest > 0 && c.longest == c.n,
     ),
     _Line('My Streak Freeze has your back if you miss a day.', (c) => c.freeze),
-    _Line('Right now I am a {stage}. Keep climbing!', (c) => c.n > 0),
+    _Line('Right now I am {stage}. Keep climbing!', (c) => c.n > 0),
     _Line('Every day you open the app, I get stronger.', (c) => c.n > 0),
     _Line('Open eDonate every day and watch me evolve!'),
     _Line(
@@ -120,16 +120,121 @@ final List<_Pool> _pools = [
   ]),
 ];
 
-/// Picks what the mascot says. Pure logic (no timers or widgets) so it can be
+/// Lines about the screen the donor is on, keyed by StreakScreen id. Screens
+/// without an entry (and 'generic') use the everyday pools above.
+const Map<String, List<_Line>> _screenPools = {
+  'newsfeed': [
+    _Line(
+      'Scrolling can potentially save lives. Someone may need your blood type '
+      'today!',
+    ),
+    _Line('Spot an urgent request? Share it with a friend.'),
+    _Line('Verified donors can tap Donate Now on donation posts.'),
+    _Line('Like the posts that inspire you!'),
+  ],
+  'home': [
+    _Line("Welcome back! Here's your donation summary."),
+    _Line('Check your next eligible date here.'),
+    _Line('Your streak is shown on me. Tap me for the ladder.'),
+    _Line('Everything you need to donate is one tap away.'),
+  ],
+  'book': [
+    _Line('Pick a date and time that works for you.'),
+    _Line('Arrive a few minutes early at the donation center.'),
+    _Line('Eat a healthy meal and drink water first.'),
+    _Line('Booked a slot? Your ticket will show up right here.'),
+  ],
+  'check': [
+    _Line('Answer honestly. It keeps donors and patients safe.'),
+    _Line("Take your time, there's no rush."),
+    _Line("You can retake the check when you're eligible again."),
+    _Line('This quick check makes sure donating is safe for you.'),
+  ],
+  'donation_history': [
+    _Line('Every donation here helped someone. Thank you!'),
+    _Line('Each donation can help save up to 3 lives.'),
+    _Line('Look at all those lifesaving moments!'),
+    _Line('Your donation history is a record of heroism.'),
+  ],
+  'alerts': [
+    _Line('Notifications keep you updated on your appointments.'),
+    _Line('Swipe a notification to delete it.'),
+    _Line('Urgent blood requests near you show up here too.'),
+    _Line('All caught up? Great, you are on top of things!'),
+  ],
+  'profile': [
+    _Line('Looking good! Tap Edit Frame to dress up your photo.'),
+    _Line('Keep your contact details updated so we can reach you.'),
+    _Line('Your profile is your donor identity. Keep it fresh!'),
+    _Line('Frames unlock as your streak grows.'),
+  ],
+  'edit_profile': [
+    _Line(
+      'Update your address or number here. Edits are limited to once every '
+      '7 days.',
+    ),
+    _Line('Double-check your phone number.'),
+    _Line('Accurate details help us reach you when it matters.'),
+    _Line('Take a moment to review everything before saving.'),
+  ],
+  'digital_id': [
+    _Line('This is your Digital Donor ID. Show it at the donation center.'),
+    _Line('Keep your Digital Donor ID handy on donation day.'),
+    _Line('You can save your ID as a PDF for later.'),
+    _Line('Your ID makes check-in at the center quick and easy.'),
+  ],
+  'verify': [
+    _Line('Use a clear photo with all four corners visible.'),
+    _Line('Verified donors unlock the Verified Donor frame!'),
+    _Line('Good lighting helps. Avoid glare and shadows.'),
+    _Line('Make sure the name on your ID matches your profile.'),
+  ],
+  'notification_settings': [
+    _Line('Choose which alerts you want to get.'),
+    _Line('Turn on notifications so you never miss an appointment.'),
+    _Line('You can change these anytime.'),
+    _Line('Only the alerts you want, nothing more.'),
+  ],
+  'privacy_security': [
+    _Line('Your privacy matters. You control your data.'),
+    _Line('Choose a strong password and keep it to yourself.'),
+    _Line('You can change your password here whenever you like.'),
+    _Line('Your information is only used to help you donate.'),
+  ],
+  'help_support': [
+    _Line('Need a hand? The eDonate team is here for you.'),
+    _Line("Can't find an answer? Reach out to the team."),
+    _Line('No question is too small. Just ask!'),
+    _Line('We read every message. Thanks for helping us improve!'),
+  ],
+};
+
+/// On these screens Dugtong only says the screen's own (neutral) lines: no
+/// jokes, greetings, tips or celebrations. Privacy & Security hosts the
+/// delete-account flow.
+const Set<String> _neutralScreens = {'privacy_security'};
+
+/// Picks what Dugtong says. Pure logic (no timers or widgets) so it can be
 /// tested on its own; the overlay decides *when* to speak.
-class MascotChatter {
+class DugtongChatter {
   final math.Random _rand;
   final List<String> _recent = [];
   final List<String> _specials = [];
 
-  MascotChatter({math.Random? random}) : _rand = random ?? math.Random();
+  DugtongChatter({math.Random? random}) : _rand = random ?? math.Random();
 
   static const int _recentLimit = 6;
+
+  /// How often a random line comes from the current screen's pool, when it
+  /// has one.
+  static const double screenChance = 0.6;
+
+  /// Whether [screenId] has lines of its own.
+  static bool hasScreenPool(String screenId) =>
+      _screenPools.containsKey(screenId);
+
+  /// Whether Dugtong must stay neutral on [screenId].
+  static bool isNeutral(String screenId) => _neutralScreens.contains(screenId);
 
   /// Templates currently excluded because they were said recently.
   List<String> get recent => List.unmodifiable(_recent);
@@ -141,15 +246,47 @@ class MascotChatter {
 
   bool get hasSpecial => _specials.isNotEmpty;
 
-  /// Next line to speak for [data], or null if nothing is eligible.
-  String? next(StreakData data, {DateTime? now}) {
+  /// A line about the screen the donor just opened, or null when the screen
+  /// has no pool or everything in it was said recently.
+  String? screenLine(StreakData data, String screenId, {DateTime? now}) {
+    final lines = _screenPools[screenId];
+    if (lines == null) return null;
     final ctx = _ctxFor(data, now ?? DateTime.now());
+    final line = _pick(lines, ctx);
+    return line == null ? null : _remember(line.text, ctx);
+  }
 
-    // Special lines go first, once.
-    while (_specials.isNotEmpty) {
+  _Line? _pick(List<_Line> lines, _Ctx ctx) {
+    final eligible = [
+      for (final line in lines)
+        if ((line.when?.call(ctx) ?? true) &&
+            _usable(line.text, ctx) &&
+            !_recent.contains(line.text))
+          line,
+    ];
+    if (eligible.isEmpty) return null;
+    return eligible[_rand.nextInt(eligible.length)];
+  }
+
+  /// Next line to speak for [data], or null if nothing is eligible. About 60 %
+  /// of the time it comes from [screenId]'s pool (if it has one), the rest
+  /// from the everyday pools.
+  String? next(StreakData data, {DateTime? now, String screenId = 'generic'}) {
+    final ctx = _ctxFor(data, now ?? DateTime.now());
+    final neutral = isNeutral(screenId);
+
+    // Special lines go first, once. (Not on neutral screens: they wait.)
+    while (!neutral && _specials.isNotEmpty) {
       final template = _specials.removeAt(0);
       if (_usable(template, ctx)) return _remember(template, ctx);
     }
+
+    final screenLines = _screenPools[screenId];
+    if (screenLines != null && (neutral || _rand.nextDouble() < screenChance)) {
+      final line = _pick(screenLines, ctx);
+      if (line != null) return _remember(line.text, ctx);
+    }
+    if (neutral) return null;
 
     for (var attempt = 0; attempt < 2; attempt++) {
       final eligible = <_Pool, List<_Line>>{};
@@ -198,7 +335,7 @@ class MascotChatter {
           ? null
           : (next.remaining ?? next.days - data.current),
       label: (next != null && next.label.isNotEmpty) ? next.label : null,
-      stage: mascotStageFor(data.current).stageName,
+      stage: dugtongStageFor(data.current).stageName,
       freeze: data.freezeAvailable,
       verified: data.isVerified,
       hour: now.hour,
@@ -224,12 +361,18 @@ class MascotChatter {
   static List<String> get allTemplates => [
     for (final pool in _pools) ...pool.lines.map((l) => l.text),
   ];
+
+  /// Every screen line, by screen id.
+  static Map<String, List<String>> get screenTemplates => {
+    for (final e in _screenPools.entries)
+      e.key: [for (final l in e.value) l.text],
+  };
 }
 
 // ─── The speech bubble ─────────────────────────────────────────────────────
 
-/// A rounded white card with a small tail pointing at the mascot.
-class MascotSpeechBubble extends StatelessWidget {
+/// A rounded white card with a small tail pointing at Dugtong.
+class DugtongSpeechBubble extends StatelessWidget {
   static const double maxWidth = 190;
   static const double tailWidth = 8;
   static const TextStyle textStyle = TextStyle(
@@ -244,13 +387,13 @@ class MascotSpeechBubble extends StatelessWidget {
 
   final String text;
 
-  /// True when the mascot is on the bubble's right (so the tail is too).
+  /// True when Dugtong is on the bubble's right (so the tail is too).
   final bool tailOnRight;
 
   /// Vertical position of the tail tip, in pixels from the bubble's top.
   final double tailTop;
 
-  const MascotSpeechBubble({
+  const DugtongSpeechBubble({
     super.key,
     required this.text,
     required this.tailOnRight,

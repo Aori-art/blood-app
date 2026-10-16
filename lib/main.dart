@@ -13,6 +13,7 @@ import 'notification_service.dart';
 import 'splash_screen/splash_screen.dart';
 import 'streak/streak_bubble.dart';
 import 'streak/streak_controller.dart';
+import 'streak/streak_screen.dart';
 
 /// The floating streak bubble lives above the Navigator, so it reaches routes,
 /// dialogs and sheets through this key.
@@ -100,7 +101,7 @@ Future<void> main() async {
 
   runApp(MyApp(isLoggedIn: isLoggedIn));
 
-  if (isLoggedIn) unawaited(StreakController.instance.checkIn());
+  if (isLoggedIn) unawaited(StreakController.instance.onLoggedIn());
 }
 
 Future<void> _handleTokenRefresh(String token) async {
@@ -136,8 +137,10 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'eDonate',
 
-      // The streak bubble sits above every route (it hides itself on
-      // sensitive screens via StreakBubbleHidden).
+      // Dugtong's floating bubble sits above every route. Each screen reports
+      // itself with StreakScreen, and this observer follows the navigation.
+      navigatorObservers: [streakRouteObserver],
+
       builder: (context, child) => Stack(
         fit: StackFit.expand,
         children: [

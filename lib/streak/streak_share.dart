@@ -8,16 +8,16 @@ import 'package:share_plus/share_plus.dart';
 
 import '../main.dart' show appNavigatorKey;
 import '../shared_design.dart';
-import 'blood_bag_mascot.dart';
+import 'dugtong.dart';
 
 /// The picture that gets shared. Fixed 360 x 450 logical size, and it holds
-/// no personal data: no name, email or ID — only the streak and the mascot.
+/// no personal data: no name, email or ID — only the streak and Dugtong.
 class StreakShareCard extends StatelessWidget {
   static const double width = 360;
   static const double height = 450;
 
   final int streak;
-  final MascotStage stage;
+  final DugtongStage stage;
 
   const StreakShareCard({super.key, required this.streak, required this.stage});
 
@@ -68,7 +68,7 @@ class StreakShareCard extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    BloodBagMascot(
+                    Dugtong(
                       size: 190,
                       streak: streak,
                       stage: stage,
@@ -145,7 +145,7 @@ class StreakShareCard extends StatelessWidget {
 Future<File> renderStreakShareImage(
   BuildContext context, {
   required int streak,
-  required MascotStage stage,
+  required DugtongStage stage,
 }) async {
   final overlay =
       Overlay.maybeOf(context, rootOverlay: true) ??
@@ -193,7 +193,7 @@ Future<File> renderStreakShareImage(
 Future<void> shareStreak(
   BuildContext context, {
   required int streak,
-  required MascotStage stage,
+  required DugtongStage stage,
   Rect? origin,
 }) async {
   final file = await renderStreakShareImage(
@@ -204,8 +204,8 @@ Future<void> shareStreak(
   await SharePlus.instance.share(
     ShareParams(
       text:
-          "I'm on a $streak-day streak on eDonate! Join me and help save lives. "
-          '#EveryDropCounts',
+          "I'm on a $streak-day streak with Dugtong on eDonate! Join me and help "
+          'save lives. #EveryDropCounts',
       files: [XFile(file.path, mimeType: 'image/png')],
       sharePositionOrigin: origin,
     ),

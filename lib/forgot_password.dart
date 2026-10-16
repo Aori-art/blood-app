@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 
 import 'config.dart';
 import 'login.dart';
-import 'streak/streak_hidden.dart';
+import 'streak/streak_screen.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -117,7 +117,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
 
   @override
   Widget build(BuildContext context) =>
-      StreakBubbleHidden(child: _buildScreen(context));
+      StreakScreen(id: 'forgot_password', hideBubble: true, child: _buildScreen(context));
 
   Widget _buildScreen(BuildContext context) {
     final size = MediaQuery.of(context).size;

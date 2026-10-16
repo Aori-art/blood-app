@@ -12,7 +12,8 @@ import 'home.dart';
 import 'login.dart';
 import 'privacy_statement.dart';
 import 'streak/streak_controller.dart';
-import 'streak/streak_hidden.dart';
+import 'unread_notifications.dart';
+import 'donor_avatar.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // eDonate PIN — a 4-digit PIN (like GCash's MPIN) that protects Home.
@@ -621,7 +622,11 @@ class _PinScreenState extends State<PinScreen> with TickerProviderStateMixin {
       } catch (_) {}
     }
     await clearSessionKeepConsent(prefs);
-    StreakController.instance.reset();
+    StreakController.instance.onLoggedOut();
+    UnreadNotifications.instance
+      ..stop()
+      ..clear();
+    MyAvatar.instance.clear();
     AppSession.homeInStack = false;
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
@@ -668,8 +673,7 @@ class _PinScreenState extends State<PinScreen> with TickerProviderStateMixin {
   // ── Build ──────────────────────────────────────────────────────────────
 
   @override
-  Widget build(BuildContext context) =>
-      StreakBubbleHidden(child: _buildScreen(context));
+  Widget build(BuildContext context) => _buildScreen(context);
 
   Widget _buildScreen(BuildContext context) {
     final mq = MediaQuery.of(context);

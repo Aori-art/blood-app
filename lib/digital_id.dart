@@ -17,7 +17,7 @@ import 'book.dart';
 import 'digital_id_service.dart';
 import 'newsfeed.dart' show resolveMediaUrl;
 import 'shared_design.dart';
-import 'streak/streak_hidden.dart';
+import 'streak/streak_screen.dart';
 
 // Fixed design canvas every ID card is authored at, then uniformly scaled
 // (via FittedBox) to whatever box it's actually shown or captured in — so
@@ -449,7 +449,7 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
 
   @override
   Widget build(BuildContext context) =>
-      StreakBubbleHidden(child: _buildScreen(context));
+      StreakScreen(id: 'digital_id', child: _buildScreen(context));
 
   Widget _buildScreen(BuildContext context) => Scaffold(
     backgroundColor: const Color(0xFFF9FAFB),

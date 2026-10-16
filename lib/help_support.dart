@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'streak/streak_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -84,7 +85,10 @@ Thank you.''';
   );
 
   @override
-  Widget build(BuildContext context) => ProfilePage(
+  Widget build(BuildContext context) =>
+      StreakScreen(id: 'help_support', child: _buildScreen(context));
+
+  Widget _buildScreen(BuildContext context) => ProfilePage(
     title: 'Help & Support',
     subtitle: "We're here to help",
     child: Column(

@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../shared_design.dart';
-import 'mascot_stage_art.dart';
+import 'dugtong_stage_art.dart';
 
 /// Frame keys the app knows how to draw.
 const Set<String> kStreakFrameKeys = {
@@ -445,3 +445,9 @@ class _FramePainter extends CustomPainter {
       old.progress != progress ||
       old.shimmer != shimmer;
 }
+
+/// The side of the square a framed avatar of [radius] takes up: the photo plus
+/// the ring and its gap on every side. Lists use it to reserve the same room
+/// for every row, framed or not.
+double streakFrameExtent(double radius) =>
+    2 * radius + 2 * (math.max(3.0, radius * 0.12) + 2.0);

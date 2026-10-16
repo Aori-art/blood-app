@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'streak/streak_screen.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -373,7 +374,10 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
       Container(width: 1, height: 34, color: const Color(0xFFE5E7EB));
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      StreakScreen(id: 'donation_history', child: _buildScreen(context));
+
+  Widget _buildScreen(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       body: Column(

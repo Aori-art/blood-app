@@ -7,12 +7,16 @@ import 'package:flutter/services.dart';
 import '../home.dart' show kBottomNavBarHeight;
 import '../main.dart' show appNavigatorKey;
 import '../shared_design.dart';
-import 'blood_bag_mascot.dart';
-import 'mascot_chatter.dart';
+import 'dugtong.dart';
+import 'dugtong_chatter.dart';
 import 'milestone_celebration.dart';
 import 'streak_controller.dart';
 import 'streak_ladder_screen.dart';
 import 'streak_particles.dart';
+
+/// Tests set this to make the bubble's timing and chat choices repeatable.
+@visibleForTesting
+math.Random? debugStreakRandom;
 
 /// The assistive-touch style floating streak bubble. Mounted once, above the
 /// Navigator, so it navigates and shows sheets through [appNavigatorKey].
@@ -33,8 +37,10 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
   static const int _burstMs = 2500;
 
   final StreakController _c = StreakController.instance;
-  final MascotChatter _chatter = MascotChatter();
-  final math.Random _rand = math.Random();
+  late final DugtongChatter _chatter = DugtongChatter(
+    random: debugStreakRandom,
+  );
+  final math.Random _rand = debugStreakRandom ?? math.Random();
 
   late final AnimationController _snap;
   late final AnimationController _burst;
@@ -71,7 +77,7 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
   Timer? _celebrateTimer;
   int _seenReset = 0;
 
-  // Mascot chat.
+  // Dugtong chat.
   Timer? _chatTimer;
   Timer? _chatHideTimer;
   String? _chatText;
@@ -79,6 +85,10 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
   bool _foreground = true;
   bool _wasVisible = false;
   bool _lastChatEnabled = true;
+  String _lastScreenId = 'generic';
+  Timer? _screenChatTimer;
+  bool _screenChatCooling = false;
+  Timer? _screenChatCooldown;
 
   // Full-screen celebrations.
   bool _celebrationOpen = false;
@@ -88,7 +98,7 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
       _c.loggedIn &&
       _c.data != null &&
       _c.showBubblePref &&
-      _c.hiddenCount == 0;
+      !_c.currentScreenHidden;
 
   bool get _reduceMotion =>
       MediaQuery.maybeOf(context)?.disableAnimations ?? false;
@@ -123,6 +133,8 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
     _celebrateTimer?.cancel();
     _chatTimer?.cancel();
     _chatHideTimer?.cancel();
+    _screenChatTimer?.cancel();
+    _screenChatCooldown?.cancel();
     _snap.dispose();
     _burst.dispose();
     super.dispose();
@@ -183,6 +195,11 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
         _hideChat(reschedule: false);
       }
     }
+    // A new screen: maybe say something about it in a moment.
+    if (_c.currentScreenId != _lastScreenId) {
+      _lastScreenId = _c.currentScreenId;
+      _planScreenChat(_lastScreenId);
+    }
     _wasVisible = visible;
 
     setState(() {});
@@ -228,7 +245,7 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
     if (_idle) setState(() => _idle = false);
   }
 
-  // ─── Mascot chat ────────────────────────────────────────────────────────
+  // ─── Dugtong chat ────────────────────────────────────────────────────────
 
   bool get _chatPossible =>
       _visible && _c.chatEnabled && _foreground && !_celebrationOpen;
@@ -246,23 +263,57 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
   void _tryChat() {
     _chatTimer = null;
     if (!mounted || !_chatPossible) return;
-    if (_dragging || _celebrating || _chatShowing || _c.hiddenCount > 0) {
+    if (_dragging || _celebrating || _chatShowing || _c.currentScreenHidden) {
       _chatTimer = Timer(const Duration(seconds: 10), _tryChat);
       return;
     }
     final data = _c.data;
     if (data == null) return;
-    final text = _chatter.next(data);
+    final text = _chatter.next(data, screenId: _c.currentScreenId);
     if (text == null) {
       _scheduleChat();
       return;
     }
+    _showChat(text);
+  }
+
+  void _showChat(String text) {
     setState(() {
       _chatText = text;
       _chatShowing = true;
     });
     _chatHideTimer?.cancel();
     _chatHideTimer = Timer(const Duration(milliseconds: 4500), _hideChat);
+  }
+
+  // A couple of seconds after the donor opens a screen (2-3 s), Dugtong
+  // may say a line about it: 60 % of the time, and at most once a minute.
+  void _planScreenChat(String screenId) {
+    _screenChatTimer?.cancel();
+    _screenChatTimer = null;
+    if (!_chatPossible || _screenChatCooling) return;
+    if (!DugtongChatter.hasScreenPool(screenId)) return;
+    if (_rand.nextDouble() >= DugtongChatter.screenChance) return;
+    _screenChatTimer = Timer(
+      Duration(milliseconds: 2000 + _rand.nextInt(1001)),
+      () => _sayScreenLine(screenId),
+    );
+  }
+
+  void _sayScreenLine(String screenId) {
+    _screenChatTimer = null;
+    if (!mounted || !_chatPossible || _c.currentScreenId != screenId) return;
+    if (_dragging || _celebrating || _chatShowing) return;
+    final data = _c.data;
+    if (data == null) return;
+    final text = _chatter.screenLine(data, screenId);
+    if (text == null) return;
+    _screenChatCooling = true;
+    _screenChatCooldown?.cancel();
+    _screenChatCooldown = Timer(const Duration(seconds: 60), () {
+      _screenChatCooling = false;
+    });
+    _showChat(text);
   }
 
   void _hideChat({bool reschedule = true}) {
@@ -487,16 +538,12 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
   // sensitive screen — they wait in the queue until it's allowed.
   Future<void> _maybeShowCelebration() async {
     if (_celebrationBusy || !_c.hasCelebration || _celebrating) return;
-    if (!_c.loggedIn || _c.hiddenCount > 0 || !_foreground) return;
+    if (!_c.celebrationAllowed || !_foreground) return;
     _celebrationBusy = true;
     try {
       await Future<void>.delayed(const Duration(milliseconds: 500));
-      // Re-check: a sensitive screen may have opened while we waited.
-      if (!mounted ||
-          !_c.loggedIn ||
-          _c.hiddenCount > 0 ||
-          _celebrating ||
-          !_foreground) {
+      // Re-check: the donor may have moved to a login screen while we waited.
+      if (!mounted || !_c.celebrationAllowed || _celebrating || !_foreground) {
         return;
       }
       final event = _c.takeCelebration();
@@ -506,6 +553,12 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
       final origin = _bubbleCenter();
       setState(() => _celebrationOpen = true);
       await showMilestoneCelebration(event: event, origin: origin);
+      // Dugtong has something to say about it once the show is over.
+      if (event.evolved) {
+        _chatter.queueSpecial('Look at me, I evolved into {stage}!');
+      } else if (event.hasCount) {
+        _chatter.queueSpecial('Day {n}! You did it again!');
+      }
     } finally {
       _celebrationBusy = false;
       if (mounted && _celebrationOpen) setState(() => _celebrationOpen = false);
@@ -672,11 +725,11 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
     );
   }
 
-  // The speech bubble beside the mascot, on the side facing the screen centre.
+  // The speech bubble beside Dugtong, on the side facing the screen centre.
   Widget _chatBubble(Offset pos, bool onRight) {
     final text = _chatText;
     if (text == null) return const SizedBox.shrink();
-    final size = MascotSpeechBubble.measure(text);
+    final size = DugtongSpeechBubble.measure(text);
     final bagCenterY = pos.dy + _size / 2;
     final minTop = _safe.top + 8;
     final maxTop = math.max(
@@ -705,7 +758,7 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: _hideChat,
-              child: MascotSpeechBubble(
+              child: DugtongSpeechBubble(
                 text: text,
                 tailOnRight: onRight,
                 tailTop: bagCenterY - top,
@@ -719,13 +772,13 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
 
   Widget _bubble() {
     final streak = _c.data?.current ?? 0;
-    final MascotMood mood = _dragging
-        ? MascotMood.dragging
+    final DugtongMood mood = _dragging
+        ? DugtongMood.dragging
         : _celebrating
-        ? MascotMood.celebrate
+        ? DugtongMood.celebrate
         : _chatShowing
-        ? MascotMood.talking
-        : (streak == 0 ? MascotMood.sleepy : MascotMood.idle);
+        ? DugtongMood.talking
+        : (streak == 0 ? DugtongMood.sleepy : DugtongMood.idle);
     final rolling = _celebrating && !_reduceMotion;
     return Listener(
       behavior: HitTestBehavior.opaque,
@@ -745,7 +798,7 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
             scale: _idle ? 0.9 : 1,
             child: Transform.translate(
               offset: Offset(0, rolling ? _jumpOffset() : 0),
-              child: BloodBagMascot(
+              child: Dugtong(
                 size: _size,
                 streak: streak,
                 mood: mood,

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:app_settings/app_settings.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'streak/streak_screen.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -162,7 +163,10 @@ class _NotificationSettingsScreenState
   }
 
   @override
-  Widget build(BuildContext context) => ProfilePage(
+  Widget build(BuildContext context) =>
+      StreakScreen(id: 'notification_settings', child: _buildScreen(context));
+
+  Widget _buildScreen(BuildContext context) => ProfilePage(
     title: 'Notification Settings',
     subtitle: 'Control how eDonate notifies you',
     child: loading

@@ -12,7 +12,8 @@ import 'screens/register/register1.dart';
 import 'shared_design.dart';
 import 'forgot_password.dart';
 import 'streak/streak_controller.dart';
-import 'streak/streak_hidden.dart';
+import 'unread_notifications.dart';
+import 'streak/streak_screen.dart';
 
 // Design tokens now come from shared_design.dart (kCrimson, kSurface, etc.)
 // so this screen matches the rest of the app instead of its own palette.
@@ -102,8 +103,11 @@ class _LoginScreenState extends State<LoginScreen>
           await prefs.setString('userName', data['user_name']);
         if (data['donor_id'] != null)
           await prefs.setString('donorId', data['donor_id'].toString());
-        // Count today's open for the new session (server is idempotent).
-        unawaited(StreakController.instance.checkIn());
+        // Tell the streak the donor is signed in, before leaving this screen:
+        // it loads the cache and counts today (the server is idempotent).
+        unawaited(StreakController.instance.onLoggedIn());
+        // Start counting unread notifications for the Alerts badge.
+        UnreadNotifications.instance.start();
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const NewsfeedPage()),
@@ -152,7 +156,7 @@ class _LoginScreenState extends State<LoginScreen>
 
   @override
   Widget build(BuildContext context) =>
-      StreakBubbleHidden(child: _buildScreen(context));
+      StreakScreen(id: 'login', hideBubble: true, child: _buildScreen(context));
 
   Widget _buildScreen(BuildContext context) {
     final h = MediaQuery.of(context).size.height;

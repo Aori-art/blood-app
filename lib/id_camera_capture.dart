@@ -9,7 +9,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'config.dart';
 import 'shared_design.dart';
-import 'streak/streak_hidden.dart';
+import 'streak/streak_screen.dart';
 
 enum _CaptureStep {
   selectType,
@@ -237,7 +237,7 @@ class _IdCameraCaptureScreenState extends State<IdCameraCaptureScreen>
 
   @override
   Widget build(BuildContext context) =>
-      StreakBubbleHidden(child: _buildScreen(context));
+      StreakScreen(id: 'verify', child: _buildScreen(context));
 
   Widget _buildScreen(BuildContext context) => Scaffold(
     backgroundColor: const Color(0xFFF9FAFB),

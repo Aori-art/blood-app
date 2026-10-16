@@ -2,49 +2,60 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import 'mascot_stage_art.dart';
+import 'dugtong_stage_art.dart';
 
-export 'mascot_stage_art.dart'
-    show MascotStage, MascotStageInfo, kMascotStageThresholds, mascotStageFor;
+export 'dugtong_stage_art.dart'
+    show
+        DugtongStage,
+        DugtongStageInfo,
+        kDugtongStageThresholds,
+        dugtongStageFor,
+        stageHasCapeOrWings;
 
-enum MascotMood { idle, dragging, celebrate, sleepy, talking }
+/// How Dugtong feels. [picked] is "being held" (the interactive Dugtong on the
+/// ladder), [dizzy] shows spiral eyes.
+enum DugtongMood { idle, dragging, celebrate, sleepy, talking, dizzy, picked }
 
-/// A cute blood-bag mascot drawn with [CustomPaint]. It evolves with the
-/// streak (see [mascotStageFor]), blinks, follows [look] with its pupils and
+/// Dugtong, a cute blood bag drawn with [CustomPaint]. It evolves with the
+/// streak (see [dugtongStageFor]), blinks, follows [look] with its pupils and
 /// changes face with [mood]. The streak number is printed on its label.
-class BloodBagMascot extends StatefulWidget {
+class Dugtong extends StatefulWidget {
   final double size;
   final int streak;
-  final MascotMood mood;
+  final DugtongMood mood;
 
   /// Where the pupils should look, each axis in -1..1 (drag direction).
   final Offset look;
 
   /// Previews can force a stage; otherwise it comes from [streak].
-  final MascotStage? stage;
+  final DugtongStage? stage;
 
   /// False draws one still frame (used for share images).
   final bool animate;
+
+  /// 0..1: how hard the cape and wings flutter (a tap reaction).
+  final double flutter;
 
   /// While [rollProgress] < 1 the label rolls like an odometer from this
   /// number to [streak].
   final int? rollFrom;
   final double rollProgress;
 
-  const BloodBagMascot({
+  const Dugtong({
     super.key,
     this.size = 58,
     required this.streak,
-    this.mood = MascotMood.idle,
+    this.mood = DugtongMood.idle,
     this.look = Offset.zero,
     this.stage,
     this.animate = true,
+    this.flutter = 0,
     this.rollFrom,
     this.rollProgress = 1,
   });
 
   @override
-  State<BloodBagMascot> createState() => _BloodBagMascotState();
+  State<Dugtong> createState() => _DugtongState();
 }
 
 class _Glyph {
@@ -61,8 +72,7 @@ class _Roll {
   const _Roll(this.glyphs, this.cellWidth, this.height);
 }
 
-class _BloodBagMascotState extends State<BloodBagMascot>
-    with SingleTickerProviderStateMixin {
+class _DugtongState extends State<Dugtong> with SingleTickerProviderStateMixin {
   // The only controller: a 2 s loop that drives the bob, idle pupil drift and
   // celebration sparkles. Blinking, talking and the release squash are derived
   // from timestamps so they need no controllers of their own.
@@ -76,7 +86,7 @@ class _BloodBagMascotState extends State<BloodBagMascot>
   late TextPainter _label = _buildLabel();
   _Roll? _roll;
 
-  MascotStage get _stage => widget.stage ?? mascotStageFor(widget.streak);
+  DugtongStage get _stage => widget.stage ?? dugtongStageFor(widget.streak);
   bool get _detail => widget.size >= 72;
 
   Duration _blinkDelay() =>
@@ -110,9 +120,10 @@ class _BloodBagMascotState extends State<BloodBagMascot>
   }
 
   @override
-  void didUpdateWidget(covariant BloodBagMascot old) {
+  void didUpdateWidget(covariant Dugtong old) {
     super.didUpdateWidget(old);
-    if (old.mood == MascotMood.dragging && widget.mood != MascotMood.dragging) {
+    if (old.mood == DugtongMood.dragging &&
+        widget.mood != DugtongMood.dragging) {
       _squashStart = DateTime.now();
     }
     if (old.streak != widget.streak ||
@@ -145,7 +156,7 @@ class _BloodBagMascotState extends State<BloodBagMascot>
     text: TextSpan(
       text: text,
       style: TextStyle(
-        color: mascotLookFor(_stage).number,
+        color: dugtongLookFor(_stage).number,
         fontWeight: FontWeight.w900,
         fontSize: fontSize,
         height: 1.0,
@@ -179,7 +190,7 @@ class _BloodBagMascotState extends State<BloodBagMascot>
     );
   }
 
-  _MascotPainter _frame(double t, {required bool animating}) {
+  _DugtongPainter _frame(double t, {required bool animating}) {
     final now = DateTime.now();
     var blink = 0.0;
     if (animating) {
@@ -196,7 +207,8 @@ class _BloodBagMascotState extends State<BloodBagMascot>
       }
     }
 
-    final dragging = widget.mood == MascotMood.dragging;
+    final dragging = widget.mood == DugtongMood.dragging;
+    final held = dragging || widget.mood == DugtongMood.picked;
     final look = Offset(
       widget.look.dx.clamp(-1.0, 1.0),
       widget.look.dy.clamp(-1.0, 1.0),
@@ -207,7 +219,7 @@ class _BloodBagMascotState extends State<BloodBagMascot>
             math.cos(t * 2 * math.pi) * 0.12,
           )
         : Offset.zero;
-    final target = (dragging || look != Offset.zero) ? look : idleDrift;
+    final target = (held || look != Offset.zero) ? look : idleDrift;
     _pupil = Offset.lerp(_pupil, target, animating ? 0.2 : 1)!;
 
     final tiltTarget = dragging ? look.dx * 0.24 : 0.0;
@@ -227,12 +239,13 @@ class _BloodBagMascotState extends State<BloodBagMascot>
     }
 
     final ms = now.millisecondsSinceEpoch;
-    return _MascotPainter(
+    return _DugtongPainter(
       stage: _stage,
       detail: _detail,
       t: animating ? t : 0,
       slow: animating ? (ms % 8000) / 8000.0 : 0.12,
       talk: animating ? (ms % 420) / 420.0 : 0.25,
+      flutter: widget.flutter,
       mood: widget.mood,
       pupil: _pupil,
       blink: blink,
@@ -266,13 +279,14 @@ class _BloodBagMascotState extends State<BloodBagMascot>
   }
 }
 
-class _MascotPainter extends CustomPainter {
-  final MascotStage stage;
+class _DugtongPainter extends CustomPainter {
+  final DugtongStage stage;
   final bool detail;
   final double t;
   final double slow;
   final double talk;
-  final MascotMood mood;
+  final double flutter;
+  final DugtongMood mood;
   final Offset pupil;
   final double blink;
   final double bob;
@@ -283,12 +297,13 @@ class _MascotPainter extends CustomPainter {
   final _Roll? roll;
   final double rollProgress;
 
-  _MascotPainter({
+  _DugtongPainter({
     required this.stage,
     required this.detail,
     required this.t,
     required this.slow,
     required this.talk,
+    required this.flutter,
     required this.mood,
     required this.pupil,
     required this.blink,
@@ -303,7 +318,7 @@ class _MascotPainter extends CustomPainter {
 
   static const Color _mouthInside = Color(0xFF450A0A);
 
-  MascotLook get _look => mascotLookFor(stage);
+  DugtongLook get _look => dugtongLookFor(stage);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -331,35 +346,36 @@ class _MascotPainter extends CustomPainter {
     final body = _bodyRRect(s);
 
     // Behind the body.
-    artWings(canvas, s, stage, t);
-    artCape(canvas, s, stage, t);
-    if (detail && stage == MascotStage.champion) artLaurels(canvas, s);
+    artWings(canvas, s, stage, t, flutter: flutter);
+    artCape(canvas, s, stage, t, flutter: flutter);
+    if (detail && stage == DugtongStage.champion) artLaurels(canvas, s);
 
     _tube(canvas, s);
     _tab(canvas, s);
     _body(canvas, s, body);
     _highlight(canvas, s);
-    if (stage == MascotStage.platinumAura) {
+    if (stage == DugtongStage.platinumAura) {
       artIcy(canvas, s, body);
       if (detail) artShimmer(canvas, s, body, slow);
     }
-    if (stage == MascotStage.spark) artHeadband(canvas, s, body);
+    if (stage == DugtongStage.spark) artHeadband(canvas, s, body);
 
     _face(canvas, s);
-    if (detail && stage == MascotStage.crimsonHero) artEyebrows(canvas, s);
+    if (detail && stage == DugtongStage.crimsonHero) artEyebrows(canvas, s);
     _labelPlate(canvas, s);
 
     // In front of everything else.
-    if (stage == MascotStage.guardian) artHalo(canvas, s);
-    if (stage == MascotStage.legend) artCrown(canvas, s, detail: detail);
+    if (stage == DugtongStage.guardian) artHalo(canvas, s);
+    if (stage == DugtongStage.legend) artCrown(canvas, s, detail: detail);
     if (detail) {
-      if (stage == MascotStage.spark || stage == MascotStage.guardian) {
+      if (stage == DugtongStage.spark || stage == DugtongStage.guardian) {
         artGlints(canvas, s, stage, t);
       }
-      if (stage == MascotStage.platinumAura) artOrbitingDrops(canvas, s, slow);
-      if (stage == MascotStage.legend) artFloatingHearts(canvas, s, t);
+      if (stage == DugtongStage.platinumAura) artOrbitingDrops(canvas, s, slow);
+      if (stage == DugtongStage.legend) artFloatingHearts(canvas, s, t);
     }
-    if (mood == MascotMood.celebrate) _celebration(canvas, s);
+    if (mood == DugtongMood.celebrate) _celebration(canvas, s);
+    if (mood == DugtongMood.dizzy) _dizzyStars(canvas, s);
 
     canvas.restore();
     canvas.restore();
@@ -499,12 +515,17 @@ class _MascotPainter extends CustomPainter {
   }
 
   void _eye(Canvas canvas, double s, Offset center) {
-    final sleepy = mood == MascotMood.sleepy;
+    final sleepy = mood == DugtongMood.sleepy;
     final openness = sleepy ? 1.0 : (1 - blink * 0.92);
     final rx = s * 0.085;
     final ry = s * 0.098 * openness.clamp(0.08, 1.0);
     final eye = Rect.fromCenter(center: center, width: rx * 2, height: ry * 2);
     canvas.drawOval(eye, Paint()..color = Colors.white);
+
+    if (mood == DugtongMood.dizzy) {
+      _spiral(canvas, s, center, rx);
+      return;
+    }
 
     if (openness > 0.3) {
       canvas.save();
@@ -549,6 +570,46 @@ class _MascotPainter extends CustomPainter {
     }
   }
 
+  // A hypnotic spiral that turns with the animation loop.
+  void _spiral(Canvas canvas, double s, Offset center, double radius) {
+    final path = Path();
+    const turns = 2.4;
+    const steps = 48;
+    final spin = t * 2 * math.pi * 2;
+    for (var i = 0; i <= steps; i++) {
+      final u = i / steps;
+      final r = radius * 0.86 * u;
+      final a = spin + u * turns * 2 * math.pi;
+      final p = center + Offset(math.cos(a) * r, math.sin(a) * r);
+      if (i == 0) {
+        path.moveTo(p.dx, p.dy);
+      } else {
+        path.lineTo(p.dx, p.dy);
+      }
+    }
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = s * 0.014
+        ..color = const Color(0xFF1F2937),
+    );
+  }
+
+  // Little stars circling above the head while dizzy.
+  void _dizzyStars(Canvas canvas, double s) {
+    final paint = Paint()..color = const Color(0xFFFFE082);
+    for (var i = 0; i < 3; i++) {
+      final a = t * 2 * math.pi * 2 + i * 2 * math.pi / 3;
+      final p = Offset(
+        s * 0.5 + math.cos(a) * s * 0.3,
+        s * 0.06 + math.sin(a) * s * 0.045,
+      );
+      artStar(canvas, p, s * 0.045, paint);
+    }
+  }
+
   void _mouth(Canvas canvas, double s) {
     final line = Paint()
       ..style = PaintingStyle.stroke
@@ -556,14 +617,26 @@ class _MascotPainter extends CustomPainter {
       ..strokeWidth = s * 0.024
       ..color = Colors.white;
     switch (mood) {
-      case MascotMood.idle:
+      case DugtongMood.idle:
         canvas.drawPath(
           Path()
             ..moveTo(s * 0.44, s * 0.52)
             ..quadraticBezierTo(s * 0.5, s * 0.585, s * 0.56, s * 0.52),
           line,
         );
-      case MascotMood.dragging:
+      case DugtongMood.dizzy:
+        final wave = Path()..moveTo(s * 0.42, s * 0.54);
+        for (var i = 1; i <= 4; i++) {
+          wave.quadraticBezierTo(
+            s * (0.42 + 0.04 * (i - 0.5)),
+            s * (0.54 + (i.isOdd ? -0.025 : 0.025)),
+            s * (0.42 + 0.04 * i),
+            s * 0.54,
+          );
+        }
+        canvas.drawPath(wave, line);
+      case DugtongMood.picked:
+      case DugtongMood.dragging:
         final o = Rect.fromCenter(
           center: Offset(s * 0.5, s * 0.545),
           width: s * 0.06,
@@ -577,7 +650,7 @@ class _MascotPainter extends CustomPainter {
             ..strokeWidth = s * 0.014
             ..color = Colors.white,
         );
-      case MascotMood.talking:
+      case DugtongMood.talking:
         final open = 0.5 + 0.5 * math.sin(talk * 2 * math.pi);
         final m = Rect.fromCenter(
           center: Offset(s * 0.5, s * (0.532 + 0.014 * open)),
@@ -605,7 +678,7 @@ class _MascotPainter extends CustomPainter {
           );
           canvas.restore();
         }
-      case MascotMood.celebrate:
+      case DugtongMood.celebrate:
         final mouth = Path()
           ..moveTo(s * 0.4, s * 0.505)
           ..lineTo(s * 0.6, s * 0.505)
@@ -627,7 +700,7 @@ class _MascotPainter extends CustomPainter {
           Paint()..color = Colors.white,
         );
         canvas.restore();
-      case MascotMood.sleepy:
+      case DugtongMood.sleepy:
         canvas.drawLine(
           Offset(s * 0.45, s * 0.545),
           Offset(s * 0.55, s * 0.545),
@@ -664,7 +737,7 @@ class _MascotPainter extends CustomPainter {
           ..color = Colors.white.withValues(alpha: .55),
       );
     }
-    if (stage == MascotStage.legend) {
+    if (stage == DugtongStage.legend) {
       // Shimmer across the gold label.
       canvas.save();
       canvas.clipRRect(plate);
@@ -754,5 +827,5 @@ class _MascotPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _MascotPainter old) => true;
+  bool shouldRepaint(covariant _DugtongPainter old) => true;
 }

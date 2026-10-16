@@ -3,12 +3,26 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../shared_design.dart';
 import 'avatar_frame.dart';
-import 'blood_bag_mascot.dart';
+import 'dugtong.dart';
+import 'interactive_dugtong.dart';
 import 'streak_controller.dart';
-import 'streak_hidden.dart';
+import 'streak_screen.dart';
 import 'streak_share.dart';
 
 const Color _kTrackGray = Color(0xFFE5E7EB);
+
+/// Size of the big Dugtong in the summary card.
+const double _kDugtongSize = 110;
+
+/// Shown in the "About Dugtong" card.
+const String _kAboutDugtong =
+    "Meet Dugtong! The name comes from the Tagalog word 'dugtong', which "
+    "means 'to connect' or 'to join'. It also begins with 'dug', the start of "
+    "'dugo' (blood). That is the idea behind it: every blood donation connects "
+    "one person's gift to another person's life, and every day of your streak "
+    "connects to the day before it. In Filipino, 'dugtong-buhay' even "
+    "describes something that extends a life. Dugtong is the link, and you "
+    'keep the connection going.';
 const List<BoxShadow> _kSoftShadow = [
   BoxShadow(color: Color(0x0A000000), blurRadius: 10, offset: Offset(0, 3)),
 ];
@@ -43,6 +57,9 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
   String? _busyFrame;
   bool _refreshing = false;
   bool _sharing = false;
+
+  // The summary card is the area the interactive Dugtong can be dragged in.
+  final GlobalKey _summaryKey = GlobalKey();
 
   @override
   void initState() {
@@ -104,7 +121,7 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
       await shareStreak(
         context,
         streak: d.current,
-        stage: mascotStageFor(d.current),
+        stage: dugtongStageFor(d.current),
         origin: origin,
       );
     } catch (_) {
@@ -128,7 +145,10 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
   }
 
   @override
-  Widget build(BuildContext context) => StreakBubbleHidden(
+  Widget build(BuildContext context) => StreakScreen(
+    id: 'streak_ladder',
+    // The ladder has its own interactive Dugtong.
+    hideBubble: true,
     child: Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       body: Column(
@@ -205,10 +225,12 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
     final rungs = [...d.ladder]..sort((a, b) => b.days.compareTo(a.days));
     // The largest milestone the donor has reached (list is highest-first).
     final here = rungs.where((m) => m.days <= d.current).firstOrNull;
-    return Column(
+    final column = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _summaryCard(d),
+        const SizedBox(height: 14),
+        _aboutCard(),
         const SizedBox(height: 14),
         _nextRewardCard(d),
         const SizedBox(height: 22),
@@ -268,11 +290,33 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
         ),
       ],
     );
+
+    // The interactive Dugtong sits in a layer above every card, so it never
+    // slides under the cards that follow the summary.
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        column,
+        Positioned(
+          left: 16,
+          top: 16,
+          width: _kDugtongSize,
+          height: _kDugtongSize,
+          child: InteractiveDugtong(
+            size: _kDugtongSize,
+            streak: d.current,
+            restingMood: d.current == 0 ? DugtongMood.sleepy : DugtongMood.idle,
+            limitKey: _summaryKey,
+          ),
+        ),
+      ],
+    );
   }
 
   // ─── Cards ───────────────────────────────────────────────────────────────
 
-  Widget _card({required Widget child, Color? border}) => Container(
+  Widget _card({required Widget child, Color? border, Key? key}) => Container(
+    key: key,
     width: double.infinity,
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
@@ -284,6 +328,33 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
     child: child,
   );
 
+  Widget _aboutCard() => _card(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(Icons.favorite_rounded, size: 18, color: kCrimson),
+            SizedBox(width: 8),
+            Text(
+              'About Dugtong',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: kTextPrimary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          _kAboutDugtong,
+          style: TextStyle(fontSize: 13, color: kTextMuted, height: 1.5),
+        ),
+      ],
+    ),
+  );
+
   Widget _summaryCard(StreakData d) {
     final notice = _c.streakLostNow
         ? 'Your streak restarted${_c.previousStreak > 0 ? ' (it was ${_c.previousStreak} days)' : ''}. '
@@ -292,16 +363,14 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
               ? 'Your Streak Freeze just saved your streak!'
               : null);
     return _card(
+      key: _summaryKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              BloodBagMascot(
-                size: 96,
-                streak: d.current,
-                mood: d.current == 0 ? MascotMood.sleepy : MascotMood.idle,
-              ),
+              // Where the interactive Dugtong rests (it is drawn in a layer above).
+              const SizedBox(width: _kDugtongSize, height: _kDugtongSize),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -340,7 +409,7 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
-                        mascotStageFor(d.current).stageName,
+                        dugtongStageFor(d.current).stageName,
                         style: const TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w800,
@@ -937,7 +1006,7 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
           children: [
             const Expanded(
               child: Text(
-                'Mascot chat',
+                'Dugtong chat',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,

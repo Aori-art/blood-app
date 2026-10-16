@@ -10,7 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'config.dart';
 import 'privacy_statement.dart';
 import 'shared_design.dart';
-import 'streak/streak_hidden.dart';
+import 'streak/streak_screen.dart';
 
 // ─── Consent receipt ─────────────────────────────────────────────────────────
 // An anonymous record that this install accepted a policy version. It never
@@ -217,8 +217,11 @@ class _PrivacyConsentScreenState extends State<PrivacyConsentScreen> {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      StreakBubbleHidden(child: _buildScreen(context));
+  Widget build(BuildContext context) => StreakScreen(
+    id: 'consent',
+    hideBubble: true,
+    child: _buildScreen(context),
+  );
 
   Widget _buildScreen(BuildContext context) => PopScope(
     canPop: false,

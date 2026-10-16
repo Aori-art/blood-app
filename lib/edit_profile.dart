@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'config.dart';
 import 'profile_page_widgets.dart';
 import 'shared_design.dart';
-import 'streak/streak_hidden.dart';
+import 'streak/streak_screen.dart';
 
 class _Location {
   final String code;
@@ -346,7 +346,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) =>
-      StreakBubbleHidden(child: _buildScreen(context));
+      StreakScreen(id: 'edit_profile', child: _buildScreen(context));
 
   Widget _buildScreen(BuildContext context) {
     final disabled = !canEdit || !online;

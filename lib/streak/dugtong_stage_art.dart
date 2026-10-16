@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../shared_design.dart';
 
-/// Visual-only evolution stages of the blood-bag mascot.
-enum MascotStage {
+/// Visual-only evolution stages of Dugtong.
+enum DugtongStage {
   rookie,
   spark,
   cadet,
@@ -17,36 +17,36 @@ enum MascotStage {
 }
 
 /// Streak needed for each stage (index = stage). Visual only.
-const List<int> kMascotStageThresholds = [0, 7, 14, 30, 60, 100, 200, 365];
+const List<int> kDugtongStageThresholds = [0, 7, 14, 30, 60, 100, 200, 365];
 
 /// The one place that decides which stage a streak maps to. It is given the
 /// CURRENT streak today; switch the argument at the call sites (or this
 /// function) to use the longest streak instead.
-MascotStage mascotStageFor(int streak) {
+DugtongStage dugtongStageFor(int streak) {
   var index = 0;
-  for (var i = 0; i < kMascotStageThresholds.length; i++) {
-    if (streak >= kMascotStageThresholds[i]) index = i;
+  for (var i = 0; i < kDugtongStageThresholds.length; i++) {
+    if (streak >= kDugtongStageThresholds[i]) index = i;
   }
-  return MascotStage.values[index];
+  return DugtongStage.values[index];
 }
 
-extension MascotStageInfo on MascotStage {
+extension DugtongStageInfo on DugtongStage {
   String get stageName => switch (this) {
-    MascotStage.rookie => 'Rookie Bag',
-    MascotStage.spark => 'Spark Bag',
-    MascotStage.cadet => 'Cadet Hero',
-    MascotStage.guardian => 'Silver Guardian',
-    MascotStage.champion => 'Golden Champion',
-    MascotStage.crimsonHero => 'Crimson Hero',
-    MascotStage.platinumAura => 'Platinum Aura',
-    MascotStage.legend => 'Legend',
+    DugtongStage.rookie => 'Little Dugtong',
+    DugtongStage.spark => 'Spark Dugtong',
+    DugtongStage.cadet => 'Cadet Dugtong',
+    DugtongStage.guardian => 'Silver Guardian Dugtong',
+    DugtongStage.champion => 'Golden Champion Dugtong',
+    DugtongStage.crimsonHero => 'Crimson Hero Dugtong',
+    DugtongStage.platinumAura => 'Platinum Aura Dugtong',
+    DugtongStage.legend => 'Legend Dugtong',
   };
 
-  int get minStreak => kMascotStageThresholds[index];
+  int get minStreak => kDugtongStageThresholds[index];
 }
 
 /// Everything about a stage that is a plain colour or number.
-class MascotLook {
+class DugtongLook {
   final Color bodyA;
   final Color bodyB;
   final Color plateA;
@@ -57,7 +57,7 @@ class MascotLook {
   /// square canvas.
   final double scale;
 
-  const MascotLook({
+  const DugtongLook({
     required this.bodyA,
     required this.bodyB,
     required this.plateA,
@@ -69,8 +69,8 @@ class MascotLook {
 
 const Color _white = Colors.white;
 
-MascotLook mascotLookFor(MascotStage stage) => switch (stage) {
-  MascotStage.rookie => const MascotLook(
+DugtongLook dugtongLookFor(DugtongStage stage) => switch (stage) {
+  DugtongStage.rookie => const DugtongLook(
     bodyA: kCrimson,
     bodyB: Color(0xFF8B0000),
     plateA: _white,
@@ -78,7 +78,7 @@ MascotLook mascotLookFor(MascotStage stage) => switch (stage) {
     number: Color(0xFF991B1B),
     scale: 1.0,
   ),
-  MascotStage.spark => const MascotLook(
+  DugtongStage.spark => const DugtongLook(
     bodyA: Color(0xFFEF4444),
     bodyB: Color(0xFFB91C1C),
     plateA: _white,
@@ -86,7 +86,7 @@ MascotLook mascotLookFor(MascotStage stage) => switch (stage) {
     number: Color(0xFF991B1B),
     scale: 0.98,
   ),
-  MascotStage.cadet => const MascotLook(
+  DugtongStage.cadet => const DugtongLook(
     bodyA: Color(0xFFEF4444),
     bodyB: Color(0xFFB91C1C),
     plateA: Color(0xFFB91C1C),
@@ -94,7 +94,7 @@ MascotLook mascotLookFor(MascotStage stage) => switch (stage) {
     number: _white,
     scale: 0.96,
   ),
-  MascotStage.guardian => const MascotLook(
+  DugtongStage.guardian => const DugtongLook(
     bodyA: Color(0xFFEF4444),
     bodyB: Color(0xFFB91C1C),
     plateA: Color(0xFFF1F5F9),
@@ -102,7 +102,7 @@ MascotLook mascotLookFor(MascotStage stage) => switch (stage) {
     number: Color(0xFF334155),
     scale: 0.9,
   ),
-  MascotStage.champion => const MascotLook(
+  DugtongStage.champion => const DugtongLook(
     bodyA: Color(0xFFEF4444),
     bodyB: Color(0xFFB91C1C),
     plateA: Color(0xFFFFE082),
@@ -110,7 +110,7 @@ MascotLook mascotLookFor(MascotStage stage) => switch (stage) {
     number: Color(0xFF5B3A00),
     scale: 0.9,
   ),
-  MascotStage.crimsonHero => const MascotLook(
+  DugtongStage.crimsonHero => const DugtongLook(
     bodyA: Color(0xFFB91C1C),
     bodyB: Color(0xFF450A0A),
     plateA: Color(0xFF7F1D1D),
@@ -118,7 +118,7 @@ MascotLook mascotLookFor(MascotStage stage) => switch (stage) {
     number: _white,
     scale: 0.84,
   ),
-  MascotStage.platinumAura => const MascotLook(
+  DugtongStage.platinumAura => const DugtongLook(
     bodyA: Color(0xFFDC2626),
     bodyB: Color(0xFF7F1D1D),
     plateA: Color(0xFFE0F7FA),
@@ -126,7 +126,7 @@ MascotLook mascotLookFor(MascotStage stage) => switch (stage) {
     number: Color(0xFF312E81),
     scale: 0.84,
   ),
-  MascotStage.legend => const MascotLook(
+  DugtongStage.legend => const DugtongLook(
     bodyA: Color(0xFFDC2626),
     bodyB: Color(0xFF7F1D1D),
     plateA: Color(0xFFFFE082),
@@ -259,15 +259,15 @@ void artShield(Canvas c, Offset ctr, double h, Paint paint) {
 
 // ─── Aura (behind everything) ──────────────────────────────────────────────
 
-void artAura(Canvas c, double s, MascotStage stage, double t, double slow) {
+void artAura(Canvas c, double s, DugtongStage stage, double t, double slow) {
   final center = Offset(s * 0.5, s * 0.5);
   switch (stage) {
-    case MascotStage.champion:
+    case DugtongStage.champion:
       _glow(c, center, s * 0.62, const Color(0xFFFFD54F), 0.42);
-    case MascotStage.crimsonHero:
+    case DugtongStage.crimsonHero:
       final pulse = 0.5 + 0.5 * math.sin(t * 2 * math.pi);
       _glow(c, center, s * (0.6 + 0.05 * pulse), kCrimson, 0.28 + 0.24 * pulse);
-    case MascotStage.platinumAura:
+    case DugtongStage.platinumAura:
       c.drawCircle(
         center,
         s * 0.64,
@@ -298,7 +298,7 @@ void artAura(Canvas c, double s, MascotStage stage, double t, double slow) {
             transform: GradientRotation(slow * 2 * math.pi),
           ).createShader(Rect.fromCircle(center: center, radius: s * 0.5)),
       );
-    case MascotStage.legend:
+    case DugtongStage.legend:
       _glow(c, center, s * 0.6, const Color(0xFFFFD54F), 0.3);
       c.drawCircle(
         center,
@@ -339,18 +339,28 @@ void _glow(Canvas c, Offset center, double radius, Color color, double alpha) {
 
 // ─── Cape (behind the body) ────────────────────────────────────────────────
 
-void artCape(Canvas c, double s, MascotStage stage, double t) {
+void artCape(
+  Canvas c,
+  double s,
+  DugtongStage stage,
+  double t, {
+  double flutter = 0,
+}) {
   final (Color a, Color b) = switch (stage) {
-    MascotStage.cadet => (const Color(0xFFDC2626), const Color(0xFF7F1D1D)),
-    MascotStage.guardian => (const Color(0xFFE2E8F0), const Color(0xFF94A3B8)),
-    MascotStage.champion => (const Color(0xFFFFE082), const Color(0xFFB8860B)),
-    MascotStage.crimsonHero => (kCrimson, const Color(0xFF450A0A)),
+    DugtongStage.cadet => (const Color(0xFFDC2626), const Color(0xFF7F1D1D)),
+    DugtongStage.guardian => (const Color(0xFFE2E8F0), const Color(0xFF94A3B8)),
+    DugtongStage.champion => (const Color(0xFFFFE082), const Color(0xFFB8860B)),
+    DugtongStage.crimsonHero => (kCrimson, const Color(0xFF450A0A)),
     _ => (Colors.transparent, Colors.transparent),
   };
   if (a == Colors.transparent) return;
-  final flow = stage == MascotStage.crimsonHero
+  var flow = stage == DugtongStage.crimsonHero
       ? math.sin(t * 2 * math.pi)
       : 0.0;
+  // A tap reaction makes every cape ripple fast.
+  if (flutter > 0) {
+    flow = flow * 0.4 + flutter * 2.4 * math.sin(t * 8 * math.pi);
+  }
   final w1 = s * 0.025 * flow;
   final cape = Path()
     ..moveTo(s * 0.22, s * 0.26)
@@ -386,10 +396,18 @@ void artCape(Canvas c, double s, MascotStage stage, double t) {
 
 // ─── Wings (behind the body) ───────────────────────────────────────────────
 
-void artWings(Canvas c, double s, MascotStage stage, double t) {
-  final flap = math.sin(t * 2 * math.pi) * 3; // degrees
+void artWings(
+  Canvas c,
+  double s,
+  DugtongStage stage,
+  double t, {
+  double flutter = 0,
+}) {
+  // Degrees; a tap reaction beats the wings quickly.
+  final flap =
+      math.sin(t * 2 * math.pi) * 3 + flutter * 14 * math.sin(t * 8 * math.pi);
   switch (stage) {
-    case MascotStage.crimsonHero:
+    case DugtongStage.crimsonHero:
       _wingPair(
         c,
         s,
@@ -401,7 +419,7 @@ void artWings(Canvas c, double s, MascotStage stage, double t) {
         colors: const [Color(0xFFDC2626), Color(0xFF7F1D1D)],
         outline: true,
       );
-    case MascotStage.platinumAura:
+    case DugtongStage.platinumAura:
       _wingPair(
         c,
         s,
@@ -416,7 +434,7 @@ void artWings(Canvas c, double s, MascotStage stage, double t) {
         ],
         glow: true,
       );
-    case MascotStage.legend:
+    case DugtongStage.legend:
       _wingPair(
         c,
         s,
@@ -622,14 +640,14 @@ void artLaurels(Canvas c, double s) {
   side(false);
 }
 
-void artGlints(Canvas c, double s, MascotStage stage, double t) {
+void artGlints(Canvas c, double s, DugtongStage stage, double t) {
   final Color color;
   final List<(double, double, double)> spots;
   switch (stage) {
-    case MascotStage.spark:
+    case DugtongStage.spark:
       color = const Color(0xFFE0A66B);
       spots = const [(0.07, 0.3, 0.0), (0.94, 0.24, 0.33), (0.9, 0.72, 0.66)];
-    case MascotStage.guardian:
+    case DugtongStage.guardian:
       color = const Color(0xFFF1F5F9);
       spots = const [(0.08, 0.2, 0.0), (0.93, 0.36, 0.4), (0.88, 0.8, 0.7)];
     default:
@@ -749,11 +767,11 @@ void artEyebrows(Canvas c, double s) {
 }
 
 /// The emblem printed on the label plate (fine detail, large sizes only).
-void artLabelEmblem(Canvas c, MascotStage stage, Offset center, double size) {
+void artLabelEmblem(Canvas c, DugtongStage stage, Offset center, double size) {
   switch (stage) {
-    case MascotStage.cadet:
+    case DugtongStage.cadet:
       artStar(c, center, size * 0.55, Paint()..color = Colors.white);
-    case MascotStage.guardian:
+    case DugtongStage.guardian:
       artShield(c, center, size, Paint()..color = const Color(0xFF475569));
       artShield(
         c,
@@ -761,7 +779,7 @@ void artLabelEmblem(Canvas c, MascotStage stage, Offset center, double size) {
         size * 0.6,
         Paint()..color = const Color(0xFFE2E8F0),
       );
-    case MascotStage.crimsonHero:
+    case DugtongStage.crimsonHero:
       artDrop(c, center, size, Paint()..color = Colors.white);
     default:
       break;
@@ -769,7 +787,11 @@ void artLabelEmblem(Canvas c, MascotStage stage, Offset center, double size) {
 }
 
 /// Which stages put an emblem on the label.
-bool stageHasLabelEmblem(MascotStage stage) =>
-    stage == MascotStage.cadet ||
-    stage == MascotStage.guardian ||
-    stage == MascotStage.crimsonHero;
+bool stageHasLabelEmblem(DugtongStage stage) =>
+    stage == DugtongStage.cadet ||
+    stage == DugtongStage.guardian ||
+    stage == DugtongStage.crimsonHero;
+
+/// Whether the stage has a cape or wings that can flutter.
+bool stageHasCapeOrWings(DugtongStage stage) =>
+    stage.index >= DugtongStage.cadet.index;

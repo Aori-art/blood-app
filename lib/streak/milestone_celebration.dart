@@ -7,8 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../main.dart' show appNavigatorKey;
 import '../shared_design.dart';
 import 'avatar_frame.dart';
-import 'blood_bag_mascot.dart';
-import 'mascot_stage_art.dart';
+import 'dugtong.dart';
+import 'dugtong_stage_art.dart';
 import 'streak_controller.dart';
 import 'streak_particles.dart';
 import 'streak_ladder_screen.dart' show badgeVisualFor;
@@ -23,7 +23,7 @@ double _seg(double ms, double a, double b, [Curve curve = Curves.linear]) {
 }
 
 /// Shows the full-screen celebration for [event]. [origin] is where the
-/// floating bubble was, so the mascot can fly out of it. Completes when the
+/// floating bubble was, so Dugtong can fly out of it. Completes when the
 /// celebration is closed.
 Future<void> showMilestoneCelebration({
   required StreakCelebration event,
@@ -52,6 +52,89 @@ Future<void> showMilestoneCelebration({
   );
 }
 
+/// When each phase of one celebration starts and ends, in milliseconds.
+///
+///   A. count splash   [0, aEnd]       (only when the streak hit a ladder day)
+///   B. evolution      [b0, bEnd]      (only when Dugtong changed stage)
+///   C. reward reveal  [cStart, total] (only when a badge or frame is new)
+///
+/// A celebration without a reward closes itself when its last phase is done.
+class CelebrationTimeline {
+  final bool hasA;
+  final bool hasB;
+  final bool hasC;
+  final bool verified;
+
+  /// Dugtong flies out of the bubble over this long.
+  final double fly;
+  final double aEnd;
+  final double b0;
+  final double bEnd;
+  final double cStart;
+
+  /// When the reward's confetti goes off.
+  final double burstC;
+  final double total;
+
+  const CelebrationTimeline._({
+    required this.hasA,
+    required this.hasB,
+    required this.hasC,
+    required this.verified,
+    required this.fly,
+    required this.aEnd,
+    required this.b0,
+    required this.bEnd,
+    required this.cStart,
+    required this.burstC,
+    required this.total,
+  });
+
+  /// Length of the count splash.
+  static const double countMs = 2800;
+
+  /// Taps skip the count splash only after this long.
+  static const double skipAfterMs = 800;
+
+  factory CelebrationTimeline.of(StreakCelebration e) {
+    final verified = e.isVerifiedFrame;
+    final hasA = e.hasCount && !verified;
+    final hasB = e.evolved && !verified;
+    final hasC = e.hasReward;
+    final fly = hasA ? 450.0 : 800.0;
+    final aEnd = hasA ? countMs : 0.0;
+    final b0 = hasA ? aEnd : fly;
+    final bEnd = hasB ? b0 + 1800 : b0;
+    final cStart = verified ? 900.0 : (hasB ? bEnd : (hasA ? aEnd : 1100.0));
+    final burstC = hasB
+        ? b0 + 800
+        : (verified ? 700.0 : (hasA ? aEnd + 100 : 900.0));
+    final total = hasC
+        ? cStart + 3600
+        : (hasB ? bEnd + 1500 : (hasA ? aEnd : 1500.0));
+    return CelebrationTimeline._(
+      hasA: hasA,
+      hasB: hasB,
+      hasC: hasC,
+      verified: verified,
+      fly: fly,
+      aEnd: aEnd,
+      b0: b0,
+      bEnd: bEnd,
+      cStart: cStart,
+      burstC: burstC,
+      total: total,
+    );
+  }
+}
+
+class _Burst {
+  final double at;
+  final List<Particle> particles;
+  final double gravity;
+  const _Burst(this.at, this.particles, this.gravity);
+}
+
 class MilestoneCelebration extends StatefulWidget {
   final StreakCelebration event;
   final Offset origin;
@@ -68,18 +151,31 @@ class MilestoneCelebration extends StatefulWidget {
 
 class _MilestoneCelebrationState extends State<MilestoneCelebration>
     with TickerProviderStateMixin {
+  static const double _base = 200; // Dugtong's size on this screen
+  static const List<Color> _confettiColors = [
+    Color(0xFFDC2626),
+    Color(0xFFFF8FA3),
+    Color(0xFFFFD54F),
+    Colors.white,
+    Color(0xFF80DEEA),
+  ];
+
   // One clock for the whole show; every phase is a function of its time in ms.
   late final AnimationController _clock;
+  late final CelebrationTimeline _t = CelebrationTimeline.of(widget.event);
   late final List<Particle> _spiral;
-  late final List<Particle> _confetti;
-  // Runs for the first 1.5 s: taps are ignored until it completes, and it
-  // drives the card fade in reduced-motion mode.
+  late final List<_Burst> _bursts;
+  // Runs for the first 1.5 s: in reduced-motion mode it fades the card in and
+  // taps are ignored until it completes.
   late final AnimationController _guard;
 
   bool _reduce = false;
   bool _started = false;
-  bool _firedCharge = false;
-  bool _firedBurst = false;
+  bool _closed = false;
+  bool _hapticLand = false;
+  bool _hapticCharge = false;
+  bool _hapticBurst = false;
+  bool _hapticReveal = false;
   String _initials = '?';
   bool _equipBusy = false;
   bool _shareBusy = false;
@@ -87,21 +183,23 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
 
   StreakCelebration get _event => widget.event;
   bool get _isVerified => _event.isVerifiedFrame;
-  bool get _evolves => _event.evolved;
-  bool get _hasMascot => !_isVerified;
-
-  // Timeline (ms).
-  double get _rewardStart => _isVerified ? 900 : (_evolves ? 2600 : 1100);
-  double get _burstAt => _isVerified ? 700 : (_evolves ? 1600 : 900);
-  double get _total => _rewardStart + 3600;
+  bool get _hasDugtong => !_isVerified;
+  double get _ms => _reduce ? _t.total : _clock.value * _t.total;
 
   @override
   void initState() {
     super.initState();
     _clock = AnimationController(
       vsync: this,
-      duration: Duration(milliseconds: _total.round()),
+      duration: Duration(milliseconds: _t.total.round()),
     )..addListener(_onTick);
+    _clock.addStatusListener((status) {
+      // No reward to wait for: the overlay closes itself when it is done.
+      // (Reduced motion has no timeline: the clock only jumps to its end, and
+      // the donor closes it with the button.)
+      if (_reduce) return;
+      if (status == AnimationStatus.completed && !_t.hasC) _close();
+    });
     _spiral = generateParticles(
       seed: _event.streak * 31 + 7,
       count: 36,
@@ -124,33 +222,106 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
       radiusMin: 90,
       radiusMax: 190,
     );
-    _confetti = generateParticles(
-      seed: _event.streak * 17 + _event.key.length,
-      count: 70,
-      palette: const [
-        Color(0xFFDC2626),
-        Color(0xFFFF8FA3),
-        Color(0xFFFFD54F),
-        Colors.white,
-        Color(0xFF80DEEA),
+    _bursts = [
+      if (_t.hasA) ...[
+        // Blood drops, hearts and stars when the number lands, then a second,
+        // smaller shower.
+        _Burst(
+          850,
+          generateParticles(
+            seed: _event.streak * 13 + 5,
+            count: 56,
+            palette: _confettiColors,
+            shapes: const [
+              ParticleShape.drop,
+              ParticleShape.heart,
+              ParticleShape.star,
+            ],
+            speedMin: 140,
+            speedMax: 400,
+            sizeMin: 8,
+            sizeMax: 15,
+            lifeMin: 1.6,
+            lifeMax: 2.4,
+            delayMax: 0.2,
+          ),
+          380,
+        ),
+        _Burst(
+          1650,
+          generateParticles(
+            seed: _event.streak * 29 + 3,
+            count: 36,
+            palette: _confettiColors,
+            shapes: const [
+              ParticleShape.heart,
+              ParticleShape.drop,
+              ParticleShape.star,
+            ],
+            speedMin: 100,
+            speedMax: 300,
+            sizeMin: 7,
+            sizeMax: 12,
+            lifeMin: 1.4,
+            lifeMax: 2.0,
+            delayMax: 0.2,
+          ),
+          340,
+        ),
       ],
-      shapes: const [
-        ParticleShape.drop,
-        ParticleShape.star,
-        ParticleShape.rect,
-        ParticleShape.rect,
-      ],
-      speedMin: 140,
-      speedMax: 420,
-      sizeMin: 7,
-      sizeMax: 14,
-      lifeMin: 2.2,
-      lifeMax: 3.2,
-      delayMax: 0.25,
-    );
+      if (_t.hasB || (_t.hasC && !_t.hasA))
+        _Burst(
+          _t.burstC,
+          generateParticles(
+            seed: _event.streak * 17 + _event.key.length,
+            count: 70,
+            palette: _confettiColors,
+            shapes: const [
+              ParticleShape.drop,
+              ParticleShape.star,
+              ParticleShape.rect,
+              ParticleShape.rect,
+            ],
+            speedMin: 140,
+            speedMax: 420,
+            sizeMin: 7,
+            sizeMax: 14,
+            lifeMin: 2.2,
+            lifeMax: 3.2,
+            delayMax: 0.25,
+          ),
+          420,
+        ),
+      if (_t.hasC && _t.hasA && !_t.hasB)
+        _Burst(
+          _t.burstC,
+          generateParticles(
+            seed: _event.streak * 7 + _event.key.length,
+            count: 60,
+            palette: _confettiColors,
+            shapes: const [
+              ParticleShape.drop,
+              ParticleShape.star,
+              ParticleShape.rect,
+              ParticleShape.rect,
+            ],
+            speedMin: 140,
+            speedMax: 400,
+            sizeMin: 7,
+            sizeMax: 13,
+            lifeMin: 2.0,
+            lifeMax: 3.0,
+            delayMax: 0.25,
+          ),
+          420,
+        ),
+    ];
     _guard = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
+      // Real time even with reduced motion (which would otherwise shrink it to
+      // a few milliseconds): this is the tap guard.
+      animationBehavior: AnimationBehavior.preserve,
     )..forward();
     _loadName();
   }
@@ -174,18 +345,22 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
   }
 
   void _onTick() {
-    final ms = _clock.value * _total;
-    if (_evolves && !_firedCharge && ms >= 800) {
-      _firedCharge = true;
+    final ms = _clock.value * _t.total;
+    if (_t.hasA && !_hapticLand && ms >= 700) {
+      _hapticLand = true;
       HapticFeedback.mediumImpact();
     }
-    if (!_firedBurst && ms >= _burstAt) {
-      _firedBurst = true;
-      if (_evolves) {
-        HapticFeedback.heavyImpact();
-      } else {
-        HapticFeedback.mediumImpact();
-      }
+    if (_t.hasB && !_hapticCharge && ms >= _t.b0) {
+      _hapticCharge = true;
+      HapticFeedback.mediumImpact();
+    }
+    if (_t.hasB && !_hapticBurst && ms >= _t.b0 + 800) {
+      _hapticBurst = true;
+      HapticFeedback.heavyImpact();
+    }
+    if (_t.hasC && !_t.hasB && !_hapticReveal && ms >= _t.burstC) {
+      _hapticReveal = true;
+      HapticFeedback.mediumImpact();
     }
   }
 
@@ -196,9 +371,61 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
     super.dispose();
   }
 
-  bool get _canTap => _guard.isCompleted;
+  // ─── Taps ───────────────────────────────────────────────────────────────
 
-  void _close() => Navigator.of(context).pop();
+  bool get _inReward => _t.hasC && _ms >= _t.cStart;
+
+  // The reward card can be dismissed once it has had time to be read; its
+  // buttons come alive a little after it appears.
+  bool get _canTap {
+    if (_reduce) return _guard.isCompleted;
+    final ms = _ms;
+    if (_inReward) return ms >= _t.cStart + 800;
+    return true;
+  }
+
+  void _close() {
+    if (_closed || !mounted) return;
+    _closed = true;
+    Navigator.of(context).pop();
+  }
+
+  // A tap during the count splash or the evolution jumps to the next phase,
+  // or closes the overlay when nothing follows.
+  void _skipTo(double? ms) {
+    if (ms == null) {
+      _close();
+      return;
+    }
+    _clock.forward(from: (ms / _t.total).clamp(0.0, 1.0));
+  }
+
+  void _onBackdropTap() {
+    if (_reduce) {
+      if (_canTap && !_t.hasC) _close();
+      if (_canTap && _t.hasC) _close();
+      return;
+    }
+    final ms = _ms;
+    if (_inReward) {
+      if (_canTap) _close();
+      return;
+    }
+    if (_t.hasA && ms < _t.aEnd) {
+      if (ms >= CelebrationTimeline.skipAfterMs) {
+        _skipTo(_t.hasB ? _t.b0 : (_t.hasC ? _t.cStart : null));
+      }
+      return;
+    }
+    if (_t.hasB && ms < _t.bEnd) {
+      if (ms >= _t.b0 + CelebrationTimeline.skipAfterMs) {
+        _skipTo(_t.hasC ? _t.cStart : null);
+      }
+      return;
+    }
+    // Reward-less ending, or the moment before the reward card.
+    if (!_t.hasC && ms >= _t.bEnd + CelebrationTimeline.skipAfterMs) _close();
+  }
 
   Future<void> _equip() async {
     if (!_canTap || _equipBusy) return;
@@ -252,10 +479,6 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
     if (mounted) setState(() => _shareBusy = false);
   }
 
-  void _onBackdropTap() {
-    if (_canTap) _close();
-  }
-
   // ─── Build ──────────────────────────────────────────────────────────────
 
   @override
@@ -264,11 +487,12 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
     child: AnimatedBuilder(
       animation: Listenable.merge([_clock, _guard]),
       builder: (context, _) {
-        final ms = _reduce ? _total : _clock.value * _total;
+        final ms = _ms;
         return LayoutBuilder(
           builder: (context, c) {
             final size = c.biggest;
-            final center = Offset(size.width / 2, size.height * 0.33);
+            final center = Offset(size.width / 2, size.height * 0.31);
+            if (_reduce) return _reducedLayout(size, center);
             return Stack(
               fit: StackFit.expand,
               clipBehavior: Clip.none,
@@ -279,23 +503,16 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
                     onTap: _onBackdropTap,
                   ),
                 ),
-                if (!_reduce)
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: RepaintBoundary(
-                        child: CustomPaint(
-                          painter: _FxPainter(
-                            ms: ms,
-                            center: center,
-                            evolves: _evolves,
-                            hasMascot: _hasMascot,
-                            burstAt: _burstAt,
-                          ),
-                        ),
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: RepaintBoundary(
+                      child: CustomPaint(
+                        painter: _FxPainter(ms: ms, center: center, t: _t),
                       ),
                     ),
                   ),
-                if (!_reduce && ms >= 800 && ms < 1650 && _evolves)
+                ),
+                if (_t.hasB && ms >= _t.b0 && ms < _t.b0 + 850)
                   Positioned.fill(
                     child: IgnorePointer(
                       child: RepaintBoundary(
@@ -303,33 +520,35 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
                           painter: ParticlePainter(
                             particles: _spiral,
                             mode: ParticleMode.spiralIn,
-                            time: (ms - 800) / 1000,
+                            time: (ms - _t.b0) / 1000,
                             origin: center,
                           ),
                         ),
                       ),
                     ),
                   ),
-                if (!_reduce && _hasMascot) _mascot(ms, center),
-                if (!_reduce && _isVerified) _verifiedEmblem(ms, center),
-                if (!_reduce && ms >= _burstAt)
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: RepaintBoundary(
-                        child: CustomPaint(
-                          painter: ParticlePainter(
-                            particles: _confetti,
-                            mode: ParticleMode.burst,
-                            time: (ms - _burstAt) / 1000,
-                            origin: center,
-                            gravity: 420,
+                if (_hasDugtong) _dugtong(ms, center),
+                if (_isVerified) _verifiedEmblem(ms, center),
+                for (final burst in _bursts)
+                  if (ms >= burst.at && ms < burst.at + 3600)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: RepaintBoundary(
+                          child: CustomPaint(
+                            painter: ParticlePainter(
+                              particles: burst.particles,
+                              mode: ParticleMode.burst,
+                              time: (ms - burst.at) / 1000,
+                              origin: center,
+                              gravity: burst.gravity,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                if (!_reduce && _evolves) _evolvedText(ms, center),
-                _card(ms, size),
+                if (_t.hasA) _dayText(ms, center),
+                if (_t.hasB) _evolvedText(ms, center),
+                if (_t.hasC) _card(ms, size),
               ],
             );
           },
@@ -338,33 +557,123 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
     ),
   );
 
-  Widget _mascot(double ms, Offset center) {
-    const base = 140.0;
-    final fly = _seg(ms, 0, 800, Curves.easeOutCubic);
-    var pos = Offset.lerp(widget.origin, center, fly)!;
-    var scale = (58 / base) + (1 - 58 / base) * fly;
+  // Reduced motion: no flying, shaking or confetti. A still picture of what
+  // happened, then the reward card (or a single button) once the guard is up.
+  Widget _reducedLayout(Size size, Offset center) {
+    final bottom = MediaQuery.paddingOf(context).bottom;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _onBackdropTap,
+          ),
+        ),
+        if (_hasDugtong)
+          Positioned(
+            left: center.dx - _base / 2,
+            top: center.dy - _base / 2,
+            width: _base,
+            height: _base,
+            child: IgnorePointer(
+              child: Dugtong(
+                size: _base,
+                streak: _event.streak,
+                stage: _event.newStage,
+                mood: DugtongMood.celebrate,
+              ),
+            ),
+          ),
+        if (_isVerified)
+          Positioned(
+            left: center.dx - 60,
+            top: center.dy - 60,
+            width: 120,
+            height: 120,
+            child: IgnorePointer(child: _verifiedBadge()),
+          ),
+        if (_t.hasA) _dayText(_t.total, center),
+        if (_t.hasB) _evolvedText(_t.total, center),
+        if (_t.hasC)
+          _card(_t.total, size)
+        else
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(40, 0, 40, 28 + bottom),
+              child: SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: _guard.isCompleted ? _close : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kCrimson,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: kCrimson.withValues(alpha: 0.5),
+                    disabledForegroundColor: Colors.white70,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: const Text(
+                    'Great!',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 
-    final charging = _evolves && ms >= 800 && ms < 1600;
+  // Dugtong flies out of the bubble, jumps while the number rolls, charges up
+  // and morphs when it evolves, then makes room for the reward card.
+  Widget _dugtong(double ms, Offset center) {
+    final t = _t;
+    final fly = _seg(ms, 0, t.fly, Curves.easeOutCubic);
+    var pos = Offset.lerp(widget.origin, center, fly)!;
+    var scale = (58 / _base) + (1 - 58 / _base) * fly;
+
+    // Two hops while the count lands.
+    if (t.hasA && ms >= 650 && ms < 1300) {
+      final u = _seg(ms, 650, 1300);
+      pos += Offset(0, -46 * math.sin(2 * math.pi * u).abs());
+    }
+    // The number "pops" as it lands.
+    if (t.hasA) scale *= 1 + 0.14 * math.sin(math.pi * _seg(ms, 1000, 1400));
+
+    final charging = t.hasB && ms >= t.b0 && ms < t.b0 + 800;
     if (charging) {
-      final p = _seg(ms, 800, 1600);
+      final p = _seg(ms, t.b0, t.b0 + 800);
       pos += Offset(
         math.sin(ms * 0.12) * (2 + 6 * p),
         math.cos(ms * 0.15) * (1 + 3 * p),
       );
     }
 
-    final MascotMood mood = charging
-        ? MascotMood.dragging
-        : MascotMood.celebrate;
-    final streak = _event.streak;
+    // Shrink a little to share the screen with the reward card.
+    if (t.hasC) {
+      final from = (t.hasA || t.hasB) ? t.cStart - 250 : t.fly;
+      final to = (t.hasA || t.hasB) ? t.cStart + 150 : t.cStart;
+      scale *= 1 - 0.28 * _seg(ms, from, to, Curves.easeInOut);
+    }
 
-    Widget mascot(
-      MascotStage stage, {
+    final DugtongMood mood = charging
+        ? DugtongMood.dragging
+        : DugtongMood.celebrate;
+    final streak = _event.streak;
+    final rolling = t.hasA && ms < t.aEnd;
+
+    Widget dugtong(
+      DugtongStage stage, {
       int? rollFrom,
       double roll = 1,
       int? showStreak,
-    }) => BloodBagMascot(
-      size: base,
+    }) => Dugtong(
+      size: _base,
       streak: showStreak ?? streak,
       stage: stage,
       mood: mood,
@@ -373,45 +682,113 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
     );
 
     Widget body;
-    if (_evolves) {
-      final evo = _seg(ms, 1600, 2000);
-      final pop = 1 + 0.25 * math.sin(math.pi * _seg(ms, 1600, 2300));
+    if (t.hasB) {
+      // A count splash already rolled the number; on its own, the evolution
+      // rolls it as the new form appears.
+      final evo = _seg(ms, t.b0 + 800, t.b0 + 1200);
+      final pop =
+          1 + 0.25 * math.sin(math.pi * _seg(ms, t.b0 + 800, t.b0 + 1500));
       scale *= pop;
-      final oldStreak = streak > 0 ? streak - 1 : 0;
+      final oldStreak = (!t.hasA && streak > 0) ? streak - 1 : streak;
       body = Stack(
         alignment: Alignment.center,
         clipBehavior: Clip.none,
         children: [
-          if (evo < 1)
+          if (evo < 1 || rolling)
             Opacity(
-              opacity: 1 - evo,
-              child: mascot(_event.oldStage, showStreak: oldStreak),
+              opacity: rolling ? 1 : 1 - evo,
+              child: dugtong(
+                _event.oldStage,
+                showStreak: rolling ? null : oldStreak,
+                rollFrom: rolling ? _event.countFrom : null,
+                roll: rolling ? _seg(ms, 600, 1300) : 1,
+              ),
             ),
-          if (evo > 0)
+          if (evo > 0 && !rolling)
             Opacity(
               opacity: evo,
-              child: mascot(
+              child: dugtong(
                 _event.newStage,
-                rollFrom: oldStreak,
-                roll: _seg(ms, 1700, 2300),
+                rollFrom: t.hasA ? null : oldStreak,
+                roll: t.hasA ? 1 : _seg(ms, t.b0 + 900, t.b0 + 1500),
               ),
             ),
         ],
       );
+    } else if (t.hasA) {
+      body = dugtong(
+        rolling ? _event.oldStage : _event.newStage,
+        rollFrom: rolling ? _event.countFrom : null,
+        roll: rolling ? _seg(ms, 600, 1300) : 1,
+      );
     } else {
-      body = mascot(_event.newStage);
+      body = dugtong(_event.newStage);
     }
 
     return Positioned(
-      left: pos.dx - base / 2,
-      top: pos.dy - base / 2,
-      width: base,
-      height: base,
+      left: pos.dx - _base / 2,
+      top: pos.dy - _base / 2,
+      width: _base,
+      height: _base,
       child: IgnorePointer(
         child: Transform.scale(scale: scale, child: body),
       ),
     );
   }
+
+  // "Day 3 streak!" under Dugtong while the count lands.
+  Widget _dayText(double ms, Offset center) {
+    final t = _seg(ms, 900, 1300, Curves.easeOutBack);
+    final out = _t.hasC ? 1 - _seg(ms, _t.cStart - 200, _t.cStart + 100) : 1.0;
+    final opacity = (_seg(ms, 900, 1200) * out).clamp(0.0, 1.0);
+    return Positioned(
+      left: 0,
+      right: 0,
+      top: center.dy + _base * 0.62,
+      child: IgnorePointer(
+        child: Opacity(
+          opacity: opacity,
+          child: Transform.translate(
+            offset: Offset(0, 24 * (1 - t)),
+            child: Text(
+              'Day ${_event.streak} streak!',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 32,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.3,
+                shadows: [
+                  Shadow(color: kCrimson, blurRadius: 24),
+                  Shadow(color: Colors.black54, blurRadius: 6),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _verifiedBadge() => Container(
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      gradient: const LinearGradient(
+        colors: [Color(0xFF2563EB), Color(0xFF06B6D4)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      border: Border.all(color: Colors.white, width: 4),
+      boxShadow: [
+        BoxShadow(
+          color: const Color(0xFF06B6D4).withValues(alpha: 0.6),
+          blurRadius: 40,
+          spreadRadius: 6,
+        ),
+      ],
+    ),
+    child: const Icon(Icons.verified_rounded, size: 76, color: Colors.white),
+  );
 
   Widget _verifiedEmblem(double ms, Offset center) {
     final pop = Curves.elasticOut.transform(_seg(ms, 0, 900));
@@ -421,43 +798,24 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
       width: 120,
       height: 120,
       child: IgnorePointer(
-        child: Transform.scale(
-          scale: pop,
-          child: Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                colors: [Color(0xFF2563EB), Color(0xFF06B6D4)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              border: Border.all(color: Colors.white, width: 4),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF06B6D4).withValues(alpha: 0.6),
-                  blurRadius: 40,
-                  spreadRadius: 6,
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.verified_rounded,
-              size: 76,
-              color: Colors.white,
-            ),
-          ),
-        ),
+        child: Transform.scale(scale: pop, child: _verifiedBadge()),
       ),
     );
   }
 
+  // "Evolved!" and the new stage's name slide in above Dugtong.
   Widget _evolvedText(double ms, Offset center) {
-    final t = _seg(ms, 1850, 2350, Curves.easeOutCubic);
-    final t2 = _seg(ms, 2050, 2550, Curves.easeOutCubic);
+    final b0 = _t.b0;
+    final t = _reduce
+        ? 1.0
+        : _seg(ms, b0 + 1050, b0 + 1550, Curves.easeOutCubic);
+    final t2 = _reduce
+        ? 1.0
+        : _seg(ms, b0 + 1250, b0 + 1750, Curves.easeOutCubic);
     return Positioned(
       left: 0,
       right: 0,
-      top: math.max(36, center.dy - 168),
+      top: math.max(36, center.dy - _base * 0.5 - 76),
       child: IgnorePointer(
         child: Column(
           children: [
@@ -483,6 +841,7 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
                 offset: Offset(0, 22 * (1 - t2)),
                 child: Text(
                   _event.newStage.stageName,
+                  textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: _kGold,
                     fontSize: 20,
@@ -507,10 +866,11 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
     CelebrationKind.badge => 'Badge unlocked: ${_event.label}',
     CelebrationKind.evolution =>
       'You evolved into ${_event.newStage.stageName}!',
+    CelebrationKind.count => 'Day ${_event.streak} streak!',
   };
 
   Widget _card(double ms, Size size) {
-    final r = ms - _rewardStart;
+    final r = ms - _t.cStart;
     final slide = _reduce ? 1.0 : _seg(r, 0, 520, Curves.easeOutBack);
     final opacity = _reduce ? 1.0 : _seg(r, 0, 220);
     final textIn = _reduce ? 1.0 : _seg(r, 600, 1000);
@@ -685,6 +1045,7 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
           ),
         );
       case CelebrationKind.evolution:
+      case CelebrationKind.count:
         final pop = _reduce
             ? 1.0
             : Curves.elasticOut.transform(_seg(r, 300, 1100));
@@ -736,7 +1097,7 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
     );
 
     return IgnorePointer(
-      ignoring: !_canTapNow,
+      ignoring: !_canTap,
       child: Row(
         children: [
           if (isFrame) ...[
@@ -794,26 +1155,16 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
       ),
     );
   }
-
-  bool get _canTapNow => _canTap;
 }
 
-// ─── Effects drawn behind and over the mascot ──────────────────────────────
+// ─── Effects drawn behind and over Dugtong ──────────────────────────────
 
 class _FxPainter extends CustomPainter {
   final double ms;
   final Offset center;
-  final bool evolves;
-  final bool hasMascot;
-  final double burstAt;
+  final CelebrationTimeline t;
 
-  const _FxPainter({
-    required this.ms,
-    required this.center,
-    required this.evolves,
-    required this.hasMascot,
-    required this.burstAt,
-  });
+  const _FxPainter({required this.ms, required this.center, required this.t});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -850,10 +1201,33 @@ class _FxPainter extends CustomPainter {
       }
     }
 
-    // Charge-up glow behind the mascot.
-    if (evolves && ms >= 800 && ms < 2000) {
-      final p = ms < 1600 ? _seg(ms, 800, 1600) : 1 - _seg(ms, 1600, 2000);
-      final radius = 80 + 110 * p;
+    // Phase A: two shock rings pulse out as the number lands.
+    if (t.hasA) {
+      for (var i = 0; i < 2; i++) {
+        final start = 700.0 + i * 350;
+        if (ms < start || ms >= start + 1000) continue;
+        final p = _seg(ms, start, start + 1000, Curves.easeOutCubic);
+        canvas.drawCircle(
+          center,
+          60 + 300 * p,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 8 * (1 - p) + 1.5
+            ..color = (i == 0 ? Colors.white : const Color(0xFFFF8FA3))
+                .withValues(alpha: 0.85 * (1 - p)),
+        );
+      }
+    }
+
+    if (!t.hasB) return;
+    final b0 = t.b0;
+
+    // Phase B: charge-up glow behind Dugtong.
+    if (ms >= b0 && ms < b0 + 1200) {
+      final p = ms < b0 + 800
+          ? _seg(ms, b0, b0 + 800)
+          : 1 - _seg(ms, b0 + 800, b0 + 1200);
+      final radius = 90 + 110 * p;
       canvas.drawCircle(
         center,
         radius,
@@ -869,9 +1243,9 @@ class _FxPainter extends CustomPainter {
       );
     }
 
-    // Shock ring when the mascot evolves.
-    if (evolves && ms >= 1600 && ms < 2300) {
-      final p = _seg(ms, 1600, 2300, Curves.easeOutCubic);
+    // Shock ring when Dugtong evolves.
+    if (ms >= b0 + 800 && ms < b0 + 1500) {
+      final p = _seg(ms, b0 + 800, b0 + 1500, Curves.easeOutCubic);
       canvas.drawCircle(
         center,
         40 + 360 * p,
@@ -883,8 +1257,10 @@ class _FxPainter extends CustomPainter {
     }
 
     // White flash right before the new form appears.
-    if (evolves && ms >= 1450 && ms < 2000) {
-      final a = ms < 1600 ? _seg(ms, 1450, 1600) : 1 - _seg(ms, 1600, 2000);
+    if (ms >= b0 + 650 && ms < b0 + 1200) {
+      final a = ms < b0 + 800
+          ? _seg(ms, b0 + 650, b0 + 800)
+          : 1 - _seg(ms, b0 + 800, b0 + 1200);
       canvas.drawRect(
         Offset.zero & size,
         Paint()..color = Colors.white.withValues(alpha: 0.9 * a),

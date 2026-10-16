@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:blood/config.dart';
 import 'package:blood/shared_design.dart';
-import 'package:blood/streak/streak_hidden.dart';
+import 'package:blood/streak/streak_screen.dart';
 import 'otp.dart';
 
 class RegisterStep3 extends StatefulWidget {
@@ -135,7 +135,7 @@ class _RegisterStep3State extends State<RegisterStep3> {
 
   @override
   Widget build(BuildContext context) =>
-      StreakBubbleHidden(child: _buildScreen(context));
+      StreakScreen(id: 'register', hideBubble: true, child: _buildScreen(context));
 
   Widget _buildScreen(BuildContext context) {
     return Scaffold(

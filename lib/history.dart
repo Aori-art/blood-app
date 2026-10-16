@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'streak/streak_screen.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -17,6 +18,8 @@ import 'shared_design.dart';
 import 'streak/avatar_frame.dart';
 import 'streak/frame_picker.dart';
 import 'streak/streak_controller.dart';
+import 'unread_notifications.dart';
+import 'donor_avatar.dart';
 import 'streak/streak_ladder_screen.dart';
 import 'verify.dart';
 
@@ -161,7 +164,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
       }
     }
     await clearSessionKeepConsent(prefs);
-    StreakController.instance.reset();
+    StreakController.instance.onLoggedOut();
+    UnreadNotifications.instance
+      ..stop()
+      ..clear();
+    MyAvatar.instance.clear();
     AppSession.homeInStack = false; // PIN: next Home visit asks for the PIN
     if (mounted)
       Navigator.pushAndRemoveUntil(
@@ -232,7 +239,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      StreakScreen(id: 'profile', child: _buildScreen(context));
+
+  Widget _buildScreen(BuildContext context) {
     final name = safe(profile?['full_name']);
     final total =
         int.tryParse((profile?['total_donations'] ?? 0).toString()) ?? 0;

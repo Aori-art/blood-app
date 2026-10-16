@@ -14,7 +14,9 @@ import 'privacy_statement.dart';
 import 'profile_page_widgets.dart';
 import 'shared_design.dart';
 import 'streak/streak_controller.dart';
-import 'streak/streak_hidden.dart';
+import 'unread_notifications.dart';
+import 'donor_avatar.dart';
+import 'streak/streak_screen.dart';
 
 class PrivacySecurityScreen extends StatefulWidget {
   final bool showChangePin;
@@ -123,7 +125,11 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
       final prefs = await SharedPreferences.getInstance();
       await clearSessionKeepConsent(prefs);
     } catch (_) {}
-    StreakController.instance.reset(forgetSeen: true);
+    StreakController.instance.onLoggedOut(forgetSeen: true);
+    UnreadNotifications.instance
+      ..stop()
+      ..clear();
+    MyAvatar.instance.clear();
     AppSession.homeInStack = false;
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -142,7 +148,7 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
 
   @override
   Widget build(BuildContext context) =>
-      StreakBubbleHidden(child: _buildScreen(context));
+      StreakScreen(id: 'privacy_security', child: _buildScreen(context));
 
   Widget _buildScreen(BuildContext context) => ProfilePage(
     title: 'Privacy & Security',

@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:blood/newsfeed.dart';
 import 'package:blood/privacy_consent.dart';
 import 'package:blood/privacy_statement.dart';
-import 'package:blood/streak/streak_hidden.dart';
+import 'package:blood/streak/streak_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   final bool isLoggedIn;
@@ -198,7 +198,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) =>
-      StreakBubbleHidden(child: _buildScreen(context));
+      StreakScreen(id: 'splash', hideBubble: true, child: _buildScreen(context));
 
   Widget _buildScreen(BuildContext context) {
     final size = MediaQuery.of(context).size;

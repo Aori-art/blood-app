@@ -5,7 +5,7 @@ import 'shared_design.dart';
 
 // Bump this whenever the statement below changes in a way users must
 // re-consent to — the splash gate compares it with the stored value.
-const kPrivacyPolicyVersion = '2026-10-11-v1';
+const kPrivacyPolicyVersion = '2026-10-12-v2';
 
 const kPrivacyConsentVersionKey = 'privacy_consent_version';
 const kPrivacyConsentAtKey = 'privacy_consent_at';
@@ -84,6 +84,8 @@ const List<_PrivacySection> _kSections = [
         'advertising or analytics trackers.',
     'Firebase (push notifications) and Gmail (email delivery) are used to '
         'deliver messages to you.',
+    'If you comment on a post, your first name, last initial, profile photo '
+        'and frame are visible to other users.',
   ]),
   _PrivacySection(Icons.lock_outline_rounded, '4. How we protect it', [
     'Your password is stored in encrypted (hashed) form and is never kept '

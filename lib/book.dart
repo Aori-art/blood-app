@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'streak/streak_screen.dart';
 
 import 'anim.dart';
 import 'check.dart';
@@ -1099,7 +1100,10 @@ class _BookScreenState extends State<BookScreen>
       selectedTime != null;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      StreakScreen(id: 'book', child: _buildScreen(context));
+
+  Widget _buildScreen(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final screenHeight = size.height;
     final showingForm = _showingBookingForm;

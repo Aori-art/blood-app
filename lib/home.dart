@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'streak/streak_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -27,6 +29,7 @@ import 'notification_service.dart';
 import 'shared_design.dart';
 import 'streak/avatar_frame.dart';
 import 'streak/streak_controller.dart';
+import 'unread_notifications.dart';
 import 'verify.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -90,6 +93,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (id > 0) {
+      // Keep the Alerts badge in step with the server while Home is open.
+      UnreadNotifications.instance.start();
       await _saveFcmTokenToServer(id);
     } else {
       debugPrint("FCM token not saved: donorId is missing.");
@@ -130,7 +135,15 @@ class _HomeScreenState extends State<HomeScreen> {
       // IndexedStack keeps every tab mounted (instead of swapping the body
       // widget), so switching tabs — e.g. tapping Home mid eligibility-check —
       // no longer disposes/rebuilds the other tabs and loses their state.
-      body: IndexedStack(index: _selectedIndex, children: _screens),
+      body: IndexedStack(
+        index: _selectedIndex,
+        // The tabs are not routes: tell each one whether it is showing, so
+        // Dugtong knows which tab the donor is on.
+        children: [
+          for (var i = 0; i < _screens.length; i++)
+            StreakTabScope(active: i == _selectedIndex, child: _screens[i]),
+        ],
+      ),
       bottomNavigationBar: Material(
         type: MaterialType.transparency,
         child: _CustomNavBar(
@@ -235,6 +248,7 @@ class _CustomNavBar extends StatelessWidget {
                         index: 4,
                         selectedIndex: selectedIndex,
                         onTap: onTap,
+                        badge: UnreadNotifications.instance.count,
                       ),
                     ],
                   ),
@@ -263,12 +277,16 @@ class _NavItem extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onTap;
 
+  /// Optional unread count shown as a badge on the icon (hidden at 0).
+  final ValueNotifier<int>? badge;
+
   const _NavItem({
     required this.icon,
     required this.label,
     required this.index,
     required this.selectedIndex,
     required this.onTap,
+    this.badge,
   });
 
   @override
@@ -305,19 +323,32 @@ class _NavItem extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  TweenAnimationBuilder<double>(
-                    tween: Tween(begin: 1.0, end: isSelected ? 1.18 : 1.0),
-                    duration: const Duration(milliseconds: 380),
-                    curve: Curves.elasticOut,
-                    builder: (context, scale, child) =>
-                        Transform.scale(scale: scale, child: child),
-                    child: Icon(
-                      icon,
-                      size: 22,
-                      color: isSelected
-                          ? const Color(0xFFDC2626)
-                          : const Color(0xFF9CA3AF),
-                    ),
+                  // The badge hangs off the icon's top-right corner without
+                  // taking any room (the Stack is only as big as the icon).
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 1.0, end: isSelected ? 1.18 : 1.0),
+                        duration: const Duration(milliseconds: 380),
+                        curve: Curves.elasticOut,
+                        builder: (context, scale, child) =>
+                            Transform.scale(scale: scale, child: child),
+                        child: Icon(
+                          icon,
+                          size: 22,
+                          color: isSelected
+                              ? const Color(0xFFDC2626)
+                              : const Color(0xFF9CA3AF),
+                        ),
+                      ),
+                      if (badge != null)
+                        Positioned(
+                          top: -7,
+                          right: -9,
+                          child: _UnreadBadge(count: badge!),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 5),
                   AnimatedContainer(
@@ -336,6 +367,98 @@ class _NavItem extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The crimson count bubble on the Alerts icon: hidden at 0, "99+" above 99,
+/// and a small pop (1.0 -> 1.25 -> 1.0) whenever the number goes up.
+class _UnreadBadge extends StatefulWidget {
+  final ValueNotifier<int> count;
+
+  const _UnreadBadge({required this.count});
+
+  @override
+  State<_UnreadBadge> createState() => _UnreadBadgeState();
+}
+
+class _UnreadBadgeState extends State<_UnreadBadge>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pop = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 320),
+  );
+  late int _last = widget.count.value;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.count.addListener(_onCount);
+  }
+
+  @override
+  void didUpdateWidget(covariant _UnreadBadge old) {
+    super.didUpdateWidget(old);
+    if (old.count != widget.count) {
+      old.count.removeListener(_onCount);
+      widget.count.addListener(_onCount);
+      _last = widget.count.value;
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.count.removeListener(_onCount);
+    _pop.dispose();
+    super.dispose();
+  }
+
+  void _onCount() {
+    final n = widget.count.value;
+    final reduce = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (n > _last && !reduce) _pop.forward(from: 0);
+    _last = n;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<int>(
+      valueListenable: widget.count,
+      builder: (context, n, _) {
+        if (n <= 0) return const SizedBox.shrink();
+        return IgnorePointer(
+          child: Semantics(
+            label: n == 1 ? '1 unread notification' : '$n unread notifications',
+            excludeSemantics: true,
+            child: AnimatedBuilder(
+              animation: _pop,
+              builder: (context, child) => Transform.scale(
+                scale: 1 + 0.25 * math.sin(math.pi * _pop.value),
+                child: child,
+              ),
+              child: Container(
+                constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                padding: const EdgeInsets.symmetric(horizontal: 3),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDC2626),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+                child: Text(
+                  n > 99 ? '99+' : '$n',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    height: 1.1,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -1704,7 +1827,10 @@ class _HomeContentState extends State<HomeContent> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      StreakScreen(id: 'home', child: _buildScreen(context));
+
+  Widget _buildScreen(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final firstName = userName.split(' ').first;
 

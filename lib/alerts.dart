@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'streak/streak_screen.dart';
 import 'package:http/http.dart' as http;
 import 'anim.dart';
 import 'config.dart';
 import 'notification_service.dart';
 import 'shared_design.dart';
+import 'unread_notifications.dart';
 
 class NotificationModel {
   final int id;
@@ -89,6 +91,9 @@ class _AlertsScreenState extends State<AlertsScreen> {
     super.dispose();
   }
 
+  // The badge on the Alerts icon always shows what this list says.
+  void _syncBadge() => UnreadNotifications.instance.set(_unreadCount);
+
   Future<void> _fetchNotifications() async {
     setState(() {
       _isLoading = true;
@@ -114,6 +119,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
             _unreadCount = data['unread_count'] ?? 0;
             _isLoading = false;
           });
+          _syncBadge();
         } else {
           setState(() {
             _errorMessage = data['message'] ?? 'Failed to load notifications';
@@ -161,6 +167,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
               if (_unreadCount > 0) _unreadCount--;
             }
           });
+          _syncBadge();
         }
       }
     } catch (e) {
@@ -185,6 +192,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
                 .toList();
             _unreadCount = 0;
           });
+          _syncBadge();
           if (mounted) {
             _showSnack('All notifications marked as read', isSuccess: true);
           }
@@ -207,6 +215,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
       if (!removed.isRead && _unreadCount > 0) _unreadCount--;
       if (_expandedId == notificationId) _expandedId = null;
     });
+    _syncBadge();
 
     try {
       final response = await http.post(
@@ -226,6 +235,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
             _notifications.insert(index, removed);
             if (!removed.isRead) _unreadCount++;
           });
+          _syncBadge();
           if (mounted) _showSnack('Failed to delete. Please try again.');
         } else {
           if (mounted) _showSnack('Notification deleted', isSuccess: true);
@@ -237,6 +247,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
         _notifications.insert(index, removed);
         if (!removed.isRead) _unreadCount++;
       });
+      _syncBadge();
       if (mounted) _showSnack('Failed to delete. Please try again.');
     }
   }
@@ -293,6 +304,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
       _unreadCount = 0;
       _expandedId = null;
     });
+    _syncBadge();
 
     try {
       final response = await http.post(
@@ -453,7 +465,10 @@ class _AlertsScreenState extends State<AlertsScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      StreakScreen(id: 'alerts', child: _buildScreen(context));
+
+  Widget _buildScreen(BuildContext context) {
     final size = MediaQuery.of(context).size;
 
     final showDeleteAll =

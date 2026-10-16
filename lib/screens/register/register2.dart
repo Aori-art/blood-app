@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:blood/config.dart';
 import 'package:blood/shared_design.dart';
-import 'package:blood/streak/streak_hidden.dart';
+import 'package:blood/streak/streak_screen.dart';
 import 'register3.dart';
 
 class _LocationOption {
@@ -285,7 +285,7 @@ class _RegisterStep2State extends State<RegisterStep2> {
 
   @override
   Widget build(BuildContext context) =>
-      StreakBubbleHidden(child: _buildScreen(context));
+      StreakScreen(id: 'register', hideBubble: true, child: _buildScreen(context));
 
   Widget _buildScreen(BuildContext context) {
     return Scaffold(

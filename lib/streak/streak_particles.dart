@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import 'mascot_stage_art.dart';
+import 'dugtong_stage_art.dart';
 
 enum ParticleShape { drop, heart, star, rect, sparkle }
 

@@ -1,14 +1,20 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'streak/streak_controller.dart';
+import 'streak/streak_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:share_plus/share_plus.dart';
 import 'anim.dart';
 import 'book.dart';
 import 'history.dart';
 import 'login.dart';
+import 'post_comments.dart';
 import 'pin_screen.dart'; // PIN: "Go to Home" now goes through the PIN screen
 import 'config.dart';
+import 'donor_avatar.dart';
 import 'verify.dart';
 // ── Theme Colors ─────────────────────────────────────────────────────────────
 
@@ -73,6 +79,7 @@ class Post {
   final String content;
   final String? image;
   final int likes;
+  final int comments;
   final String? bloodType;
   final String? hospital;
   final String? eventDate;
@@ -96,6 +103,7 @@ class Post {
     required this.content,
     this.image,
     required this.likes,
+    this.comments = 0,
     this.bloodType,
     this.hospital,
     this.eventDate,
@@ -121,6 +129,7 @@ class Post {
       content: json['content'] as String? ?? '',
       image: json['image'] as String?,
       likes: (json['likes'] as num?)?.toInt() ?? 0,
+      comments: (json['comments'] as num?)?.toInt() ?? 0,
       bloodType: json['bloodType'] as String?,
       hospital: json['hospital'] as String?,
       eventDate: json['eventDate'] as String?,
@@ -1278,7 +1287,23 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
 class PostCard extends StatefulWidget {
   final Post post;
   final bool canDonate;
-  const PostCard({super.key, required this.post, this.canDonate = false});
+
+  // Who is looking: decides what the comments sheet offers (write, verify
+  // first, or sign in). Reading and sharing are open to everyone.
+  final bool isLoggedIn;
+  final String verificationStatus;
+
+  // Called when the comments sheet learns the donor's verification changed.
+  final VoidCallback? onVerificationChanged;
+
+  const PostCard({
+    super.key,
+    required this.post,
+    this.canDonate = false,
+    this.isLoggedIn = false,
+    this.verificationStatus = 'unverified',
+    this.onVerificationChanged,
+  });
 
   @override
   State<PostCard> createState() => _PostCardState();
@@ -1287,6 +1312,7 @@ class PostCard extends StatefulWidget {
 class _PostCardState extends State<PostCard> {
   late bool liked;
   late int likeCount;
+  late int commentCount;
   double _likeIconScale = 1.0;
 
   @override
@@ -1294,6 +1320,7 @@ class _PostCardState extends State<PostCard> {
     super.initState();
     liked = widget.post.liked;
     likeCount = widget.post.likes;
+    commentCount = widget.post.comments;
   }
 
   @override
@@ -1306,7 +1333,113 @@ class _PostCardState extends State<PostCard> {
         likeCount = widget.post.likes;
       });
     }
+    if (oldWidget.post.comments != widget.post.comments) {
+      setState(() => commentCount = widget.post.comments);
+    }
   }
+
+  void _openComments() {
+    HapticFeedback.selectionClick();
+    showPostComments(
+      context,
+      postId: widget.post.id,
+      isLoggedIn: widget.isLoggedIn,
+      verificationStatus: widget.verificationStatus,
+      total: commentCount,
+      onTotalChanged: (total) {
+        if (mounted && total != commentCount) {
+          setState(() => commentCount = total);
+        }
+      },
+      onVerificationChanged: widget.onVerificationChanged,
+    );
+  }
+
+  // The text that gets shared: built from the post only, nothing about the
+  // person sharing it.
+  String _shareText() {
+    final post = widget.post;
+    String? field(String? v) => (v == null || v.trim().isEmpty) ? null : v.trim();
+    final lines = <String>[
+      '${post.author} on eDonate:',
+      post.content,
+      if (field(post.eventDate) != null) 'Date: ${field(post.eventDate)}',
+      if (field(post.eventLocation) != null)
+        'Location: ${field(post.eventLocation)}',
+      if (field(post.bloodType) != null)
+        'Blood type needed: ${field(post.bloodType)}',
+      if (field(post.hospital) != null) 'Hospital: ${field(post.hospital)}',
+      if (resolveMediaUrl(post.image) != null) resolveMediaUrl(post.image)!,
+      'Every drop counts. Every life matters. #eDonate',
+    ];
+    return lines.join('\n');
+  }
+
+  Future<void> _handleShare(BuildContext buttonContext) async {
+    HapticFeedback.lightImpact();
+    Rect? origin;
+    final box = buttonContext.findRenderObject();
+    if (box is RenderBox && box.hasSize) {
+      origin = box.localToGlobal(Offset.zero) & box.size;
+    }
+    try {
+      await SharePlus.instance.share(
+        ShareParams(text: _shareText(), sharePositionOrigin: origin),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Couldn't open the share sheet. Please try again."),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  // One of the three equal-width buttons under a post.
+  Widget _actionButton({
+    required void Function(BuildContext buttonContext) onTap,
+    required IconData icon,
+    required String label,
+    Color color = AppColors.muted,
+    Widget? iconWidget,
+  }) {
+    return Expanded(
+      child: Builder(
+        builder: (buttonContext) => InkWell(
+          onTap: () => onTap(buttonContext),
+          borderRadius: BorderRadius.circular(999),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                iconWidget ?? Icon(icon, size: 17, color: color),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: color,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _countLabel(int n, String one, String many) =>
+      '${formatCount(n)} ${n == 1 ? one : many}';
 
   Future<void> _handleLike() async {
     final wasLiked = liked;
@@ -1553,52 +1686,76 @@ class _PostCardState extends State<PostCard> {
           if (post.isDonation && post.donationOpen && widget.canDonate)
             _DonateBlock(post: post),
 
-          // Action bar
+          // Counts row — only when there is something to count.
+          if (likeCount > 0 || commentCount > 0)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+              child: Row(
+                children: [
+                  if (likeCount > 0)
+                    Text(
+                      _countLabel(likeCount, 'like', 'likes'),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.muted,
+                      ),
+                    ),
+                  const Spacer(),
+                  if (commentCount > 0)
+                    InkWell(
+                      onTap: _openComments,
+                      borderRadius: BorderRadius.circular(6),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 2,
+                        ),
+                        child: Text(
+                          _countLabel(commentCount, 'comment', 'comments'),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.muted,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+          // Action bar: Like, Comment, Share
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             decoration: const BoxDecoration(
               border: Border(top: BorderSide(color: AppColors.border)),
             ),
             child: Row(
               children: [
-                InkWell(
-                  onTap: _handleLike,
-                  borderRadius: BorderRadius.circular(999),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AnimatedScale(
-                          scale: _likeIconScale,
-                          duration: const Duration(milliseconds: 140),
-                          curve: Curves.easeOut,
-                          child: Icon(
-                            liked ? Icons.favorite : Icons.favorite_border,
-                            size: 17,
-                            color: liked ? AppColors.primary : AppColors.muted,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          liked ? "Liked" : "Like",
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: liked ? AppColors.primary : AppColors.muted,
-                          ),
-                        ),
-                      ],
+                _actionButton(
+                  onTap: (_) => _handleLike(),
+                  icon: liked ? Icons.favorite : Icons.favorite_border,
+                  label: liked ? "Liked" : "Like",
+                  color: liked ? AppColors.primary : AppColors.muted,
+                  iconWidget: AnimatedScale(
+                    scale: _likeIconScale,
+                    duration: const Duration(milliseconds: 140),
+                    curve: Curves.easeOut,
+                    child: Icon(
+                      liked ? Icons.favorite : Icons.favorite_border,
+                      size: 17,
+                      color: liked ? AppColors.primary : AppColors.muted,
                     ),
                   ),
                 ),
-                const Spacer(),
-                Text(
-                  "${formatCount(likeCount)} likes",
-                  style: const TextStyle(fontSize: 12, color: AppColors.muted),
+                _actionButton(
+                  onTap: (_) => _openComments(),
+                  icon: Icons.mode_comment_outlined,
+                  label: "Comment",
+                ),
+                _actionButton(
+                  onTap: _handleShare,
+                  icon: Icons.ios_share_rounded,
+                  label: "Share",
                 ),
               ],
             ),
@@ -1783,12 +1940,17 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     final prefs = await SharedPreferences.getInstance();
     final loggedIn = prefs.getBool('isLoggedIn') ?? false;
     final donorId = prefs.getString('donorId');
+    final signedIn = loggedIn && donorId != null && donorId.isNotEmpty;
+    // The cached photo path first, so the header has the picture straight
+    // away; the server's answer follows.
+    if (signedIn) await MyAvatar.instance.load();
     if (!mounted) return;
     setState(() {
-      _isLoggedIn = loggedIn && donorId != null && donorId.isNotEmpty;
+      _isLoggedIn = signedIn;
       _userName = prefs.getString('userName');
       _checkedLogin = true;
     });
+    if (signedIn) unawaited(MyAvatar.instance.refresh());
   }
 
   Future<void> _fetchVerificationStatus() async {
@@ -1830,6 +1992,11 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
             _checkingVerification = false;
             _verifiedCardDismissed = dismissed;
           });
+          // A verified ID unlocks the Verified Donor frame: make sure the
+          // streak has the latest instead of trusting an older cache.
+          if (_verificationStatus == 'verified') {
+            unawaited(StreakController.instance.refresh());
+          }
           return;
         }
       }
@@ -1914,6 +2081,8 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       _loadingPosts = true;
       _postsError = null;
     });
+    // The newsfeed loading is also when the header photo gets refreshed.
+    unawaited(MyAvatar.instance.refresh());
     try {
       final prefs = await SharedPreferences.getInstance();
       final donorId = prefs.getString('donorId');
@@ -1933,7 +2102,10 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      StreakScreen(id: 'newsfeed', child: _buildScreen(context));
+
+  Widget _buildScreen(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.mutedBg,
       body: SafeArea(
@@ -2153,6 +2325,9 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
               key: ValueKey(_posts[i].id),
               post: _posts[i],
               canDonate: _canDonate,
+              isLoggedIn: _isLoggedIn,
+              verificationStatus: _verificationStatus,
+              onVerificationChanged: _fetchVerificationStatus,
             ),
           ),
           const SizedBox(height: 12),
@@ -2234,22 +2409,74 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     );
   }
 
+  Future<void> _openProfile() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const HistoryScreen()));
+    // The photo or frame may have changed over there.
+    if (mounted) unawaited(MyAvatar.instance.refresh());
+  }
+
   Widget _buildHeaderProfileButton() {
-    return SizedBox(
-      width: 36,
-      height: 36,
-      child: IconButton(
-        padding: EdgeInsets.zero,
-        tooltip: 'Profile',
-        onPressed: () => Navigator.of(
-          context,
-        ).push(MaterialPageRoute(builder: (_) => const HistoryScreen())),
-        icon: const Icon(
-          Icons.person_outline_rounded,
-          color: AppColors.muted,
-          size: 20,
+    // Until the login check is done, leave the spot empty instead of flashing
+    // the default icon at a signed-in donor.
+    if (!_checkedLogin) return const SizedBox(width: 36, height: 36);
+
+    if (!_isLoggedIn) {
+      return SizedBox(
+        width: 36,
+        height: 36,
+        child: IconButton(
+          padding: EdgeInsets.zero,
+          tooltip: 'Profile',
+          onPressed: _openProfile,
+          icon: const Icon(
+            Icons.person_outline_rounded,
+            color: AppColors.muted,
+            size: 20,
+          ),
         ),
-      ),
+      );
+    }
+
+    // The donor's own photo and frame. The header keeps its height: the ring of
+    // a frame may poke a little past the 36 px box, which is only paint.
+    return ListenableBuilder(
+      listenable: Listenable.merge([
+        MyAvatar.instance,
+        StreakController.instance,
+      ]),
+      builder: (context, _) {
+        final me = MyAvatar.instance;
+        final frame = me.viewerFrame;
+        return SizedBox(
+          width: 36,
+          height: 36,
+          child: Semantics(
+            label: 'Open my profile',
+            button: true,
+            excludeSemantics: true,
+            child: InkResponse(
+              onTap: _openProfile,
+              radius: 22,
+              child: OverflowBox(
+                minWidth: 0,
+                minHeight: 0,
+                maxWidth: 48,
+                maxHeight: 48,
+                child: Center(
+                  child: DonorAvatar(
+                    photoUrl: me.path,
+                    name: me.name.isNotEmpty ? me.name : (_userName ?? ''),
+                    frame: frame,
+                    radius: frame != null ? 15 : 17,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

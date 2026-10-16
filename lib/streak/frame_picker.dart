@@ -59,8 +59,17 @@ class _FrameCatalogSheet extends StatefulWidget {
 class _FrameCatalogSheetState extends State<_FrameCatalogSheet> {
   final StreakController _c = StreakController.instance;
   bool _failed = false;
+
+  // The sheet's own messenger. Looking it up from this State's context would
+  // find the page's, whose SnackBars hide behind the sheet.
+  final GlobalKey<ScaffoldMessengerState> _messenger =
+      GlobalKey<ScaffoldMessengerState>();
   // Frame key whose request is running ('' while switching to "No frame").
   String? _busyKey;
+
+  // True while the refresh made when the sheet opened is still running: a
+  // frame is never shown as locked from cached data alone.
+  bool _checking = false;
 
   @override
   void initState() {
@@ -68,9 +77,18 @@ class _FrameCatalogSheetState extends State<_FrameCatalogSheet> {
     if (_c.data == null) {
       _load();
     } else {
-      // Quietly refresh so unlock states are current.
-      _c.refresh();
+      _checking = true;
+      _recheck();
     }
+  }
+
+  // Always ask the server when the sheet opens, so the unlock states are
+  // current (e.g. the ID was verified since the cache was saved).
+  Future<void> _recheck() async {
+    final ok = await _c.refresh();
+    if (!mounted) return;
+    setState(() => _checking = false);
+    if (!ok) _snack("Couldn't check for new frames. Showing what we know.");
   }
 
   Future<void> _load() async {
@@ -82,7 +100,7 @@ class _FrameCatalogSheetState extends State<_FrameCatalogSheet> {
 
   void _snack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    _messenger.currentState?.showSnackBar(
       SnackBar(
         content: Text(message),
         behavior: SnackBarBehavior.floating,
@@ -124,6 +142,7 @@ class _FrameCatalogSheetState extends State<_FrameCatalogSheet> {
 
   @override
   Widget build(BuildContext context) => ScaffoldMessenger(
+    key: _messenger,
     // Its own messenger so error SnackBars appear inside the sheet instead of
     // behind it.
     child: Scaffold(
@@ -353,6 +372,7 @@ class _FrameCatalogSheetState extends State<_FrameCatalogSheet> {
     );
 
     if (!unlocked) {
+      final checking = _checking;
       return _tile(
         avatar: Stack(
           alignment: Alignment.center,
@@ -383,18 +403,37 @@ class _FrameCatalogSheetState extends State<_FrameCatalogSheet> {
         ),
         label: frame.label.isEmpty ? frame.key : frame.label,
         equipped: false,
-        onTap: () => _showRequirement(frame, data),
-        state: Text(
-          _requirement(frame),
-          maxLines: 3,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 10.5,
-            color: kTextMuted,
-            height: 1.25,
-          ),
-        ),
+        onTap: checking ? null : () => _showRequirement(frame, data),
+        state: checking
+            ? const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 11,
+                    height: 11,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1.8,
+                      color: kTextMuted,
+                    ),
+                  ),
+                  SizedBox(width: 6),
+                  Text(
+                    'Checking…',
+                    style: TextStyle(fontSize: 10.5, color: kTextMuted),
+                  ),
+                ],
+              )
+            : Text(
+                _requirement(frame),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 10.5,
+                  color: kTextMuted,
+                  height: 1.25,
+                ),
+              ),
       );
     }
 

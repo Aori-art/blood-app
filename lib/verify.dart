@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -8,7 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'config.dart';
 import 'shared_design.dart';
-import 'streak/streak_hidden.dart';
+import 'streak/streak_controller.dart';
+import 'streak/streak_screen.dart';
 
 enum _IdSide { front, back }
 
@@ -80,6 +82,9 @@ class _VerifyScreenState extends State<VerifyScreen>
   void dispose() {
     _resultAnimation.dispose();
     _refreshIconController.dispose();
+    // Leaving this screen: the ID may have just been verified, which unlocks
+    // the Verified Donor frame, so ask the streak for the latest.
+    unawaited(StreakController.instance.refresh());
     super.dispose();
   }
 
@@ -296,7 +301,7 @@ class _VerifyScreenState extends State<VerifyScreen>
 
   @override
   Widget build(BuildContext context) =>
-      StreakBubbleHidden(child: _buildScreen(context));
+      StreakScreen(id: 'verify', child: _buildScreen(context));
 
   Widget _buildScreen(BuildContext context) => Scaffold(
     backgroundColor: const Color(0xFFF9FAFB),

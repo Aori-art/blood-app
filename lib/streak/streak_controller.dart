@@ -7,7 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config.dart';
-import 'mascot_stage_art.dart';
+import 'dugtong_stage_art.dart';
 
 int _int(dynamic v) {
   if (v is num) return v.toInt();
@@ -97,6 +97,15 @@ class FrameInfo {
 
   bool get isVerifiedFrame => unlockType == 'verified';
 
+  FrameInfo asUnlocked() => FrameInfo(
+    key: key,
+    label: label,
+    description: description,
+    unlockType: unlockType,
+    unlockDays: unlockDays,
+    unlocked: true,
+  );
+
   factory FrameInfo.fromJson(Map<String, dynamic> json) {
     final unlock = json['unlock'];
     String type = 'streak';
@@ -167,6 +176,32 @@ class StreakData {
     final ladder = body['ladder'];
     final frames = body['unlocked_frames'];
     final frameList = body['frames'];
+    final isVerified = body['is_verified'] == true;
+
+    // The server's `frames` list is the truth about locked/unlocked; a donor
+    // the server calls verified always has the Verified Donor frame.
+    final infos = frameList is List
+        ? frameList
+              .whereType<Map>()
+              .map((e) => FrameInfo.fromJson(Map<String, dynamic>.from(e)))
+              .where((f) => f.key.isNotEmpty)
+              .map((f) => isVerified && f.isVerifiedFrame ? f.asUnlocked() : f)
+              .toList()
+        : <FrameInfo>[];
+    final byKey = {for (final f in infos) f.key: f};
+    final unlockedFrames = <String>[
+      if (frames is List)
+        for (final e in frames)
+          if (byKey[e.toString()]?.unlocked ?? true) e.toString(),
+    ];
+    for (final f in infos) {
+      if (f.unlocked && !unlockedFrames.contains(f.key)) {
+        unlockedFrames.add(f.key);
+      }
+    }
+    if (isVerified && !unlockedFrames.contains('verified')) {
+      unlockedFrames.add('verified');
+    }
     return StreakData(
       current: _int(streak['current']),
       longest: _int(streak['longest']),
@@ -174,9 +209,7 @@ class StreakData {
       lastCheckinDate: _nullableString(streak['last_checkin_date']),
       freezeAvailable: streak['freeze_available'] == true,
       equippedFrame: _nullableString(body['equipped_frame']),
-      unlockedFrames: frames is List
-          ? frames.map((e) => e.toString()).toList()
-          : const [],
+      unlockedFrames: unlockedFrames,
       nextMilestone: next is Map
           ? Milestone.fromJson(Map<String, dynamic>.from(next))
           : null,
@@ -186,14 +219,8 @@ class StreakData {
                 .map((e) => Milestone.fromJson(Map<String, dynamic>.from(e)))
                 .toList()
           : const [],
-      isVerified: body['is_verified'] == true,
-      frames: frameList is List
-          ? frameList
-                .whereType<Map>()
-                .map((e) => FrameInfo.fromJson(Map<String, dynamic>.from(e)))
-                .where((f) => f.key.isNotEmpty)
-                .toList()
-          : const [],
+      isVerified: isVerified,
+      frames: infos,
     );
   }
 
@@ -238,22 +265,29 @@ class StreakActionResult {
   const StreakActionResult({required this.ok, this.code, this.message});
 }
 
-enum CelebrationKind { frame, badge, evolution }
+enum CelebrationKind { frame, badge, evolution, count }
 
-/// Something worth a full-screen celebration: a new frame or badge, and/or
-/// the mascot evolving.
+/// One full-screen celebration, played as phases in order:
+///   A. the count splash ([hasCount]: 2 -> 3, 6 -> 7, ...),
+///   B. Dugtong evolving ([evolved]),
+///   C. the reward reveal ([hasReward]: a new badge or frame).
+/// Any phase that does not apply is skipped.
 class StreakCelebration {
   final CelebrationKind kind;
 
-  /// Frame key or badge key (empty for a pure evolution).
+  /// Frame key or badge key (empty when there is no reward).
   final String key;
   final String label;
   final String description;
 
   /// Streak when it happened.
   final int streak;
-  final MascotStage oldStage;
-  final MascotStage newStage;
+  final DugtongStage oldStage;
+  final DugtongStage newStage;
+
+  /// Set when phase A plays: the number rolls from [countFrom] to [countTo].
+  final int? countFrom;
+  final int? countTo;
 
   const StreakCelebration({
     required this.kind,
@@ -263,15 +297,20 @@ class StreakCelebration {
     required this.streak,
     required this.oldStage,
     required this.newStage,
+    this.countFrom,
+    this.countTo,
   });
 
-  String get id =>
-      '${kind == CelebrationKind.badge
-          ? 'badge'
-          : kind == CelebrationKind.evolution
-          ? 'evolution'
-          : 'frame'}:$key';
+  String get id => switch (kind) {
+    CelebrationKind.badge => 'badge:$key',
+    CelebrationKind.frame => 'frame:$key',
+    CelebrationKind.evolution => 'evolution:$key',
+    CelebrationKind.count => 'count:$streak',
+  };
 
+  bool get hasCount => countFrom != null && countTo != null;
+  bool get hasReward =>
+      kind == CelebrationKind.frame || kind == CelebrationKind.badge;
   bool get isVerifiedFrame =>
       kind == CelebrationKind.frame && key == 'verified';
   bool get evolved => newStage.index > oldStage.index;
@@ -292,13 +331,28 @@ class StreakController extends ChangeNotifier {
   static const double defaultBubbleDy = 0.35;
   static const Duration _resumeThrottle = Duration(minutes: 30);
 
+  /// When a check-in can't be counted (offline, server hiccup) it is tried
+  /// again after these delays, so the bubble doesn't stay missing until the
+  /// next app start.
+  static const List<Duration> _retryDelays = [
+    Duration(seconds: 5),
+    Duration(seconds: 15),
+    Duration(seconds: 45),
+  ];
+
+  /// Ladder days that get the full-screen count splash.
+  static const Set<int> countMilestones = {3, 7, 14, 30, 60, 100, 200, 365};
+
   StreakData? data;
   bool showBubblePref = true;
   bool chatEnabled = true;
   bool loggedIn = false;
 
-  /// Screens where the bubble must not show hold this above zero.
-  int hiddenCount = 0;
+  // Where the donor is right now (see StreakScreen). An unwrapped route is
+  // 'generic' and never hides the bubble.
+  String _screenId = 'generic';
+  bool _screenHidden = false;
+  Object? _screenToken;
 
   /// One-shot: set when a new day was recorded, cleared by [consumeCelebrate].
   bool celebrate = false;
@@ -307,7 +361,7 @@ class StreakController extends ChangeNotifier {
   int celebrateFrom = 0;
   int celebrateTo = 0;
 
-  /// Whether the latest check-in moved the mascot to a new stage.
+  /// Whether the latest check-in moved Dugtong to a new stage.
   bool evolvedNow = false;
 
   /// Display-only facts about the latest check-in.
@@ -327,13 +381,43 @@ class StreakController extends ChangeNotifier {
   String? _seenDonor;
   String? _dataDonorId;
   int _session = 0;
+  int _applySeq = 0;
   bool _checkInBusy = false;
+  Timer? _retryTimer;
+  int _retryAttempt = 0;
   DateTime? _lastCheckInAt;
   String? _lastCheckInDate;
   bool _notifyScheduled = false;
 
   String? get equippedFrame => loggedIn ? data?.equippedFrame : null;
+
+  /// The server's name for a frame (e.g. "Gold Frame"), or null when the key
+  /// is not in the list this donor received.
+  String? frameLabel(String key) {
+    final label = data?.frameByKey(key)?.label;
+    return (label == null || label.isEmpty) ? null : label;
+  }
   bool get hasCelebration => _celebrations.isNotEmpty;
+
+  /// Id of the screen the donor is on ('generic' when it isn't a StreakScreen).
+  String get currentScreenId => _screenId;
+
+  /// True while a screen that keeps the bubble off is current.
+  bool get currentScreenHidden => _screenHidden;
+
+  /// Screens shown before the donor is inside the app.
+  static const Set<String> preAppScreens = {
+    'login',
+    'register',
+    'otp',
+    'forgot_password',
+    'splash',
+    'consent',
+  };
+
+  /// Full-screen celebrations wait until the donor is signed in and past the
+  /// login / registration / OTP screens.
+  bool get celebrationAllowed => loggedIn && !preAppScreens.contains(_screenId);
 
   // ─── Setup ─────────────────────────────────────────────────────────────
 
@@ -399,17 +483,51 @@ class StreakController extends ChangeNotifier {
     return null;
   }
 
-  /// Records today's check-in (idempotent on the server). Silent on failure.
-  Future<void> checkIn() async {
-    if (_checkInBusy) return;
+  /// Called right after a successful login (before navigating away from the
+  /// login screen) and at app start when the saved session says the donor is
+  /// signed in. Loads the cached streak, then counts today.
+  Future<void> onLoggedIn() async {
+    final session = _session;
+    // Flip the flag at once so listeners react without waiting for storage.
+    if (!loggedIn) {
+      loggedIn = true;
+      notifyListeners();
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final id = _signedInDonorId(prefs);
+    if (session != _session) return;
+    if (id == null) {
+      loggedIn = false;
+      notifyListeners();
+      return;
+    }
+    if (_dataDonorId != null && _dataDonorId != id) {
+      data = null;
+      _dataDonorId = null;
+      _celebrations.clear();
+      _seenFrames = null;
+      _seenDonor = null;
+    }
+    _loadCache(prefs, id);
+    _retryAttempt = 0;
+    notifyListeners();
+    await checkIn();
+  }
+
+  /// Called on logout and after account deletion: hides the bubble and
+  /// forgets the donor (see [reset]).
+  void onLoggedOut({bool forgetSeen = false}) => reset(forgetSeen: forgetSeen);
+
+  /// Records today's check-in (idempotent on the server). Returns whether the
+  /// server answered. Silent on failure, but it tries again soon (see
+  /// [_retryDelays]) instead of waiting for the next app start.
+  Future<bool> checkIn() async {
+    if (_checkInBusy) return false;
     final session = _session;
     final prefs = await SharedPreferences.getInstance();
     final id = _signedInDonorId(prefs);
-    if (id == null || session != _session) return;
+    if (id == null || session != _session || _checkInBusy) return false;
     _checkInBusy = true;
-    final now = DateTime.now();
-    _lastCheckInAt = now;
-    _lastCheckInDate = _dateKey(now);
     try {
       if (!loggedIn) {
         loggedIn = true;
@@ -419,38 +537,75 @@ class StreakController extends ChangeNotifier {
       final body = await _request('streak_checkin.php', {
         'donor_id': id,
       }, post: true);
-      if (body == null || body['success'] != true || session != _session) {
-        return;
+      if (session != _session) return false;
+      if (body == null || body['success'] != true) {
+        // Today could not be counted. Show what the server already knows (so
+        // the bubble can appear) and try the check-in again shortly.
+        if (data == null) unawaited(refresh());
+        _scheduleRetry();
+        return false;
       }
+      _retryTimer?.cancel();
+      _retryTimer = null;
+      _retryAttempt = 0;
+      final now = DateTime.now();
+      _lastCheckInAt = now;
+      _lastCheckInDate = _dateKey(now);
       _apply(prefs, id, body, fromCheckIn: true);
+      return true;
     } finally {
       _checkInBusy = false;
     }
   }
 
-  /// Called when the app returns to the foreground: at most once per 30
-  /// minutes, unless the local date changed.
+  void _scheduleRetry() {
+    _retryTimer?.cancel();
+    if (_retryAttempt >= _retryDelays.length) return;
+    final delay = _retryDelays[_retryAttempt++];
+    _retryTimer = Timer(delay, () {
+      _retryTimer = null;
+      unawaited(checkIn());
+    });
+  }
+
+  /// Called when the app returns to the foreground. The streak (and the
+  /// frames, including Verified Donor) is always refreshed; today's check-in
+  /// is repeated at most once per 30 minutes unless the date changed or
+  /// nothing was ever loaded.
   Future<void> onAppResumed() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_signedInDonorId(prefs) == null) return;
+    if (!loggedIn) {
+      await onLoggedIn();
+      return;
+    }
     final now = DateTime.now();
     final last = _lastCheckInAt;
     final due =
         last == null ||
+        data == null ||
         now.difference(last) >= _resumeThrottle ||
         _lastCheckInDate != _dateKey(now);
-    if (due) await checkIn();
+    await Future.wait([if (due) checkIn(), refresh()]);
   }
 
+  /// Fetches the current streak and frames without recording a check-in. It
+  /// always asks the server: locked or unlocked is never decided from the
+  /// cache. Returns whether the server answered.
   Future<bool> refresh() async {
     final session = _session;
     final prefs = await SharedPreferences.getInstance();
     final id = _signedInDonorId(prefs);
     if (id == null || session != _session) return false;
+    final seq = _applySeq;
     final body = await _request('get_streak.php', {
       'donor_id': id,
     }, post: false);
     if (body == null || body['success'] != true || session != _session) {
       return false;
     }
+    // A check-in answered while this was in flight; its data is newer.
+    if (_applySeq != seq) return true;
     _apply(prefs, id, body, fromCheckIn: false);
     return true;
   }
@@ -510,11 +665,12 @@ class StreakController extends ChangeNotifier {
     final parsed = StreakData.fromBody(body);
     if (parsed == null) return;
 
-    // What the mascot looked like before this payload (for evolution).
+    // What Dugtong looked like before this payload (for evolution).
     final previous = (_dataDonorId == id) ? data : null;
     final isNewDay = fromCheckIn && body['is_new_checkin'] == true;
     final lost = fromCheckIn && body['streak_lost'] == true;
 
+    _applySeq++;
     data = parsed;
     _dataDonorId = id;
     loggedIn = true;
@@ -536,7 +692,9 @@ class StreakController extends ChangeNotifier {
         }
       }
       if (isNewDay) {
-        celebrate = true;
+        // Ladder days get the full-screen count splash instead of the small
+        // animation around the bubble.
+        celebrate = !countMilestones.contains(parsed.current);
         celebrateTo = parsed.current;
         celebrateFrom = parsed.current > 0 ? parsed.current - 1 : 0;
       }
@@ -587,8 +745,8 @@ class StreakController extends ChangeNotifier {
     }
     final seen = _seenFrames!;
 
-    // Evolution: compare the mascot before and after this check-in.
-    final newStage = mascotStageFor(parsed.current);
+    // Evolution: compare Dugtong before and after this check-in.
+    final newStage = dugtongStageFor(parsed.current);
     var oldStage = newStage;
     if (isNewDay) {
       final oldCurrent =
@@ -596,10 +754,15 @@ class StreakController extends ChangeNotifier {
           (lost
               ? previousStreak
               : (parsed.current > 0 ? parsed.current - 1 : 0));
-      oldStage = mascotStageFor(oldCurrent);
+      oldStage = dugtongStageFor(oldCurrent);
     }
     var evolutionPending = newStage.index > oldStage.index;
     evolvedNow = evolutionPending;
+
+    // Ladder day (3, 7, 14, ...): the count splash plays on every one of them,
+    // reward or not.
+    var countPending = isNewDay && countMilestones.contains(parsed.current);
+    final countFrom = parsed.current > 0 ? parsed.current - 1 : 0;
 
     final fresh = <StreakCelebration>[];
     void add(StreakCelebration c) {
@@ -614,17 +777,25 @@ class StreakController extends ChangeNotifier {
       String label,
       String description,
     ) {
-      // The evolution plays with the first reward of the check-in.
-      final carries = evolutionPending && key != 'verified';
-      if (carries) evolutionPending = false;
+      // The count splash and the evolution play once, with the first reward
+      // of the check-in (the Verified frame never carries them).
+      final carries = (evolutionPending || countPending) && key != 'verified';
+      final withCount = carries && countPending;
+      final withEvolution = carries && evolutionPending;
+      if (carries) {
+        evolutionPending = false;
+        countPending = false;
+      }
       return StreakCelebration(
         kind: kind,
         key: key,
         label: label,
         description: description,
         streak: parsed.current,
-        oldStage: carries ? oldStage : newStage,
+        oldStage: (withEvolution || withCount) ? oldStage : newStage,
         newStage: newStage,
+        countFrom: withCount ? countFrom : null,
+        countTo: withCount ? parsed.current : null,
       );
     }
 
@@ -650,16 +821,21 @@ class StreakController extends ChangeNotifier {
         ),
       );
     }
-    if (evolutionPending) {
+    if (evolutionPending || countPending) {
+      // No reward to ride along with.
       add(
         StreakCelebration(
-          kind: CelebrationKind.evolution,
-          key: newStage.name,
+          kind: evolutionPending
+              ? CelebrationKind.evolution
+              : CelebrationKind.count,
+          key: evolutionPending ? newStage.name : '',
           label: newStage.stageName,
-          description: 'Your mascot evolved!',
+          description: 'Dugtong evolved!',
           streak: parsed.current,
           oldStage: oldStage,
           newStage: newStage,
+          countFrom: countPending ? countFrom : null,
+          countTo: countPending ? parsed.current : null,
         ),
       );
     }
@@ -697,28 +873,43 @@ class StreakController extends ChangeNotifier {
     return true;
   }
 
-  // ─── Where the bubble may show ─────────────────────────────────────────
+  // ─── Where the donor is ────────────────────────────────────────────────────────────────────────────────────────
 
-  void pushHidden() {
-    hiddenCount++;
+  /// A screen became current. [token] identifies the screen instance so that a
+  /// screen leaving late can never clear the one that replaced it.
+  void screenEntered(Object token, String id, {bool hidden = false}) {
+    if (_screenToken == token && _screenId == id && _screenHidden == hidden) {
+      return;
+    }
+    _screenToken = token;
+    _screenId = id;
+    _screenHidden = hidden;
     _notifyAfterFrame();
   }
 
-  void popHidden() {
-    if (hiddenCount > 0) hiddenCount--;
+  /// A screen stopped being current (covered, popped or disposed). Does
+  /// nothing if another screen has already taken over.
+  void screenLeft(Object token) {
+    if (_screenToken != token) return;
+    _screenToken = null;
+    _screenId = 'generic';
+    _screenHidden = false;
     _notifyAfterFrame();
   }
 
-  // Hidden counters change during build/dispose, so listeners are told once
-  // the frame is done.
+  // Screens change during build/dispose, so listeners are told once the frame
+  // is done.
   void _notifyAfterFrame() {
     if (_notifyScheduled) return;
-    _notifyScheduled = true;
-    SchedulerBinding.instance.addPostFrameCallback((_) {
+    final binding = SchedulerBinding.instance;
+    binding.addPostFrameCallback((_) {
       _notifyScheduled = false;
       notifyListeners();
     });
-    SchedulerBinding.instance.ensureVisualUpdate();
+    // Only now: if scheduling had thrown, a stuck flag would swallow every
+    // later change.
+    _notifyScheduled = true;
+    binding.ensureVisualUpdate();
   }
 
   // ─── Bubble settings ───────────────────────────────────────────────────
@@ -764,6 +955,10 @@ class StreakController extends ChangeNotifier {
   /// [forgetSeen] is true, as it is when the account is deleted.
   void reset({bool forgetSeen = false}) {
     _session++;
+    _retryTimer?.cancel();
+    _retryTimer = null;
+    _retryAttempt = 0;
+    _checkInBusy = false;
     data = null;
     _dataDonorId = null;
     loggedIn = false;
