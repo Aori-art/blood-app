@@ -184,8 +184,11 @@ Widget profileInfoCard(
       Expanded(
         child: Text(
           text,
-          style: const TextStyle(
-            color: AppColors.primaryDark,
+          style: TextStyle(
+            // The deeper red in light (as always); the readable red in dark.
+            color: context.palette.isDark
+                ? context.palette.primaryText
+                : AppColors.primaryDark,
             fontSize: 13,
             height: 1.4,
           ),

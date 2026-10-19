@@ -435,7 +435,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
                               Icon(
                                 Icons.water_drop_outlined,
                                 size: 48,
-                                color: context.palette.border,
+                                color: context.palette.faint,
                               ),
                               const SizedBox(height: 12),
                               Text(
@@ -759,7 +759,7 @@ class _DonationCard extends StatelessWidget {
                       Icons.keyboard_arrow_down_rounded,
                       color: isExpanded
                           ? context.palette.primaryText
-                          : context.palette.border,
+                          : context.palette.faint,
                       size: 22,
                     ),
                   ),

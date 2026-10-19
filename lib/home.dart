@@ -2780,7 +2780,7 @@ class _HomeContentState extends State<HomeContent> {
                             children: [
                               Icon(
                                 Icons.calendar_today_outlined,
-                                color: context.palette.border,
+                                color: context.palette.faint,
                                 size: 36,
                               ),
                               const SizedBox(height: 8),

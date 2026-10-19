@@ -663,7 +663,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
             child: Icon(
               Icons.notifications_off_rounded,
               size: 48,
-              color: context.palette.border,
+              color: context.palette.faint,
             ),
           ),
           const SizedBox(height: 20),
@@ -911,7 +911,7 @@ class _NotificationCard extends StatelessWidget {
                           Icons.keyboard_arrow_down_rounded,
                           color: isExpanded
                               ? typeColor
-                              : context.palette.border,
+                              : context.palette.faint,
                           size: 22,
                         ),
                       ),

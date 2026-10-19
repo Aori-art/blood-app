@@ -1449,7 +1449,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
               selected
                   ? Icons.radio_button_checked_rounded
                   : Icons.radio_button_unchecked_rounded,
-              color: selected ? color : context.palette.border,
+              color: selected ? color : context.palette.faint,
             ),
           ],
         ),

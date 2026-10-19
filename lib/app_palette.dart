@@ -41,6 +41,11 @@ class AppPalette extends ThemeExtension<AppPalette> {
   // Category accents (purple eligibility / privacy, pink donations).
   final Color purple, purpleBg, purpleBorder, pink, pinkBg;
 
+  /// Decorative icons that are meant to be quiet (chevrons, empty-state
+  /// illustrations, unselected radio marks): the hairline [border] in light,
+  /// a gray that still reaches 3:1 in dark.
+  final Color faint;
+
   /// The shadow under cards; none in dark, where the 1 px border does the job.
   final List<BoxShadow> shadow;
 
@@ -78,6 +83,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.purpleBorder,
     required this.pink,
     required this.pinkBg,
+    required this.faint,
     required this.shadow,
   });
 
@@ -116,6 +122,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     purpleBorder: Color(0xFFE9D5FF),
     pink: Color(0xFFEC4899),
     pinkBg: Color(0xFFFDF2F8),
+    faint: AppColors.border,
     shadow: AppColors.cardShadow,
   );
 
@@ -153,6 +160,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     purpleBorder: Color(0xFF4A2A6B),
     pink: Color(0xFFF472B6),
     pinkBg: Color(0xFF2A1521),
+    faint: Color(0xFF6B6B6B),
     shadow: <BoxShadow>[],
   );
 
@@ -191,6 +199,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     Color? purpleBorder,
     Color? pink,
     Color? pinkBg,
+    Color? faint,
     List<BoxShadow>? shadow,
   }) => AppPalette(
     isDark: isDark ?? this.isDark,
@@ -226,6 +235,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     purpleBorder: purpleBorder ?? this.purpleBorder,
     pink: pink ?? this.pink,
     pinkBg: pinkBg ?? this.pinkBg,
+    faint: faint ?? this.faint,
     shadow: shadow ?? this.shadow,
   );
 
@@ -268,6 +278,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
       purpleBorder: c(purpleBorder, other.purpleBorder),
       pink: c(pink, other.pink),
       pinkBg: c(pinkBg, other.pinkBg),
+      faint: c(faint, other.faint),
       shadow: BoxShadow.lerpList(shadow, other.shadow, t) ?? const [],
     );
   }

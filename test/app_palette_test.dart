@@ -4,7 +4,11 @@ import 'package:blood/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-typedef _Pair = (String, Color Function(AppPalette), Color Function(AppPalette));
+typedef _Pair = (
+  String,
+  Color Function(AppPalette),
+  Color Function(AppPalette),
+);
 
 // Text / icon color on the surface it sits on. Every pair must reach 4.5:1.
 final List<_Pair> _pairs = [
@@ -120,7 +124,13 @@ void main() {
     expect(mid.background, isNot(AppPalette.dark.background));
     expect(mid.foreground, isNot(AppPalette.light.foreground));
     expect(mid.primaryText, isNot(AppPalette.dark.primaryText));
-    expect(AppPalette.light.lerp(AppPalette.dark, 1).surface, AppPalette.dark.surface);
-    expect(AppPalette.light.lerp(AppPalette.dark, 0).surface, AppPalette.light.surface);
+    expect(
+      AppPalette.light.lerp(AppPalette.dark, 1).surface,
+      AppPalette.dark.surface,
+    );
+    expect(
+      AppPalette.light.lerp(AppPalette.dark, 0).surface,
+      AppPalette.light.surface,
+    );
   });
 }

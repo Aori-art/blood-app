@@ -28,6 +28,16 @@ class AppTheme {
           onSecondary: Colors.white,
           surface: p.surface,
           onSurface: p.isDark ? p.foreground : null,
+          // Dark only (light keeps the generated values): menus, pickers and
+          // other Material surfaces follow the palette instead of a red tint.
+          onSurfaceVariant: p.isDark ? p.muted : null,
+          outline: p.isDark ? p.hint : null,
+          outlineVariant: p.isDark ? p.border : null,
+          surfaceContainerLowest: p.isDark ? p.background : null,
+          surfaceContainerLow: p.isDark ? p.surface : null,
+          surfaceContainer: p.isDark ? p.surface : null,
+          surfaceContainerHigh: p.isDark ? p.surfaceAlt : null,
+          surfaceContainerHighest: p.isDark ? p.surfaceAlt : null,
           error: p.primaryText,
           onError: p.isDark ? Colors.black : Colors.white,
         );
@@ -166,7 +176,9 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         headerBackgroundColor: AppColors.primary,
         headerForegroundColor: Colors.white,
-        confirmButtonStyle: TextButton.styleFrom(foregroundColor: p.primaryText),
+        confirmButtonStyle: TextButton.styleFrom(
+          foregroundColor: p.primaryText,
+        ),
         cancelButtonStyle: TextButton.styleFrom(foregroundColor: p.primaryText),
         todayForegroundColor: WidgetStateProperty.all(p.primaryText),
         todayBorder: BorderSide(color: p.primaryText),
@@ -199,11 +211,14 @@ class AppTheme {
               : p.surface,
         ),
         dayPeriodTextColor: WidgetStateColor.resolveWith(
-          (states) =>
-              states.contains(WidgetState.selected) ? Colors.white : p.foreground,
+          (states) => states.contains(WidgetState.selected)
+              ? Colors.white
+              : p.foreground,
         ),
         entryModeIconColor: p.primaryText,
-        confirmButtonStyle: TextButton.styleFrom(foregroundColor: p.primaryText),
+        confirmButtonStyle: TextButton.styleFrom(
+          foregroundColor: p.primaryText,
+        ),
         cancelButtonStyle: TextButton.styleFrom(foregroundColor: p.primaryText),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),

@@ -185,7 +185,8 @@ class UrgencyBadge extends StatelessWidget {
     if (urgency == Urgency.normal) return const SizedBox.shrink();
 
     final isCritical = urgency == Urgency.critical;
-    final color = isCritical ? context.palette.criticalText : context.palette.orange;
+    // Badge fills with white content: the same in both modes.
+    final color = isCritical ? AppColors.critical : AppColors.orange;
     final label = isCritical ? "CRITICAL" : "URGENT";
 
     return Container(
@@ -2809,7 +2810,7 @@ class _VerificationCard extends StatelessWidget {
                     height: 26,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: .75),
+                      color: context.palette.surface.withValues(alpha: .75),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(

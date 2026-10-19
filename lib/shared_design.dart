@@ -441,7 +441,11 @@ class PrimaryButton extends StatelessWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-          color: disabled ? context.palette.hint : null,
+          color: disabled
+              ? (context.palette.isDark
+                    ? context.palette.border
+                    : context.palette.hint)
+              : null,
           borderRadius: radius,
           boxShadow: disabled
               ? null
@@ -458,7 +462,9 @@ class PrimaryButton extends StatelessWidget {
             backgroundColor: Colors.transparent,
             disabledBackgroundColor: Colors.transparent,
             foregroundColor: Colors.white,
-            disabledForegroundColor: Colors.white,
+            disabledForegroundColor: context.palette.isDark
+                ? context.palette.muted
+                : Colors.white,
             shadowColor: Colors.transparent,
             elevation: 0,
             shape: RoundedRectangleBorder(borderRadius: radius),
