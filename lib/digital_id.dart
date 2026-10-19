@@ -1233,7 +1233,9 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
           Icon(Icons.circle, size: 8, color: color),
           const SizedBox(width: 8),
           Text(
-            elig?.label ?? 'Unknown',
+            (elig?.status == 'pending' || elig?.status == 'for_review')
+                ? 'Under Review'
+                : (elig?.label ?? 'Unknown'),
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w700,

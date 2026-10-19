@@ -1707,6 +1707,12 @@ class _HomeContentState extends State<HomeContent> {
     }
   }
 
+  // pending and for_review are the same state to the donor: "Under Review".
+  bool _isUnderReview(String status) {
+    final s = status.toLowerCase();
+    return s == 'pending' || s == 'for_review';
+  }
+
   Color getEligibilityStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'eligible':
@@ -1732,7 +1738,7 @@ class _HomeContentState extends State<HomeContent> {
         return 'Not Eligible';
       case 'pending':
       case 'for_review':
-        return 'Pending Review';
+        return 'Under Review';
       case 'temporary_deferred':
         return 'Temporarily Deferred';
       case 'not_checked':
@@ -2638,7 +2644,11 @@ class _HomeContentState extends State<HomeContent> {
                                   Icons.play_arrow_rounded,
                                   size: 18,
                                 ),
-                                label: const Text('Check Eligibility'),
+                                label: Text(
+                                  _isUnderReview(eligibilityStatus)
+                                      ? 'View Status'
+                                      : 'Check Eligibility',
+                                ),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.primary,
                                   disabledBackgroundColor: kBorder,

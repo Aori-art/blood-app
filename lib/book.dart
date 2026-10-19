@@ -23,6 +23,19 @@ const List<BoxShadow> kBookSoftShadow = AppColors.cardShadow;
 // gap above it instead of guessing at a fixed value.
 const double kStickyBarHeight = 12 + 50 + 12;
 
+/// One bookable time slot of a donation center (from the database).
+class TimeSlot {
+  final int id;
+
+  /// Exactly the text sent as appointment_time, e.g. "8:00 AM - 9:00 AM".
+  final String value;
+
+  /// morning | afternoon | evening
+  final String period;
+
+  const TimeSlot({required this.id, required this.value, required this.period});
+}
+
 class BookScreen extends StatefulWidget {
   final bool showBackButton;
   final int? preselectedFacilityId;
@@ -44,7 +57,8 @@ class _BookScreenState extends State<BookScreen>
   String? selectedTime;
 
   // Raw backend eligibility_status.status value: eligible / not_eligible /
-  // pending / temporary_deferred / other.
+  // pending / for_review (both shown as "Under Review") / temporary_deferred /
+  // other.
   String? _eligibilityStatus;
   String? _eligibilityRecommendation;
   String? _nextEligibleDate;
@@ -89,14 +103,16 @@ class _BookScreenState extends State<BookScreen>
     return null;
   }
 
-  final List<String> timeSlots = [
-    "8:00 AM - 9:00 AM",
-    "9:00 AM - 10:00 AM",
-    "10:00 AM - 11:00 AM",
-    "1:00 PM - 2:00 PM",
-    "2:00 PM - 3:00 PM",
-    "3:00 PM - 4:00 PM",
-  ];
+  // Time slots per donation center (slots table) — fetched, not hardcoded.
+  Map<int, List<TimeSlot>> _slotsByFacility = {};
+  bool _loadingSlots = true;
+  bool _slotsError = false;
+
+  List<TimeSlot> get _slotsForSelectedFacility {
+    final id = selectedFacilityId;
+    if (id == null) return const [];
+    return _slotsByFacility[id] ?? const [];
+  }
 
   late final AnimationController _pulseController;
 
@@ -136,6 +152,7 @@ class _BookScreenState extends State<BookScreen>
       _fetchCurrentAppointment(),
       _fetchDonationStatus(),
       _fetchFacilities(),
+      _fetchTimeSlots(),
     ]);
   }
 
@@ -367,6 +384,73 @@ class _BookScreenState extends State<BookScreen>
     }
   }
 
+  Future<void> _fetchTimeSlots() async {
+    try {
+      final url = Uri.parse("${AppConfig.baseUrl}/get_facility_time_slots.php");
+      final response = await http.get(url).timeout(const Duration(seconds: 10));
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final raw = data is Map ? data['slots_by_facility'] : null;
+        if (data is Map && data['status'] == 'success' && raw is Map) {
+          final map = <int, List<TimeSlot>>{};
+          raw.forEach((key, list) {
+            final id = int.tryParse(key.toString());
+            if (id == null || list is! List) return;
+            final slots = <TimeSlot>[];
+            for (final s in list.whereType<Map>()) {
+              final value = s['value']?.toString() ?? '';
+              if (value.isEmpty) continue;
+              slots.add(
+                TimeSlot(
+                  id: (s['slot_id'] as num?)?.toInt() ?? slots.length,
+                  value: value,
+                  period: _slotPeriod(s),
+                ),
+              );
+            }
+            if (slots.isNotEmpty) map[id] = slots;
+          });
+          setState(() {
+            _slotsByFacility = map;
+            _loadingSlots = false;
+            _slotsError = false;
+            // The admin may have changed the slots: drop a time that is gone.
+            if (selectedTime != null &&
+                !_slotsForSelectedFacility.any((s) => s.value == selectedTime)) {
+              selectedTime = null;
+            }
+          });
+          return;
+        }
+      }
+      setState(() {
+        _loadingSlots = false;
+        _slotsError = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadingSlots = false;
+        _slotsError = true;
+      });
+    }
+  }
+
+  /// The slot's period; falls back to its start time if the server sent an
+  /// unknown one, so a slot is never hidden.
+  String _slotPeriod(Map s) {
+    final p = s['period']?.toString().toLowerCase();
+    if (p == 'morning' || p == 'afternoon' || p == 'evening') return p!;
+    final hour = int.tryParse(
+      (s['start_time']?.toString() ?? '').split(':').first,
+    );
+    if (hour == null || hour < 12) return 'morning';
+    return hour < 17 ? 'afternoon' : 'evening';
+  }
+
   Future<void> _retryFetchAppointment() async {
     if (mounted) {
       setState(() {
@@ -386,6 +470,8 @@ class _BookScreenState extends State<BookScreen>
         _checkingDonation = true;
         _loadingFacilities = true;
         _facilitiesError = false;
+        _loadingSlots = true;
+        _slotsError = false;
       });
     }
 
@@ -763,6 +849,12 @@ class _BookScreenState extends State<BookScreen>
             (data is Map ? data["message"]?.toString() : null) ??
             "Unknown error";
         _showSnack(message);
+        if (data is Map && data['code'] == 'INVALID_TIME_SLOT') {
+          // The slots changed under the donor: clear the time, show current ones.
+          setState(() => selectedTime = null);
+          await _fetchTimeSlots();
+          return;
+        }
         await _refreshStatuses();
       }
     } catch (e) {
@@ -772,7 +864,7 @@ class _BookScreenState extends State<BookScreen>
     }
   }
 
-  void _startReschedule() {
+  Future<void> _startReschedule() async {
     final appointment = _currentAppointment;
     if (appointment == null) return;
 
@@ -798,14 +890,21 @@ class _BookScreenState extends State<BookScreen>
       }
     }
 
+    // The slots differ per center: make sure they are loaded before matching.
+    if (_slotsByFacility.isEmpty) {
+      await _fetchTimeSlots();
+      if (!mounted) return;
+    }
+
     final formattedStart = _formatTime24(
       appointment['appointment_time']?.toString(),
     );
     String? prefillTime;
-    if (formattedStart != null) {
-      for (final slot in timeSlots) {
-        if (slot.startsWith(formattedStart)) {
-          prefillTime = slot;
+    if (formattedStart != null && prefillFacilityId != null) {
+      // If the admin changed the slots nothing matches: the donor picks again.
+      for (final slot in _slotsByFacility[prefillFacilityId] ?? <TimeSlot>[]) {
+        if (slot.value.startsWith(formattedStart)) {
+          prefillTime = slot.value;
           break;
         }
       }
@@ -955,6 +1054,10 @@ class _BookScreenState extends State<BookScreen>
             (data is Map ? data["message"]?.toString() : null) ??
             "Unknown error";
         _showSnack(message);
+        if (data is Map && data['code'] == 'INVALID_TIME_SLOT') {
+          setState(() => selectedTime = null);
+          await _fetchTimeSlots();
+        }
       }
     } catch (e) {
       if (!mounted) return;
@@ -1940,7 +2043,14 @@ class _BookScreenState extends State<BookScreen>
     return GestureDetector(
       onTap: () {
         HapticFeedback.selectionClick();
-        setState(() => selectedFacilityId = id);
+        setState(() {
+          selectedFacilityId = id;
+          // Keep the time only if this center offers the same slot.
+          if (selectedTime != null &&
+              !_slotsForSelectedFacility.any((s) => s.value == selectedTime)) {
+            selectedTime = null;
+          }
+        });
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
@@ -2101,8 +2211,6 @@ class _BookScreenState extends State<BookScreen>
 
   // ─── 5.5 Time slots ──────────────────────────────────────────────────────
 
-  bool _endsWithAM(String slot) => slot.trim().endsWith('AM');
-
   String _compactSlotLabel(String slot) {
     final parts = slot.split(' - ');
     if (parts.length != 2) return slot;
@@ -2118,34 +2226,108 @@ class _BookScreenState extends State<BookScreen>
   }
 
   Widget _timeSlotContent() {
-    final morning = timeSlots.where(_endsWithAM).toList();
-    final afternoon = timeSlots.where((s) => !_endsWithAM(s)).toList();
+    if (selectedFacilityId == null) {
+      return const Text(
+        "Choose a donation center to see its available times.",
+        style: TextStyle(fontSize: 13, color: AppColors.muted),
+      );
+    }
+
+    if (_loadingSlots) {
+      return Container(
+        width: double.infinity,
+        height: 48,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.mutedBg,
+          border: Border.all(color: AppColors.border),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: const SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: AppColors.primary,
+          ),
+        ),
+      );
+    }
+
+    if (_slotsError) {
+      return Row(
+        children: [
+          const Icon(Icons.wifi_off_rounded, color: AppColors.muted, size: 18),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              "Couldn't load time slots",
+              style: TextStyle(fontSize: 13, color: AppColors.muted),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _loadingSlots = true;
+                _slotsError = false;
+              });
+              _fetchTimeSlots();
+            },
+            child: const Text(
+              "Retry",
+              style: TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    final slots = _slotsForSelectedFacility;
+    if (slots.isEmpty) {
+      return const Text(
+        "No time slots are available at this center right now. Please choose another center.",
+        style: TextStyle(fontSize: 13, color: AppColors.muted),
+      );
+    }
+
+    // Morning, Afternoon and (only when it has slots) Evening; empty groups
+    // are hidden.
+    final groups = <(IconData, Color, String, List<TimeSlot>)>[
+      (
+        Icons.wb_sunny_rounded,
+        AppColors.warning,
+        'Morning',
+        slots.where((s) => s.period == 'morning').toList(),
+      ),
+      (
+        Icons.wb_twilight_rounded,
+        AppColors.orange,
+        'Afternoon',
+        slots.where((s) => s.period == 'afternoon').toList(),
+      ),
+      (
+        Icons.nights_stay_rounded,
+        AppColors.info,
+        'Evening',
+        slots.where((s) => s.period == 'evening').toList(),
+      ),
+    ].where((g) => g.$4.isNotEmpty).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (morning.isNotEmpty) ...[
-          _timeGroupHeader(
-            Icons.wb_sunny_rounded,
-            AppColors.warning,
-            'Morning',
-          ),
+        for (var i = 0; i < groups.length; i++) ...[
+          if (i > 0) const SizedBox(height: 14),
+          _timeGroupHeader(groups[i].$1, groups[i].$2, groups[i].$3),
           const SizedBox(height: 8),
-          _timeChipGrid(morning),
-        ],
-        if (afternoon.isNotEmpty) ...[
-          if (morning.isNotEmpty) const SizedBox(height: 14),
-          _timeGroupHeader(
-            Icons.wb_twilight_rounded,
-            AppColors.orange,
-            'Afternoon',
-          ),
-          const SizedBox(height: 8),
-          _timeChipGrid(afternoon),
+          _timeChipGrid(groups[i].$4),
         ],
       ],
     );
   }
-
   Widget _timeGroupHeader(IconData icon, Color color, String label) => Row(
     children: [
       Icon(icon, size: 14, color: color),
@@ -2161,21 +2343,21 @@ class _BookScreenState extends State<BookScreen>
     ],
   );
 
-  Widget _timeChipGrid(List<String> slots) => LayoutBuilder(
+  Widget _timeChipGrid(List<TimeSlot> slots) => LayoutBuilder(
     builder: (context, constraints) {
       final chipWidth = (constraints.maxWidth - 8) / 2;
       return Wrap(
         spacing: 8,
         runSpacing: 8,
         children: slots.map((slot) {
-          final selected = selectedTime == slot;
+          final selected = selectedTime == slot.value;
           return SizedBox(
             width: chipWidth,
             height: 44,
             child: GestureDetector(
               onTap: () {
                 HapticFeedback.selectionClick();
-                setState(() => selectedTime = slot);
+                setState(() => selectedTime = slot.value);
               },
               child: Container(
                 decoration: BoxDecoration(
@@ -2198,7 +2380,7 @@ class _BookScreenState extends State<BookScreen>
                       const SizedBox(width: 4),
                     ],
                     Text(
-                      _compactSlotLabel(slot),
+                      _compactSlotLabel(slot.value),
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -3480,7 +3662,7 @@ class _EligibilityGate extends StatelessWidget {
         ? "Not Eligible to Book"
         : _isDeferred
         ? "Temporarily Deferred"
-        : "Screening Under Review";
+        : "Under Review";
 
     final String message = _isNotChecked
         ? "Complete the eligibility screening before booking a donation appointment."
@@ -3489,7 +3671,7 @@ class _EligibilityGate extends StatelessWidget {
               "You are currently not eligible to schedule a blood donation."
         : _isDeferred
         ? recommendation ?? "Your eligibility has been temporarily deferred."
-        : "Your eligibility screening is still being reviewed. You'll be able to book an appointment once it has been approved.";
+        : "Your eligibility is under review. You can book once our team approves it.";
 
     final String badgeLabel = _isNotChecked
         ? "Status: Not Checked"
@@ -3497,7 +3679,7 @@ class _EligibilityGate extends StatelessWidget {
         ? "Status: Not Eligible"
         : _isDeferred
         ? "Status: Temporarily Deferred"
-        : "Status: Pending Review";
+        : "Status: Under Review";
 
     final bool showRetakePill =
         (_isNotEligible || _isDeferred) && !canRetake && retakeDate != null;
