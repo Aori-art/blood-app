@@ -4,17 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'app_colors.dart';
+import 'app_palette.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
-// Aliases of the app palette in app_colors.dart (the newsfeed's), kept under
-// their old names so every screen that uses them follows the palette at once.
+// The brand colors, which are the same in both modes. Everything that depends
+// on the mode (text, surfaces, borders, fills) comes from `context.palette`.
 const Color kCrimson = AppColors.primary;
 const Color kCrimsonDark = AppColors.primaryDark;
-const Color kSurface = Colors.white;
-const Color kInputFill = AppColors.mutedBg;
-const Color kBorder = AppColors.border;
-const Color kTextPrimary = AppColors.foreground;
-const Color kTextMuted = AppColors.muted;
 
 const List<Color> kHeaderGradient = AppColors.primaryGradient;
 
@@ -273,9 +269,9 @@ class RegisterCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    decoration: const BoxDecoration(
-      color: kSurface,
-      borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+    decoration: BoxDecoration(
+      color: context.palette.surface,
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
     ),
     child: child,
   );
@@ -291,8 +287,8 @@ class FieldLabel extends StatelessWidget {
     padding: const EdgeInsets.only(bottom: 8),
     child: Text(
       text,
-      style: const TextStyle(
-        color: kTextPrimary,
+      style: TextStyle(
+        color: context.palette.foreground,
         fontWeight: FontWeight.w600,
         fontSize: 13,
       ),
@@ -326,33 +322,39 @@ class AppTextField extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => TextField(
-    controller: controller,
-    obscureText: obscure,
-    keyboardType: keyboardType,
-    readOnly: readOnly,
-    inputFormatters: inputFormatters,
-    onTap: onTap,
-    cursorColor: AppColors.primary,
-    style: const TextStyle(color: kTextPrimary, fontSize: 14),
-    decoration: InputDecoration(
-      hintText: hint,
-      hintStyle: const TextStyle(color: AppColors.muted, fontSize: 14),
-      filled: true,
-      fillColor: kInputFill,
-      prefixIcon: prefixIcon != null
-          ? Icon(prefixIcon, color: kTextMuted, size: 18)
-          : null,
-      suffixIcon: suffix,
-      errorStyle: const TextStyle(color: AppColors.primary, fontSize: 12),
-      border: _fieldBorder(kBorder),
-      enabledBorder: _fieldBorder(kBorder),
-      focusedBorder: _fieldBorder(AppColors.primary, 1.5),
-      errorBorder: _fieldBorder(AppColors.primary),
-      focusedErrorBorder: _fieldBorder(AppColors.primary, 1.5),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-    ),
-  );
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return TextField(
+      controller: controller,
+      obscureText: obscure,
+      keyboardType: keyboardType,
+      readOnly: readOnly,
+      inputFormatters: inputFormatters,
+      onTap: onTap,
+      cursorColor: p.primaryText,
+      style: TextStyle(color: p.foreground, fontSize: 14),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: TextStyle(color: p.muted, fontSize: 14),
+        filled: true,
+        fillColor: p.surfaceAlt,
+        prefixIcon: prefixIcon != null
+            ? Icon(prefixIcon, color: p.muted, size: 18)
+            : null,
+        suffixIcon: suffix,
+        errorStyle: TextStyle(color: p.primaryText, fontSize: 12),
+        border: _fieldBorder(p.border),
+        enabledBorder: _fieldBorder(p.border),
+        focusedBorder: _fieldBorder(p.primaryText, 1.5),
+        errorBorder: _fieldBorder(p.primaryText),
+        focusedErrorBorder: _fieldBorder(p.primaryText, 1.5),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
+      ),
+    );
+  }
 }
 
 // One outline for every state of a field (radius 14). Focus and error use the
@@ -379,33 +381,32 @@ class AppDropdown<T> extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => DropdownButtonFormField<T>(
-    value: value,
-    isExpanded: true,
-    icon: const Icon(
-      Icons.keyboard_arrow_down_rounded,
-      color: kTextMuted,
-      size: 20,
-    ),
-    decoration: InputDecoration(
-      filled: true,
-      fillColor: kInputFill,
-      errorStyle: const TextStyle(color: AppColors.primary, fontSize: 12),
-      border: _fieldBorder(kBorder),
-      enabledBorder: _fieldBorder(kBorder),
-      focusedBorder: _fieldBorder(AppColors.primary, 1.5),
-      errorBorder: _fieldBorder(AppColors.primary),
-      focusedErrorBorder: _fieldBorder(AppColors.primary, 1.5),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-    ),
-    hint: Text(
-      hint,
-      style: const TextStyle(color: AppColors.muted, fontSize: 14),
-    ),
-    style: const TextStyle(color: kTextPrimary, fontSize: 14),
-    items: items,
-    onChanged: onChanged,
-  );
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return DropdownButtonFormField<T>(
+      value: value,
+      isExpanded: true,
+      icon: Icon(Icons.keyboard_arrow_down_rounded, color: p.muted, size: 20),
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: p.surfaceAlt,
+        errorStyle: TextStyle(color: p.primaryText, fontSize: 12),
+        border: _fieldBorder(p.border),
+        enabledBorder: _fieldBorder(p.border),
+        focusedBorder: _fieldBorder(p.primaryText, 1.5),
+        errorBorder: _fieldBorder(p.primaryText),
+        focusedErrorBorder: _fieldBorder(p.primaryText, 1.5),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
+      ),
+      hint: Text(hint, style: TextStyle(color: p.muted, fontSize: 14)),
+      style: TextStyle(color: p.foreground, fontSize: 14),
+      items: items,
+      onChanged: onChanged,
+    );
+  }
 }
 
 // ─── Primary button ───────────────────────────────────────────────────────────
@@ -440,7 +441,11 @@ class PrimaryButton extends StatelessWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-          color: disabled ? AppColors.hint : null,
+          color: disabled
+              ? (context.palette.isDark
+                    ? context.palette.border
+                    : context.palette.hint)
+              : null,
           borderRadius: radius,
           boxShadow: disabled
               ? null
@@ -457,7 +462,9 @@ class PrimaryButton extends StatelessWidget {
             backgroundColor: Colors.transparent,
             disabledBackgroundColor: Colors.transparent,
             foregroundColor: Colors.white,
-            disabledForegroundColor: Colors.white,
+            disabledForegroundColor: context.palette.isDark
+                ? context.palette.muted
+                : Colors.white,
             shadowColor: Colors.transparent,
             elevation: 0,
             shape: RoundedRectangleBorder(borderRadius: radius),
@@ -496,8 +503,8 @@ class OutlineBtn extends StatelessWidget {
     height: 52,
     child: OutlinedButton(
       style: OutlinedButton.styleFrom(
-        foregroundColor: kCrimson,
-        side: const BorderSide(color: kCrimson, width: 1.5),
+        foregroundColor: context.palette.primaryText,
+        side: BorderSide(color: context.palette.primaryText, width: 1.5),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
       onPressed: onTap,
@@ -528,8 +535,8 @@ class SectionTitle extends StatelessWidget {
       const SizedBox(width: 8),
       Text(
         text,
-        style: const TextStyle(
-          color: kTextMuted,
+        style: TextStyle(
+          color: context.palette.muted,
           fontSize: 11,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.8,

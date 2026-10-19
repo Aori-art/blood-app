@@ -1,12 +1,12 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:blood/app_colors.dart';
 
 import '../shared_design.dart';
 import '../verify.dart';
 import 'avatar_frame.dart';
 import 'streak_controller.dart';
+import '../app_palette.dart';
 
 const ColorFilter _kGray = ColorFilter.matrix(<double>[
   0.2126,
@@ -39,7 +39,7 @@ Future<void> showFrameCatalogSheet(
 }) => showModalBottomSheet<void>(
   context: context,
   isScrollControlled: true,
-  backgroundColor: Colors.white,
+  backgroundColor: context.palette.surface,
   constraints: BoxConstraints(
     maxHeight: MediaQuery.sizeOf(context).height * 0.85,
   ),
@@ -160,24 +160,24 @@ class _FrameCatalogSheetState extends State<_FrameCatalogSheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: AppColors.border,
+                    color: context.palette.border,
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Profile Frames',
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.bold,
-                  color: kTextPrimary,
+                  color: context.palette.foreground,
                 ),
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 'Unlocked frames are free to use anytime.',
-                style: TextStyle(fontSize: 12, color: kTextMuted),
+                style: TextStyle(fontSize: 12, color: context.palette.muted),
               ),
               const SizedBox(height: 14),
               Expanded(
@@ -203,17 +203,17 @@ class _FrameCatalogSheetState extends State<_FrameCatalogSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
+            Icon(
               Icons.cloud_off_rounded,
               size: 40,
-              color: AppColors.muted,
+              color: context.palette.muted,
             ),
             const SizedBox(height: 10),
-            const Text(
+            Text(
               "Couldn't load your frames",
               style: TextStyle(
                 fontWeight: FontWeight.w700,
-                color: kTextPrimary,
+                color: context.palette.foreground,
               ),
             ),
             const SizedBox(height: 12),
@@ -225,7 +225,9 @@ class _FrameCatalogSheetState extends State<_FrameCatalogSheet> {
         ),
       );
     }
-    return const Center(child: CircularProgressIndicator(color: kCrimson));
+    return Center(
+      child: CircularProgressIndicator(color: context.palette.primaryText),
+    );
   }
 
   Widget _grid(StreakData data) {
@@ -273,10 +275,12 @@ class _FrameCatalogSheetState extends State<_FrameCatalogSheet> {
     child: Container(
       padding: const EdgeInsets.fromLTRB(6, 10, 6, 8),
       decoration: BoxDecoration(
-        color: equipped ? AppColors.accentBg : Colors.white,
+        color: equipped ? context.palette.accentBg : context.palette.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: equipped ? kCrimson : AppColors.border,
+          color: equipped
+              ? context.palette.primaryText
+              : context.palette.border,
           width: equipped ? 1.5 : 1,
         ),
       ),
@@ -289,10 +293,10 @@ class _FrameCatalogSheetState extends State<_FrameCatalogSheet> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12.5,
               fontWeight: FontWeight.w800,
-              color: kTextPrimary,
+              color: context.palette.foreground,
             ),
           ),
           const SizedBox(height: 4),
@@ -302,17 +306,21 @@ class _FrameCatalogSheetState extends State<_FrameCatalogSheet> {
     ),
   );
 
-  Widget _equippedLabel() => const Row(
+  Widget _equippedLabel() => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      Icon(Icons.check_circle_rounded, size: 14, color: kCrimson),
+      Icon(
+        Icons.check_circle_rounded,
+        size: 14,
+        color: context.palette.primaryText,
+      ),
       SizedBox(width: 4),
       Text(
         'Equipped',
         style: TextStyle(
           fontSize: 11.5,
           fontWeight: FontWeight.w800,
-          color: kCrimson,
+          color: context.palette.primaryText,
         ),
       ),
     ],
@@ -325,8 +333,8 @@ class _FrameCatalogSheetState extends State<_FrameCatalogSheet> {
       child: OutlinedButton(
         onPressed: _busyKey != null ? null : onTap,
         style: OutlinedButton.styleFrom(
-          foregroundColor: kCrimson,
-          side: const BorderSide(color: kCrimson, width: 1.3),
+          foregroundColor: context.palette.primaryText,
+          side: BorderSide(color: context.palette.primaryText, width: 1.3),
           padding: const EdgeInsets.symmetric(horizontal: 18),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
@@ -334,12 +342,12 @@ class _FrameCatalogSheetState extends State<_FrameCatalogSheet> {
           textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
         ),
         child: busy
-            ? const SizedBox(
+            ? SizedBox(
                 width: 14,
                 height: 14,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: kCrimson,
+                  color: context.palette.primaryText,
                 ),
               )
             : const Text('Use'),
@@ -389,7 +397,7 @@ class _FrameCatalogSheetState extends State<_FrameCatalogSheet> {
               child: Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: AppColors.muted,
+                  color: context.palette.muted,
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.white, width: 1.5),
                 ),
@@ -406,7 +414,7 @@ class _FrameCatalogSheetState extends State<_FrameCatalogSheet> {
         equipped: false,
         onTap: checking ? null : () => _showRequirement(frame, data),
         state: checking
-            ? const Row(
+            ? Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   SizedBox(
@@ -414,13 +422,16 @@ class _FrameCatalogSheetState extends State<_FrameCatalogSheet> {
                     height: 11,
                     child: CircularProgressIndicator(
                       strokeWidth: 1.8,
-                      color: kTextMuted,
+                      color: context.palette.muted,
                     ),
                   ),
                   SizedBox(width: 6),
                   Text(
                     'Checking…',
-                    style: TextStyle(fontSize: 10.5, color: kTextMuted),
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      color: context.palette.muted,
+                    ),
                   ),
                 ],
               )
@@ -429,9 +440,9 @@ class _FrameCatalogSheetState extends State<_FrameCatalogSheet> {
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 10.5,
-                  color: kTextMuted,
+                  color: context.palette.muted,
                   height: 1.25,
                 ),
               ),
@@ -482,7 +493,11 @@ class _RequirementDialogState extends State<_RequirementDialog> {
             ? "Your ID is verified. Pull to refresh and this frame will unlock."
             : 'Get your ID verified to unlock the Verified Donor frame.',
         textAlign: TextAlign.center,
-        style: const TextStyle(fontSize: 13, color: kTextMuted, height: 1.45),
+        style: TextStyle(
+          fontSize: 13,
+          color: context.palette.muted,
+          height: 1.45,
+        ),
       );
     } else {
       final value = days <= 0 ? 1.0 : (progress / days).clamp(0.0, 1.0);
@@ -492,9 +507,9 @@ class _RequirementDialogState extends State<_RequirementDialog> {
           Text(
             'Reach a $days-day streak to unlock it.',
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
-              color: kTextMuted,
+              color: context.palette.muted,
               height: 1.45,
             ),
           ),
@@ -508,18 +523,18 @@ class _RequirementDialogState extends State<_RequirementDialog> {
               builder: (_, v, _) => LinearProgressIndicator(
                 value: v,
                 minHeight: 10,
-                color: kCrimson,
-                backgroundColor: AppColors.mutedBg,
+                color: context.palette.primaryText,
+                backgroundColor: context.palette.surfaceAlt,
               ),
             ),
           ),
           const SizedBox(height: 6),
           Text(
             '$progress / $days days',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: kTextPrimary,
+              color: context.palette.foreground,
             ),
           ),
         ],
@@ -557,10 +572,10 @@ class _RequirementDialogState extends State<_RequirementDialog> {
           const SizedBox(height: 14),
           Text(
             f.label.isEmpty ? f.key : f.label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.w800,
-              color: kTextPrimary,
+              color: context.palette.foreground,
             ),
           ),
           if (f.description.isNotEmpty) ...[
@@ -568,9 +583,9 @@ class _RequirementDialogState extends State<_RequirementDialog> {
             Text(
               f.description,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
-                color: kTextMuted,
+                color: context.palette.muted,
                 height: 1.35,
               ),
             ),
@@ -583,7 +598,7 @@ class _RequirementDialogState extends State<_RequirementDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Close', style: TextStyle(color: kTextMuted)),
+          child: Text('Close', style: TextStyle(color: context.palette.muted)),
         ),
         if (isVerified)
           ElevatedButton(
@@ -591,8 +606,8 @@ class _RequirementDialogState extends State<_RequirementDialog> {
                 Navigator.pop(context, d.isVerified ? 'refresh' : 'verify'),
             style: ElevatedButton.styleFrom(
               backgroundColor: kCrimson,
-              disabledBackgroundColor: AppColors.border,
-              disabledForegroundColor: AppColors.muted,
+              disabledBackgroundColor: context.palette.border,
+              disabledForegroundColor: context.palette.muted,
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(

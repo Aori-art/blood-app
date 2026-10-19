@@ -11,6 +11,7 @@ import 'config.dart';
 import 'shared_design.dart' show HeaderIconButton;
 import 'home.dart' show FloatingNavMetrics;
 import 'streak/streak_screen.dart';
+import 'app_palette.dart';
 
 class Question {
   Question({
@@ -635,10 +636,10 @@ class _CheckScreenState extends State<CheckScreen>
 
   Widget _buildScreen(BuildContext context) {
     if (_loading || _checking) {
-      return const Scaffold(
-        backgroundColor: AppColors.mutedBg,
+      return Scaffold(
+        backgroundColor: context.palette.background,
         body: Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
+          child: CircularProgressIndicator(color: context.palette.primaryText),
         ),
       );
     }
@@ -651,7 +652,7 @@ class _CheckScreenState extends State<CheckScreen>
         if (!didPop && backIsOurs) _backToFirstPage();
       },
       child: Scaffold(
-        backgroundColor: AppColors.mutedBg,
+        backgroundColor: context.palette.background,
         // Bottom inset is handled by the floating nav's clearance, not here.
         body: SafeArea(
           bottom: false,
@@ -756,7 +757,7 @@ class _CheckScreenState extends State<CheckScreen>
     final answered = _questions.any((q) => q.answer != null);
     return RefreshIndicator(
       onRefresh: () => _refresh(silent: true),
-      color: AppColors.primary,
+      color: context.palette.primaryText,
       child: LayoutBuilder(
         builder: (context, constraints) => SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -791,9 +792,9 @@ class _CheckScreenState extends State<CheckScreen>
                           ? 'You can go back and change answers before submitting.'
                           : 'Open the educational materials first to start.',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
-                        color: AppColors.muted,
+                        color: context.palette.muted,
                       ),
                     ),
                   ],
@@ -809,18 +810,18 @@ class _CheckScreenState extends State<CheckScreen>
   Widget _introCard() => Container(
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
-      color: AppColors.accentBg,
+      color: context.palette.accentBg,
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: AppColors.primaryBorder),
+      border: Border.all(color: context.palette.primaryBorder),
     ),
-    child: const Row(
+    child: Row(
       children: [
         CircleAvatar(
           radius: 26,
-          backgroundColor: Colors.white,
+          backgroundColor: context.palette.surface,
           child: Icon(
             Icons.favorite_rounded,
-            color: AppColors.primary,
+            color: context.palette.primaryText,
             size: 26,
           ),
         ),
@@ -834,14 +835,14 @@ class _CheckScreenState extends State<CheckScreen>
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.foreground,
+                  color: context.palette.foreground,
                   height: 1.25,
                 ),
               ),
               SizedBox(height: 2),
               Text(
                 'A quick health check before your donation',
-                style: TextStyle(fontSize: 12, color: AppColors.muted),
+                style: TextStyle(fontSize: 12, color: context.palette.muted),
               ),
             ],
           ),
@@ -857,8 +858,8 @@ class _CheckScreenState extends State<CheckScreen>
         Expanded(
           child: _miniCard(
             Icons.quiz_outlined,
-            AppColors.info,
-            AppColors.infoBg,
+            context.palette.info,
+            context.palette.infoBg,
             '${_questions.length} Questions',
             'About your health',
           ),
@@ -867,8 +868,8 @@ class _CheckScreenState extends State<CheckScreen>
         Expanded(
           child: _miniCard(
             Icons.timer_outlined,
-            AppColors.success,
-            AppColors.successBg,
+            context.palette.success,
+            context.palette.successBg,
             '~3 minutes',
             'At your own pace',
           ),
@@ -877,8 +878,8 @@ class _CheckScreenState extends State<CheckScreen>
         Expanded(
           child: _miniCard(
             Icons.lock_outline_rounded,
-            const Color(0xFF9333EA),
-            const Color(0xFFFAF5FF),
+            context.palette.purple,
+            context.palette.purpleBg,
             'Private',
             'Medical use only',
           ),
@@ -896,9 +897,9 @@ class _CheckScreenState extends State<CheckScreen>
   ) => Container(
     padding: const EdgeInsets.all(10),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: context.palette.surface,
       borderRadius: BorderRadius.circular(12),
-      boxShadow: AppColors.cardShadow,
+      boxShadow: context.palette.shadow,
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -912,18 +913,18 @@ class _CheckScreenState extends State<CheckScreen>
         const SizedBox(height: 8),
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.bold,
-            color: AppColors.foreground,
+            color: context.palette.foreground,
           ),
         ),
         const SizedBox(height: 2),
         Text(
           subtitle,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 10.5,
-            color: AppColors.muted,
+            color: context.palette.muted,
             height: 1.3,
           ),
         ),
@@ -954,12 +955,14 @@ class _CheckScreenState extends State<CheckScreen>
       duration: const Duration(milliseconds: 250),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.palette.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: viewed ? AppColors.successBorder : AppColors.border,
+          color: viewed
+              ? context.palette.successBorder
+              : context.palette.border,
         ),
-        boxShadow: AppColors.cardShadow,
+        boxShadow: context.palette.shadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -972,7 +975,7 @@ class _CheckScreenState extends State<CheckScreen>
                 height: 40,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: viewed ? AppColors.success : AppColors.accentBg,
+                  color: viewed ? AppColors.success : context.palette.accentBg,
                 ),
                 child: AnimatedSwitcher(
                   duration: Duration(milliseconds: _reduceMotion ? 0 : 300),
@@ -987,7 +990,7 @@ class _CheckScreenState extends State<CheckScreen>
                     viewed ? Icons.check_rounded : Icons.menu_book_rounded,
                     key: ValueKey(viewed),
                     size: 22,
-                    color: viewed ? Colors.white : AppColors.primary,
+                    color: viewed ? Colors.white : context.palette.primaryText,
                   ),
                 ),
               ),
@@ -1000,10 +1003,10 @@ class _CheckScreenState extends State<CheckScreen>
                       title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.foreground,
+                        color: context.palette.foreground,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -1011,7 +1014,9 @@ class _CheckScreenState extends State<CheckScreen>
                       subtitle,
                       style: TextStyle(
                         fontSize: 12,
-                        color: viewed ? AppColors.success : AppColors.muted,
+                        color: viewed
+                            ? context.palette.success
+                            : context.palette.muted,
                       ),
                     ),
                   ],
@@ -1026,12 +1031,12 @@ class _CheckScreenState extends State<CheckScreen>
               child: TextButton.icon(
                 onPressed: _matRetrying ? null : _retryMaterials,
                 icon: _matRetrying
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: AppColors.primary,
+                          color: context.palette.primaryText,
                         ),
                       )
                     : const Icon(Icons.refresh_rounded, size: 18),
@@ -1044,19 +1049,22 @@ class _CheckScreenState extends State<CheckScreen>
               child: OutlinedButton(
                 onPressed: unknown ? null : _openMaterials,
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  side: const BorderSide(color: AppColors.primary, width: 1.5),
+                  foregroundColor: context.palette.primaryText,
+                  side: BorderSide(
+                    color: context.palette.primaryText,
+                    width: 1.5,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
                 child: _matRecording
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: AppColors.primary,
+                          color: context.palette.primaryText,
                         ),
                       )
                     : Row(
@@ -1115,8 +1123,10 @@ class _CheckScreenState extends State<CheckScreen>
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           ),
           style: ElevatedButton.styleFrom(
-            backgroundColor: canStart ? AppColors.primary : AppColors.border,
-            foregroundColor: canStart ? Colors.white : AppColors.hint,
+            backgroundColor: canStart
+                ? AppColors.primary
+                : context.palette.border,
+            foregroundColor: canStart ? Colors.white : context.palette.hint,
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
@@ -1130,21 +1140,21 @@ class _CheckScreenState extends State<CheckScreen>
   Widget _noticeBox() => Container(
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     decoration: BoxDecoration(
-      color: AppColors.warningBg,
+      color: context.palette.warningBg,
       borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: AppColors.warningBorder),
+      border: Border.all(color: context.palette.warningBorder),
     ),
-    child: const Row(
+    child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(Icons.info_outline, color: AppColors.warning, size: 16),
+        Icon(Icons.info_outline, color: context.palette.warning, size: 16),
         SizedBox(width: 8),
         Expanded(
           child: Text(
             'Please answer honestly. Your answers keep donors and patients safe.',
             style: TextStyle(
               fontSize: 12,
-              color: AppColors.warningDark,
+              color: context.palette.warningText,
               height: 1.4,
             ),
           ),
@@ -1227,7 +1237,7 @@ class _CheckScreenState extends State<CheckScreen>
                   widthFactor: value.clamp(0.0, 1.0),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: context.palette.surface,
                       borderRadius: BorderRadius.circular(8),
                       boxShadow: reduce
                           ? null
@@ -1256,7 +1266,7 @@ class _CheckScreenState extends State<CheckScreen>
       children: [
         Expanded(
           child: RefreshIndicator(
-            color: AppColors.primary,
+            color: context.palette.primaryText,
             onRefresh: () => _refresh(silent: true),
             child: SingleChildScrollView(
               controller: _scroll,
@@ -1365,11 +1375,11 @@ class _CheckScreenState extends State<CheckScreen>
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: AppColors.primary,
+                                  color: context.palette.primaryText,
                                   width: 1.5,
                                 ),
                               ),
-                              child: const FittedBox(
+                              child: FittedBox(
                                 fit: BoxFit.scaleDown,
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -1377,13 +1387,13 @@ class _CheckScreenState extends State<CheckScreen>
                                     Icon(
                                       Icons.arrow_back_rounded,
                                       size: 18,
-                                      color: AppColors.primary,
+                                      color: context.palette.primaryText,
                                     ),
                                     SizedBox(width: 6),
                                     Text(
                                       'Back',
                                       style: TextStyle(
-                                        color: AppColors.primary,
+                                        color: context.palette.primaryText,
                                         fontSize: 15,
                                         fontWeight: FontWeight.w700,
                                       ),
@@ -1421,7 +1431,7 @@ class _CheckScreenState extends State<CheckScreen>
                       gradient: LinearGradient(
                         colors: enabled
                             ? AppColors.primaryGradient
-                            : const [AppColors.border, AppColors.border],
+                            : [context.palette.border, context.palette.border],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -1454,7 +1464,7 @@ class _CheckScreenState extends State<CheckScreen>
                               style: TextStyle(
                                 color: enabled
                                     ? AppColors.onPrimary
-                                    : AppColors.hint,
+                                    : context.palette.hint,
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -1476,7 +1486,7 @@ class _CheckScreenState extends State<CheckScreen>
                                 tween: ColorTween(
                                   end: enabled
                                       ? AppColors.onPrimary
-                                      : AppColors.hint,
+                                      : context.palette.hint,
                                 ),
                                 duration: const Duration(milliseconds: 200),
                                 builder: (_, color, _) => Icon(
@@ -1507,10 +1517,10 @@ class _CheckScreenState extends State<CheckScreen>
       Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.palette.surface,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.border),
-          boxShadow: AppColors.cardShadow,
+          border: Border.all(color: context.palette.border),
+          boxShadow: context.palette.shadow,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1518,25 +1528,25 @@ class _CheckScreenState extends State<CheckScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: AppColors.accentBg,
+                color: context.palette.accentBg,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
                 'Question ${_page + 1}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
+                  color: context.palette.primaryText,
                 ),
               ),
             ),
             const SizedBox(height: 16),
             Text(
               q.question,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
-                color: AppColors.foreground,
+                color: context.palette.foreground,
                 height: 1.35,
               ),
             ),
@@ -1582,9 +1592,9 @@ class _CheckScreenState extends State<CheckScreen>
     margin: const EdgeInsets.only(top: 12),
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
-      color: AppColors.mutedBg,
+      color: context.palette.surfaceAlt,
       borderRadius: BorderRadius.circular(10),
-      border: Border.all(color: AppColors.border),
+      border: Border.all(color: context.palette.border),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1641,12 +1651,12 @@ class _CheckScreenState extends State<CheckScreen>
               gradient: LinearGradient(
                 colors: selected
                     ? AppColors.primaryGradient
-                    : const [AppColors.mutedBg, AppColors.mutedBg],
+                    : [context.palette.surfaceAlt, context.palette.surfaceAlt],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               border: Border.all(
-                color: selected ? Colors.transparent : AppColors.border,
+                color: selected ? Colors.transparent : context.palette.border,
                 width: 1.5,
               ),
               boxShadow: selected
@@ -1664,7 +1674,7 @@ class _CheckScreenState extends State<CheckScreen>
               children: [
                 TweenAnimationBuilder<Color?>(
                   tween: ColorTween(
-                    end: selected ? AppColors.onPrimary : AppColors.muted,
+                    end: selected ? AppColors.onPrimary : context.palette.muted,
                   ),
                   duration: const Duration(milliseconds: 180),
                   builder: (_, color, _) => Icon(icon, size: 22, color: color),
@@ -1677,7 +1687,7 @@ class _CheckScreenState extends State<CheckScreen>
                     fontWeight: FontWeight.w600,
                     color: selected
                         ? AppColors.onPrimary
-                        : AppColors.foreground,
+                        : context.palette.foreground,
                   ),
                   child: Text(label),
                 ),
@@ -1704,16 +1714,16 @@ class _CheckScreenState extends State<CheckScreen>
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: AppColors.mutedBg,
+          color: context.palette.surfaceAlt,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: context.palette.border),
         ),
         child: Row(
           children: [
-            const Icon(
+            Icon(
               Icons.calendar_today_outlined,
               size: 18,
-              color: AppColors.muted,
+              color: context.palette.muted,
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -1722,8 +1732,8 @@ class _CheckScreenState extends State<CheckScreen>
                 style: TextStyle(
                   fontSize: 14,
                   color: r.date == null
-                      ? AppColors.muted
-                      : AppColors.foreground,
+                      ? context.palette.muted
+                      : context.palette.foreground,
                 ),
               ),
             ),
@@ -1738,22 +1748,22 @@ class _CheckScreenState extends State<CheckScreen>
       decoration: InputDecoration(
         labelText: c?['choice_label']?.toString() ?? 'Select an option',
         filled: true,
-        fillColor: AppColors.mutedBg,
+        fillColor: context.palette.surfaceAlt,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 14,
           vertical: 14,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: BorderSide(color: context.palette.border),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: BorderSide(color: context.palette.border),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.success, width: 1.5),
+          borderSide: BorderSide(color: context.palette.success, width: 1.5),
         ),
       ),
       selectedItemBuilder: (context) => options
@@ -1799,22 +1809,22 @@ class _CheckScreenState extends State<CheckScreen>
             decoration: InputDecoration(
               hintText:
                   c?['placeholder']?.toString() ?? 'Type your answer here...',
-              hintStyle: const TextStyle(color: AppColors.muted, fontSize: 13),
+              hintStyle: TextStyle(color: context.palette.muted, fontSize: 13),
               filled: true,
-              fillColor: AppColors.mutedBg,
+              fillColor: context.palette.surfaceAlt,
               contentPadding: const EdgeInsets.all(14),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: AppColors.border),
+                borderSide: BorderSide(color: context.palette.border),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: AppColors.border),
+                borderSide: BorderSide(color: context.palette.border),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(
-                  color: AppColors.success,
+                borderSide: BorderSide(
+                  color: context.palette.success,
                   width: 1.5,
                 ),
               ),
@@ -1900,23 +1910,23 @@ class _CheckScreenState extends State<CheckScreen>
     width: double.infinity,
     padding: const EdgeInsets.all(18),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: context.palette.surface,
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: AppColors.successBorder, width: 1.5),
-      boxShadow: AppColors.cardShadow,
+      border: Border.all(color: context.palette.successBorder, width: 1.5),
+      boxShadow: context.palette.shadow,
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            const Icon(
+            Icon(
               Icons.chat_bubble_outline,
-              color: AppColors.success,
+              color: context.palette.success,
               size: 18,
             ),
             const SizedBox(width: 8),
-            const Expanded(
+            Expanded(
               child: Text(
                 'Follow-up Question',
                 maxLines: 1,
@@ -1924,7 +1934,7 @@ class _CheckScreenState extends State<CheckScreen>
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 13,
-                  color: AppColors.success,
+                  color: context.palette.success,
                 ),
               ),
             ),
@@ -1933,16 +1943,16 @@ class _CheckScreenState extends State<CheckScreen>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: AppColors.accentBg,
+                  color: context.palette.accentBg,
                   borderRadius: BorderRadius.circular(99),
-                  border: Border.all(color: AppColors.primaryBorder),
+                  border: Border.all(color: context.palette.primaryBorder),
                 ),
-                child: const Text(
+                child: Text(
                   'Required',
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.primary,
+                    color: context.palette.primaryText,
                   ),
                 ),
               ),
@@ -2008,17 +2018,17 @@ class _CheckScreenState extends State<CheckScreen>
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: state == 'upcoming'
-                              ? AppColors.muted
-                              : AppColors.foreground,
+                              ? context.palette.muted
+                              : context.palette.foreground,
                         ),
                       ),
                       if (subtitle != null) ...[
                         const SizedBox(height: 2),
                         Text(
                           subtitle,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.muted,
+                            color: context.palette.muted,
                             height: 1.4,
                           ),
                         ),
@@ -2037,20 +2047,20 @@ class _CheckScreenState extends State<CheckScreen>
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.palette.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-        boxShadow: AppColors.cardShadow,
+        border: Border.all(color: context.palette.border),
+        boxShadow: context.palette.shadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'What happens next',
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,
-              color: AppColors.foreground,
+              color: context.palette.foreground,
             ),
           ),
           const SizedBox(height: 16),
@@ -2070,16 +2080,16 @@ class _CheckScreenState extends State<CheckScreen>
             ),
             title: 'Answers submitted',
             state: 'done',
-            lineColor: AppColors.success,
+            lineColor: context.palette.success,
           ),
           step(
             marker: _PulsingDot(
-              color: AppColors.warning,
+              color: context.palette.warning,
               animate: !MediaQuery.disableAnimationsOf(context),
             ),
             title: 'Team review',
             state: 'current',
-            lineColor: AppColors.border,
+            lineColor: context.palette.border,
           ),
           step(
             marker: Container(
@@ -2087,14 +2097,14 @@ class _CheckScreenState extends State<CheckScreen>
               height: 24,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.mutedBg,
-                border: Border.all(color: AppColors.hint, width: 2),
+                color: context.palette.surfaceAlt,
+                border: Border.all(color: context.palette.hint, width: 2),
               ),
             ),
             title: 'You get the result',
             subtitle: "We'll notify you in the app",
             state: 'upcoming',
-            lineColor: AppColors.border,
+            lineColor: context.palette.border,
             last: true,
           ),
         ],
@@ -2109,10 +2119,10 @@ class _CheckScreenState extends State<CheckScreen>
     final showRetakeCountdown =
         !eligible && !_canRetake && !review && _retakeDate != null;
     final color = eligible
-        ? AppColors.success
+        ? context.palette.success
         : deferred || review
-        ? AppColors.warning
-        : AppColors.primary;
+        ? context.palette.warning
+        : context.palette.primaryText;
     final title = eligible
         ? "You're Eligible to Donate!"
         : deferred
@@ -2191,10 +2201,10 @@ class _CheckScreenState extends State<CheckScreen>
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: context.palette.surface,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: color.withValues(alpha: .18)),
-                      boxShadow: AppColors.cardShadow,
+                      boxShadow: context.palette.shadow,
                     ),
                     child: Column(
                       children: [
@@ -2211,8 +2221,8 @@ class _CheckScreenState extends State<CheckScreen>
                               ? _recommendation!
                               : fallback,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: AppColors.muted,
+                          style: TextStyle(
+                            color: context.palette.muted,
                             height: 1.5,
                           ),
                         ),
@@ -2294,10 +2304,10 @@ class _CheckScreenState extends State<CheckScreen>
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: context.palette.surface,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: color.withValues(alpha: .18)),
-                        boxShadow: AppColors.cardShadow,
+                        boxShadow: context.palette.shadow,
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2319,12 +2329,12 @@ class _CheckScreenState extends State<CheckScreen>
                                 ),
                               ),
                               const SizedBox(width: 12),
-                              const Text(
+                              Text(
                                 'Retake Available',
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color: AppColors.foreground,
+                                  color: context.palette.foreground,
                                 ),
                               ),
                             ],
@@ -2332,10 +2342,10 @@ class _CheckScreenState extends State<CheckScreen>
                           const SizedBox(height: 12),
                           Text(
                             _formatDate(_retakeDate!),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
-                              color: AppColors.foreground,
+                              color: context.palette.foreground,
                             ),
                           ),
                           const SizedBox(height: 6),
@@ -2354,9 +2364,9 @@ class _CheckScreenState extends State<CheckScreen>
                                 ? 'You can take the check again once your deferral period ends.'
                                 : 'This short waiting period lets your health settle before '
                                       "you're screened again.",
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: AppColors.muted,
+                              color: context.palette.muted,
                               height: 1.5,
                             ),
                           ),
@@ -2370,10 +2380,10 @@ class _CheckScreenState extends State<CheckScreen>
                       child: ElevatedButton.icon(
                         onPressed: null,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.border,
-                          foregroundColor: AppColors.muted,
-                          disabledBackgroundColor: AppColors.border,
-                          disabledForegroundColor: AppColors.muted,
+                          backgroundColor: context.palette.border,
+                          foregroundColor: context.palette.muted,
+                          disabledBackgroundColor: context.palette.border,
+                          disabledForegroundColor: context.palette.muted,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),

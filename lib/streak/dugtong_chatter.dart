@@ -2,9 +2,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../shared_design.dart';
 import 'dugtong.dart';
 import 'streak_controller.dart';
+import '../app_palette.dart';
 
 /// What a line can be filled in with.
 class _Ctx {
@@ -375,11 +375,8 @@ class DugtongChatter {
 class DugtongSpeechBubble extends StatelessWidget {
   static const double maxWidth = 190;
   static const double tailWidth = 8;
-  static const TextStyle textStyle = TextStyle(
-    fontSize: 12,
-    height: 1.3,
-    color: kTextPrimary,
-  );
+  // The metrics only (it also sizes the bubble); the color follows the mode.
+  static const TextStyle textStyle = TextStyle(fontSize: 12, height: 1.3);
   static const EdgeInsets padding = EdgeInsets.symmetric(
     horizontal: 11,
     vertical: 8,
@@ -432,9 +429,9 @@ class DugtongSpeechBubble extends StatelessWidget {
               padding: padding,
               alignment: Alignment.centerLeft,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: context.palette.surface,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: kBorder),
+                border: Border.all(color: context.palette.border),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: .1),
@@ -447,7 +444,7 @@ class DugtongSpeechBubble extends StatelessWidget {
                 text,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
-                style: textStyle,
+                style: textStyle.copyWith(color: context.palette.foreground),
               ),
             ),
           ),
@@ -457,7 +454,11 @@ class DugtongSpeechBubble extends StatelessWidget {
             top: (tailTop - 7).clamp(8.0, math.max(8.0, size.height - 22)),
             child: CustomPaint(
               size: const Size(tailWidth + 1, 14),
-              painter: _TailPainter(pointsRight: tailOnRight),
+              painter: _TailPainter(
+                pointsRight: tailOnRight,
+                fill: context.palette.surface,
+                border: context.palette.border,
+              ),
             ),
           ),
         ],
@@ -468,7 +469,13 @@ class DugtongSpeechBubble extends StatelessWidget {
 
 class _TailPainter extends CustomPainter {
   final bool pointsRight;
-  const _TailPainter({required this.pointsRight});
+  final Color fill;
+  final Color border;
+  const _TailPainter({
+    required this.pointsRight,
+    required this.fill,
+    required this.border,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -485,7 +492,7 @@ class _TailPainter extends CustomPainter {
             ..lineTo(0, h / 2)
             ..lineTo(w, h)
             ..close());
-    canvas.drawPath(path, Paint()..color = Colors.white);
+    canvas.drawPath(path, Paint()..color = fill);
     canvas.drawPath(
       Path()
         ..moveTo(pointsRight ? 0 : w, 0)
@@ -494,11 +501,13 @@ class _TailPainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1
-        ..color = kBorder,
+        ..color = border,
     );
   }
 
   @override
   bool shouldRepaint(covariant _TailPainter old) =>
-      old.pointsRight != pointsRight;
+      old.pointsRight != pointsRight ||
+      old.fill != fill ||
+      old.border != border;
 }

@@ -1,7 +1,9 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'app_colors.dart';
+import 'app_palette.dart';
 import 'streak/streak_screen.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,6 +24,7 @@ import 'streak/streak_controller.dart';
 import 'unread_notifications.dart';
 import 'donor_avatar.dart';
 import 'streak/streak_ladder_screen.dart';
+import 'theme_controller.dart';
 import 'verify.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -249,7 +252,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         int.tryParse((profile?['total_donations'] ?? 0).toString()) ?? 0;
     final active = days(profile?['date_registered']);
     return Scaffold(
-      backgroundColor: AppColors.mutedBg,
+      backgroundColor: context.palette.background,
       body: Column(
         children: [
           _header(context),
@@ -257,7 +260,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             child: SafeArea(
               top: false,
               child: RefreshIndicator(
-                color: kCrimson,
+                color: context.palette.primaryText,
                 onRefresh: () => _load(progress: false),
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
@@ -269,9 +272,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         const SizedBox(height: 16),
                       ],
                       if (loading)
-                        const Padding(
+                        Padding(
                           padding: EdgeInsets.all(18),
-                          child: CircularProgressIndicator(color: kCrimson),
+                          child: CircularProgressIndicator(color: context.palette.primaryText),
                         ),
                       FadeSlideIn(index: 0, child: _profileCard(name)),
                       const SizedBox(height: 16),
@@ -284,7 +287,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 Icons.water_drop,
                                 total.toString(),
                                 'Donations',
-                                kCrimson,
+                                context.palette.primaryText,
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -293,7 +296,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 Icons.calendar_today,
                                 active,
                                 'Days Active',
-                                AppColors.info,
+                                context.palette.info,
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -302,7 +305,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 Icons.emoji_events,
                                 (total * 3).toString(),
                                 'Lives Helped',
-                                AppColors.warning,
+                                context.palette.warning,
                               ),
                             ),
                           ],
@@ -344,7 +347,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             Icons.event_available,
                             'Next Eligible',
                             _next(),
-                            color: AppColors.success,
+                            color: context.palette.success,
                           ),
                         ]),
                       ),
@@ -405,6 +408,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               ),
                             ),
                           ),
+                          _darkModeRow(),
                         ]),
                       ),
                       const SizedBox(height: 16),
@@ -413,17 +417,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         height: 48,
                         child: OutlinedButton.icon(
                           onPressed: _logout,
-                          icon: const Icon(Icons.logout, color: kCrimson),
-                          label: const Text(
+                          icon: Icon(Icons.logout, color: context.palette.primaryText),
+                          label: Text(
                             'Logout',
                             style: TextStyle(
-                              color: kCrimson,
+                              color: context.palette.primaryText,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
                           style: OutlinedButton.styleFrom(
                             backgroundColor: Colors.white,
-                            side: const BorderSide(color: AppColors.primaryBorder),
+                            side: BorderSide(color: context.palette.primaryBorder),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -431,11 +435,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      const Text(
+                      Text(
                         'Version 1.0.0',
                         style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.muted,
+                          color: context.palette.muted,
                         ),
                       ),
                     ],
@@ -468,7 +472,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     ),
   );
   BoxDecoration _box({Gradient? gradient, Color? border}) => BoxDecoration(
-    color: gradient == null ? Colors.white : null,
+    color: gradient == null ? context.palette.surface : null,
     gradient: gradient,
     borderRadius: BorderRadius.circular(16),
     border: border == null ? null : Border.all(color: border),
@@ -483,18 +487,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget _notice(String text) => Container(
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
-      color: AppColors.warningBg,
-      border: Border.all(color: AppColors.warningBorder),
+      color: context.palette.warningBg,
+      border: Border.all(color: context.palette.warningBorder),
       borderRadius: BorderRadius.circular(16),
     ),
     child: Row(
       children: [
-        const Icon(Icons.cloud_off_outlined, color: AppColors.warning),
+        Icon(Icons.cloud_off_outlined, color: context.palette.warning),
         const SizedBox(width: 10),
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(fontSize: 13, color: AppColors.warningDark),
+            style: TextStyle(fontSize: 13, color: context.palette.warningText),
           ),
         ),
         TextButton(
@@ -508,10 +512,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
     width: double.infinity,
     padding: const EdgeInsets.all(24),
     decoration: _box(
-      gradient: const LinearGradient(
-        colors: [AppColors.accentBg, AppColors.accentBg],
+      gradient: LinearGradient(
+        colors: [context.palette.accentBg, context.palette.accentBg],
       ),
-      border: AppColors.primaryBorder,
+      border: context.palette.primaryBorder,
     ),
     child: Column(
       children: [
@@ -542,21 +546,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: AppColors.accentBg,
+                color: context.palette.accentBg,
                 borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: AppColors.primaryBorder),
+                border: Border.all(color: context.palette.primaryBorder),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.auto_awesome_rounded, size: 14, color: kCrimson),
+                  Icon(Icons.auto_awesome_rounded, size: 14, color: context.palette.primaryText),
                   SizedBox(width: 5),
                   Text(
                     'Edit Frame',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: kCrimson,
+                      color: context.palette.primaryText,
                     ),
                   ),
                 ],
@@ -567,16 +571,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
         const SizedBox(height: 16),
         Text(
           name,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
-            color: AppColors.foreground,
+            color: context.palette.foreground,
           ),
         ),
         const SizedBox(height: 4),
         Text(
           safe(profile?['email']),
-          style: const TextStyle(fontSize: 13, color: AppColors.muted),
+          style: TextStyle(fontSize: 13, color: context.palette.muted),
         ),
         const SizedBox(height: 16),
         Container(
@@ -608,32 +612,32 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     switch (verificationStatus) {
       case 'verified':
-        fg = AppColors.success;
-        bg = AppColors.successSoft;
+        fg = context.palette.success;
+        bg = context.palette.successSoft;
         label = 'Verified';
         icon = Icons.verified_user_rounded;
         break;
       case 'pending':
-        fg = AppColors.warning;
-        bg = AppColors.warningBg;
+        fg = context.palette.warning;
+        bg = context.palette.warningBg;
         label = 'Verification Pending';
         icon = Icons.hourglass_top_rounded;
         break;
       case 'rejected':
-        fg = kCrimson;
-        bg = AppColors.accentBg;
+        fg = context.palette.primaryText;
+        bg = context.palette.accentBg;
         label = 'Verification Rejected';
         icon = Icons.gpp_bad_outlined;
         break;
       case 'unverified':
-        fg = kCrimson;
-        bg = AppColors.accentBg;
+        fg = context.palette.primaryText;
+        bg = context.palette.accentBg;
         label = 'Not Verified';
         icon = Icons.shield_outlined;
         break;
       default:
-        fg = AppColors.muted;
-        bg = AppColors.mutedBg;
+        fg = context.palette.muted;
+        bg = context.palette.surfaceAlt;
         label = 'Checking...';
         icon = Icons.hourglass_empty_rounded;
     }
@@ -691,7 +695,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             Text(
               label,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 10, color: AppColors.muted),
+              style: TextStyle(fontSize: 10, color: context.palette.muted),
             ),
           ],
         ),
@@ -706,10 +710,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
         if (title != null) ...[
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: AppColors.foreground,
+              color: context.palette.foreground,
             ),
           ),
           const SizedBox(height: 6),
@@ -724,7 +728,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 18, color: AppColors.muted),
+            Icon(icon, size: 18, color: context.palette.muted),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -732,9 +736,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 children: [
                   Text(
                     label,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
-                      color: AppColors.muted,
+                      color: context.palette.muted,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -743,7 +747,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     style: TextStyle(
                       fontWeight: FontWeight.w500,
                       fontSize: 14,
-                      color: color ?? AppColors.foreground,
+                      color: color ?? context.palette.foreground,
                     ),
                   ),
                 ],
@@ -752,6 +756,94 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ],
         ),
       );
+  /// The Dark mode switch. It lives next to the other settings rows; toggling
+  /// it changes the whole app at once (the theme fades between the modes).
+  Widget _darkModeRow() => ListenableBuilder(
+    listenable: ThemeController.instance,
+    builder: (context, _) {
+      final dark = ThemeController.instance.isDark;
+      final p = context.palette;
+      void toggle(bool value) {
+        HapticFeedback.selectionClick();
+        ThemeController.instance.setDark(value);
+      }
+
+      return Semantics(
+        container: true,
+        label: 'Dark mode',
+        toggled: dark,
+        onTap: () => toggle(!dark),
+        excludeSemantics: true,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: () => toggle(!dark),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            child: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: p.accentBg,
+                  ),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    child: Icon(
+                      dark
+                          ? Icons.dark_mode_rounded
+                          : Icons.light_mode_rounded,
+                      key: ValueKey(dark),
+                      size: 18,
+                      color: p.primaryText,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Dark mode',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 14,
+                          color: p.foreground,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Easier on the eyes in low light',
+                        style: TextStyle(fontSize: 12, color: p.muted),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: dark,
+                  onChanged: toggle,
+                  thumbColor: WidgetStateProperty.all(Colors.white),
+                  trackColor: WidgetStateProperty.resolveWith(
+                    (states) => states.contains(WidgetState.selected)
+                        ? AppColors.primary
+                        : p.border,
+                  ),
+                  trackOutlineColor: WidgetStateProperty.resolveWith(
+                    (states) => states.contains(WidgetState.selected)
+                        ? AppColors.primary
+                        : p.border,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+
   Widget _menu(
     IconData icon,
     String label,
@@ -764,7 +856,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 4),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: AppColors.muted),
+          Icon(icon, size: 20, color: context.palette.muted),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -772,26 +864,26 @@ class _HistoryScreenState extends State<HistoryScreen> {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w500,
                     fontSize: 14,
-                    color: AppColors.foreground,
+                    color: context.palette.foreground,
                   ),
                 ),
                 if (subtitle != null) ...[
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: AppColors.muted,
+                      color: context.palette.muted,
                     ),
                   ),
                 ],
               ],
             ),
           ),
-          const Icon(Icons.chevron_right, size: 20, color: AppColors.muted),
+          Icon(Icons.chevron_right, size: 20, color: context.palette.muted),
         ],
       ),
     ),

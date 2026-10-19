@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'app_colors.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
@@ -11,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import 'config.dart';
 import 'shared_design.dart';
 import 'streak/streak_screen.dart';
+import 'app_palette.dart';
 
 enum _CaptureStep {
   selectType,
@@ -241,7 +241,7 @@ class _IdCameraCaptureScreenState extends State<IdCameraCaptureScreen>
       StreakScreen(id: 'verify', child: _buildScreen(context));
 
   Widget _buildScreen(BuildContext context) => Scaffold(
-    backgroundColor: AppColors.mutedBg,
+    backgroundColor: context.palette.background,
     body: SafeArea(
       child: Column(
         children: [
@@ -312,14 +312,14 @@ class _IdCameraCaptureScreenState extends State<IdCameraCaptureScreen>
   Widget _selectTypeStep() => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const Text(
+      Text(
         'What type of ID are you uploading?',
-        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: kTextPrimary),
+        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: context.palette.foreground),
       ),
       const SizedBox(height: 6),
-      const Text(
+      Text(
         "We'll guide you through photographing it correctly.",
-        style: TextStyle(fontSize: 13, color: kTextMuted),
+        style: TextStyle(fontSize: 13, color: context.palette.muted),
       ),
       const SizedBox(height: 20),
       Expanded(
@@ -335,10 +335,10 @@ class _IdCameraCaptureScreenState extends State<IdCameraCaptureScreen>
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
-                  color: selected ? AppColors.accentBg : Colors.white,
+                  color: selected ? context.palette.accentBg : context.palette.surface,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: selected ? kCrimson : kBorder,
+                    color: selected ? context.palette.primaryText : context.palette.border,
                     width: selected ? 1.5 : 1,
                   ),
                 ),
@@ -348,17 +348,17 @@ class _IdCameraCaptureScreenState extends State<IdCameraCaptureScreen>
                       selected
                           ? Icons.radio_button_checked_rounded
                           : Icons.radio_button_unchecked_rounded,
-                      color: selected ? kCrimson : kTextMuted,
+                      color: selected ? context.palette.primaryText : context.palette.muted,
                       size: 20,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         type['label']!,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: kTextPrimary,
+                          color: context.palette.foreground,
                         ),
                       ),
                     ),
@@ -387,7 +387,7 @@ class _IdCameraCaptureScreenState extends State<IdCameraCaptureScreen>
       children: [
         Icon(
           isFront ? Icons.credit_card_rounded : Icons.flip_rounded,
-          color: kCrimson,
+          color: context.palette.primaryText,
           size: 56,
         ),
         const SizedBox(height: 20),
@@ -396,13 +396,13 @@ class _IdCameraCaptureScreenState extends State<IdCameraCaptureScreen>
               ? 'Take a photo of the FRONT of your ID'
               : 'Take a photo of the BACK of your ID',
           textAlign: TextAlign.center,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: kTextPrimary),
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: context.palette.foreground),
         ),
         const SizedBox(height: 10),
-        const Text(
+        Text(
           "Make sure all four corners are visible and there's no glare.",
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 13, color: kTextMuted, height: 1.5),
+          style: TextStyle(fontSize: 13, color: context.palette.muted, height: 1.5),
         ),
         const SizedBox(height: 32),
         if (_captureError != null) ...[
@@ -410,14 +410,14 @@ class _IdCameraCaptureScreenState extends State<IdCameraCaptureScreen>
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppColors.accentBg,
-              border: Border.all(color: AppColors.primaryBorder),
+              color: context.palette.accentBg,
+              border: Border.all(color: context.palette.primaryBorder),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Text(
               _captureError!,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: kCrimson, fontSize: 12, height: 1.4),
+              style: TextStyle(color: context.palette.primaryText, fontSize: 12, height: 1.4),
             ),
           ),
           const SizedBox(height: 16),
@@ -436,7 +436,7 @@ class _IdCameraCaptureScreenState extends State<IdCameraCaptureScreen>
         const SizedBox(height: 12),
         Text(
           _captureError != null ? 'Tap to try again' : 'Tap to open camera',
-          style: const TextStyle(fontSize: 12, color: kTextMuted),
+          style: TextStyle(fontSize: 12, color: context.palette.muted),
         ),
       ],
     );
@@ -452,13 +452,13 @@ class _IdCameraCaptureScreenState extends State<IdCameraCaptureScreen>
         Text(
           isFront ? 'Review front photo' : 'Review back photo',
           textAlign: TextAlign.center,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: kTextPrimary),
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: context.palette.foreground),
         ),
         const SizedBox(height: 6),
-        const Text(
+        Text(
           'Make sure the ID is clear and readable.',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 13, color: kTextMuted),
+          style: TextStyle(fontSize: 13, color: context.palette.muted),
         ),
         const SizedBox(height: 20),
         Expanded(
@@ -490,19 +490,19 @@ class _IdCameraCaptureScreenState extends State<IdCameraCaptureScreen>
   Widget _backChoiceStep() => Column(
     mainAxisAlignment: MainAxisAlignment.center,
     children: [
-      const Icon(Icons.flip_rounded, color: kCrimson, size: 56),
+      Icon(Icons.flip_rounded, color: context.palette.primaryText, size: 56),
       const SizedBox(height: 20),
-      const Text(
+      Text(
         'Add a photo of the back? (optional)',
         textAlign: TextAlign.center,
-        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: kTextPrimary),
+        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: context.palette.foreground),
       ),
       const SizedBox(height: 10),
-      const Text(
+      Text(
         'Some IDs have important details on the back. You can skip this if it '
         "doesn't apply to yours.",
         textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 13, color: kTextMuted, height: 1.5),
+        style: TextStyle(fontSize: 13, color: context.palette.muted, height: 1.5),
       ),
       const SizedBox(height: 32),
       PrimaryButton(
@@ -521,7 +521,7 @@ class _IdCameraCaptureScreenState extends State<IdCameraCaptureScreen>
   Widget _processingStep() {
     if (_submitSucceeded) {
       return _resultGlow(
-        color: AppColors.success,
+        color: context.palette.success,
         icon: Icons.check_circle_rounded,
         title: 'Submitted!',
         subtitle: 'Redirecting you back...',
@@ -533,7 +533,7 @@ class _IdCameraCaptureScreenState extends State<IdCameraCaptureScreen>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           _resultGlow(
-            color: kCrimson,
+            color: context.palette.primaryText,
             icon: Icons.error_outline_rounded,
             title: 'Submission Failed',
             subtitle: _submitError!,
@@ -566,7 +566,7 @@ class _IdCameraCaptureScreenState extends State<IdCameraCaptureScreen>
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         _resultGlow(
-          color: kCrimson,
+          color: context.palette.primaryText,
           icon: Icons.cloud_upload_rounded,
           title: 'Processing your ID...',
           subtitle: 'This will only take a moment.',
@@ -575,7 +575,7 @@ class _IdCameraCaptureScreenState extends State<IdCameraCaptureScreen>
         const SizedBox(height: 14),
         Text(
           _statusLines[_statusIndex],
-          style: const TextStyle(fontSize: 12, color: kTextMuted),
+          style: TextStyle(fontSize: 12, color: context.palette.muted),
         ),
         const SizedBox(height: 32),
         SizedBox(
@@ -629,13 +629,13 @@ class _IdCameraCaptureScreenState extends State<IdCameraCaptureScreen>
         Text(
           title,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: kTextPrimary),
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: context.palette.foreground),
         ),
         const SizedBox(height: 8),
         Text(
           subtitle,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 13, color: kTextMuted, height: 1.5),
+          style: TextStyle(fontSize: 13, color: context.palette.muted, height: 1.5),
         ),
       ],
     );

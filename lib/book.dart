@@ -13,10 +13,7 @@ import 'check.dart';
 import 'config.dart';
 import 'home.dart' show FloatingNavMetrics, kBottomNavBarHeight;
 import 'shared_design.dart';
-
-// Shared soft shadow used across every card in this file: the app-wide card
-// shadow (black at 4 %, blur 6, offset (0, 2)).
-const List<BoxShadow> kBookSoftShadow = AppColors.cardShadow;
+import 'app_palette.dart';
 
 // Sticky bottom bar's own content height (12 top pad + 50 confirm button
 // height + 12 bottom pad) — used so the scroll content ends exactly one
@@ -484,7 +481,9 @@ class _BookScreenState extends State<BookScreen>
       initialDate: DateTime.now().add(const Duration(days: 1)),
       firstDate: DateTime.now().add(const Duration(days: 1)),
       lastDate: DateTime.now().add(const Duration(days: 14)),
+      // Light keeps its look; dark inherits the app's dark theme.
       builder: (context, child) {
+        if (context.palette.isDark) return child!;
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
@@ -550,7 +549,7 @@ class _BookScreenState extends State<BookScreen>
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: context.palette.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -567,31 +566,31 @@ class _BookScreenState extends State<BookScreen>
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: AppColors.border,
+                    color: context.palette.border,
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Confirm your booking?',
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.foreground,
+                  color: context.palette.foreground,
                 ),
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 'Please review your appointment details.',
-                style: TextStyle(fontSize: 12.5, color: AppColors.muted),
+                style: TextStyle(fontSize: 12.5, color: context.palette.muted),
               ),
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: AppColors.mutedBg,
-                  border: Border.all(color: AppColors.border),
+                  color: context.palette.surfaceAlt,
+                  border: Border.all(color: context.palette.border),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Column(
@@ -624,23 +623,23 @@ class _BookScreenState extends State<BookScreen>
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppColors.infoBg,
-                  border: Border.all(color: AppColors.infoBorder),
+                  color: context.palette.infoBg,
+                  border: Border.all(color: context.palette.infoBorder),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.info_outline_rounded,
                       size: 16,
-                      color: AppColors.infoDark,
+                      color: context.palette.infoText,
                     ),
                     const SizedBox(width: 8),
-                    const Expanded(
+                    Expanded(
                       child: Text(
                         'Arrive 10 minutes early and bring a valid ID.',
-                        style: TextStyle(fontSize: 12, color: AppColors.infoDark),
+                        style: TextStyle(fontSize: 12, color: context.palette.infoText),
                       ),
                     ),
                   ],
@@ -655,8 +654,8 @@ class _BookScreenState extends State<BookScreen>
                       child: OutlinedButton(
                         onPressed: () => Navigator.of(sheetContext).pop(),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.muted,
-                          side: const BorderSide(color: AppColors.border),
+                          foregroundColor: context.palette.muted,
+                          side: BorderSide(color: context.palette.border),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),
@@ -679,8 +678,8 @@ class _BookScreenState extends State<BookScreen>
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
-                          disabledBackgroundColor: AppColors.border,
-                          disabledForegroundColor: AppColors.muted,
+                          disabledBackgroundColor: context.palette.border,
+                          disabledForegroundColor: context.palette.muted,
                           foregroundColor: Colors.white,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
@@ -717,10 +716,10 @@ class _BookScreenState extends State<BookScreen>
           height: 32,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: AppColors.accentBg,
+            color: context.palette.accentBg,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, size: 16, color: kCrimson),
+          child: Icon(icon, size: 16, color: context.palette.primaryText),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -729,21 +728,21 @@ class _BookScreenState extends State<BookScreen>
             children: [
               Text(
                 label,
-                style: const TextStyle(fontSize: 11, color: AppColors.muted),
+                style: TextStyle(fontSize: 11, color: context.palette.muted),
               ),
               Text(
                 value,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.foreground,
+                  color: context.palette.foreground,
                 ),
               ),
               if (sublabel != null) ...[
                 const SizedBox(height: 2),
                 Text(
                   sublabel,
-                  style: const TextStyle(fontSize: 11, color: AppColors.muted),
+                  style: TextStyle(fontSize: 11, color: context.palette.muted),
                 ),
               ],
             ],
@@ -943,24 +942,24 @@ class _BookScreenState extends State<BookScreen>
           "Reschedule Appointment?",
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
-        content: const Text(
+        content: Text(
           "Your existing appointment will be changed to the new date and time.",
-          style: TextStyle(fontSize: 13, color: AppColors.muted, height: 1.5),
+          style: TextStyle(fontSize: 13, color: context.palette.muted, height: 1.5),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text(
+            child: Text(
               "Cancel",
-              style: TextStyle(color: AppColors.muted),
+              style: TextStyle(color: context.palette.muted),
             ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
-              disabledBackgroundColor: AppColors.border,
-              disabledForegroundColor: AppColors.muted,
+              disabledBackgroundColor: context.palette.border,
+              disabledForegroundColor: context.palette.muted,
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(
@@ -1186,18 +1185,18 @@ class _BookScreenState extends State<BookScreen>
     switch ((raw ?? '').toLowerCase()) {
       case 'cancelled':
       case 'canceled':
-        return AppColors.primary;
+        return context.palette.primaryText;
       case 'pending':
       case 'scheduled':
-        return AppColors.warning;
+        return context.palette.warning;
       case 'rescheduled':
-        return AppColors.info;
+        return context.palette.info;
       case 'approved':
       case 'confirmed':
       case 'completed':
-        return AppColors.success;
+        return context.palette.success;
       default:
-        return AppColors.muted;
+        return context.palette.muted;
     }
   }
 
@@ -1216,13 +1215,13 @@ class _BookScreenState extends State<BookScreen>
     final showingForm = _showingBookingForm;
 
     return Scaffold(
-      backgroundColor: AppColors.mutedBg,
+      backgroundColor: context.palette.background,
       body: Column(
         children: [
           _header(showingForm),
           Expanded(
             child: RefreshIndicator(
-              color: AppColors.primary,
+              color: context.palette.primaryText,
               onRefresh: _refreshStatuses,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
@@ -1291,7 +1290,7 @@ class _BookScreenState extends State<BookScreen>
                 ),
                 decoration: BoxDecoration(
                   color: s.$2
-                      ? Colors.white
+                      ? context.palette.surface
                       : Colors.white.withValues(alpha: .18),
                   borderRadius: BorderRadius.circular(999),
                 ),
@@ -1299,10 +1298,10 @@ class _BookScreenState extends State<BookScreen>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (s.$2) ...[
-                      const Icon(
+                      Icon(
                         Icons.check_rounded,
                         size: 12,
-                        color: kCrimson,
+                        color: context.palette.primaryText,
                       ),
                       const SizedBox(width: 4),
                     ],
@@ -1311,7 +1310,7 @@ class _BookScreenState extends State<BookScreen>
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: s.$2 ? kCrimson : Colors.white,
+                        color: s.$2 ? context.palette.primaryText : Colors.white,
                       ),
                     ),
                   ],
@@ -1356,7 +1355,7 @@ class _BookScreenState extends State<BookScreen>
         child: TextButton(
           onPressed: _isSubmitting ? null : _cancelReschedule,
           style: TextButton.styleFrom(
-            foregroundColor: kTextMuted,
+            foregroundColor: context.palette.muted,
             padding: EdgeInsets.zero,
           ),
           child: const Text(
@@ -1372,17 +1371,17 @@ class _BookScreenState extends State<BookScreen>
         children: [
           Text(
             '${_formatMonthDay(selectedDate!)} · $selectedTime',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: kTextPrimary,
+              color: context.palette.foreground,
             ),
           ),
           Text(
             _selectedFacility?['facility_name']?.toString() ?? '',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 11, color: kTextMuted),
+            style: TextStyle(fontSize: 11, color: context.palette.muted),
           ),
         ],
       );
@@ -1393,24 +1392,24 @@ class _BookScreenState extends State<BookScreen>
         children: [
           Text(
             'Step $stepN of 3',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: kTextPrimary,
+              color: context.palette.foreground,
             ),
           ),
-          const Text(
+          Text(
             'Select a date, center and time',
-            style: TextStyle(fontSize: 11, color: kTextMuted),
+            style: TextStyle(fontSize: 11, color: context.palette.muted),
           ),
         ],
       );
     }
 
     final bar = Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: kBorder)),
+      decoration: BoxDecoration(
+        color: context.palette.surface,
+        border: Border(top: BorderSide(color: context.palette.border)),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -1471,7 +1470,7 @@ class _BookScreenState extends State<BookScreen>
                     end: Alignment.bottomRight,
                   )
                 : null,
-            color: enabled ? null : AppColors.border,
+            color: enabled ? null : context.palette.border,
             borderRadius: BorderRadius.circular(14),
           ),
           child: _isSubmitting
@@ -1491,14 +1490,14 @@ class _BookScreenState extends State<BookScreen>
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
-                        color: enabled ? Colors.white : AppColors.hint,
+                        color: enabled ? Colors.white : context.palette.hint,
                       ),
                     ),
                     const SizedBox(width: 6),
                     Icon(
                       Icons.arrow_forward_rounded,
                       size: 18,
-                      color: enabled ? Colors.white : AppColors.hint,
+                      color: enabled ? Colors.white : context.palette.hint,
                     ),
                   ],
                 ),
@@ -1542,12 +1541,12 @@ class _BookScreenState extends State<BookScreen>
     }
 
     if (_checkingAppointment) {
-      return const Center(
+      return Center(
         key: ValueKey('appointment_loading'),
         child: Padding(
           padding: EdgeInsets.only(top: 60),
           child: CircularProgressIndicator(
-            color: AppColors.primary,
+            color: context.palette.primaryText,
             strokeWidth: 2.5,
           ),
         ),
@@ -1597,18 +1596,18 @@ class _BookScreenState extends State<BookScreen>
             children: [
               IconButton(
                 onPressed: _isSubmitting ? null : _cancelReschedule,
-                icon: const Icon(Icons.arrow_back, color: AppColors.muted),
+                icon: Icon(Icons.arrow_back, color: context.palette.muted),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
                 splashRadius: 18,
               ),
               const SizedBox(width: 8),
-              const Text(
+              Text(
                 "Reschedule Appointment",
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
-                  color: AppColors.foreground,
+                  color: context.palette.foreground,
                 ),
               ),
             ],
@@ -1628,18 +1627,18 @@ class _BookScreenState extends State<BookScreen>
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.event_available_rounded,
                         size: 16,
-                        color: kCrimson,
+                        color: context.palette.primaryText,
                       ),
                       const SizedBox(width: 6),
                       Text(
                         _formatDate(selectedDate!),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: kTextPrimary,
+                          color: context.palette.foreground,
                         ),
                       ),
                     ],
@@ -1674,7 +1673,7 @@ class _BookScreenState extends State<BookScreen>
           isReschedule
               ? "Your appointment ID stays the same — only the date, time, and center are updated."
               : "You'll receive a confirmation message with all the details once your booking is confirmed.",
-          style: const TextStyle(fontSize: 11, color: AppColors.muted),
+          style: TextStyle(fontSize: 11, color: context.palette.muted),
           textAlign: TextAlign.center,
         ),
       ],
@@ -1690,24 +1689,24 @@ class _BookScreenState extends State<BookScreen>
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: AppColors.border),
+        color: context.palette.surface,
+        border: Border.all(color: context.palette.border),
         borderRadius: BorderRadius.circular(16),
-        boxShadow: kBookSoftShadow,
+        boxShadow: context.palette.shadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, color: AppColors.primary, size: 20),
+              Icon(icon, color: context.palette.primaryText, size: 20),
               const SizedBox(width: 8),
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
-                  color: AppColors.foreground,
+                  color: context.palette.foreground,
                 ),
               ),
             ],
@@ -1794,9 +1793,9 @@ class _BookScreenState extends State<BookScreen>
                     end: Alignment.bottomRight,
                   )
                 : null,
-            color: selected ? null : Colors.white,
+            color: selected ? null : context.palette.surface,
             borderRadius: BorderRadius.circular(14),
-            border: selected ? null : Border.all(color: kBorder),
+            border: selected ? null : Border.all(color: context.palette.border),
             boxShadow: selected
                 ? [
                     BoxShadow(
@@ -1814,7 +1813,7 @@ class _BookScreenState extends State<BookScreen>
                 weekdayLabel,
                 style: TextStyle(
                   fontSize: 11,
-                  color: selected ? Colors.white70 : kTextMuted,
+                  color: selected ? Colors.white70 : context.palette.muted,
                 ),
               ),
               const SizedBox(height: 2),
@@ -1823,7 +1822,7 @@ class _BookScreenState extends State<BookScreen>
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
-                  color: selected ? Colors.white : kTextPrimary,
+                  color: selected ? Colors.white : context.palette.foreground,
                 ),
               ),
               const SizedBox(height: 2),
@@ -1831,7 +1830,7 @@ class _BookScreenState extends State<BookScreen>
                 monthsShort[d.month - 1],
                 style: TextStyle(
                   fontSize: 10,
-                  color: selected ? Colors.white70 : kTextMuted,
+                  color: selected ? Colors.white70 : context.palette.muted,
                 ),
               ),
             ],
@@ -1848,21 +1847,21 @@ class _BookScreenState extends State<BookScreen>
       height: 80,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.palette.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kBorder),
+        border: Border.all(color: context.palette.border),
       ),
-      child: const Column(
+      child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.calendar_month_rounded, size: 20, color: kCrimson),
+          Icon(Icons.calendar_month_rounded, size: 20, color: context.palette.primaryText),
           SizedBox(height: 6),
           Text(
             'More',
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w700,
-              color: kTextPrimary,
+              color: context.palette.foreground,
             ),
           ),
         ],
@@ -1879,16 +1878,16 @@ class _BookScreenState extends State<BookScreen>
         height: 48,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: AppColors.mutedBg,
-          border: Border.all(color: AppColors.border),
+          color: context.palette.surfaceAlt,
+          border: Border.all(color: context.palette.border),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: const SizedBox(
+        child: SizedBox(
           width: 16,
           height: 16,
           child: CircularProgressIndicator(
             strokeWidth: 2,
-            color: AppColors.primary,
+            color: context.palette.primaryText,
           ),
         ),
       );
@@ -1897,16 +1896,16 @@ class _BookScreenState extends State<BookScreen>
     if (_facilitiesError) {
       return Row(
         children: [
-          const Icon(
+          Icon(
             Icons.wifi_off_rounded,
-            color: AppColors.muted,
+            color: context.palette.muted,
             size: 18,
           ),
           const SizedBox(width: 8),
-          const Expanded(
+          Expanded(
             child: Text(
               "Couldn't load donation centers",
-              style: TextStyle(fontSize: 13, color: AppColors.muted),
+              style: TextStyle(fontSize: 13, color: context.palette.muted),
             ),
           ),
           TextButton(
@@ -1917,10 +1916,10 @@ class _BookScreenState extends State<BookScreen>
               });
               _fetchFacilities();
             },
-            child: const Text(
+            child: Text(
               "Retry",
               style: TextStyle(
-                color: AppColors.primary,
+                color: context.palette.primaryText,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -1930,9 +1929,9 @@ class _BookScreenState extends State<BookScreen>
     }
 
     if (_facilities.isEmpty) {
-      return const Text(
+      return Text(
         "No donation centers are available right now.",
-        style: TextStyle(fontSize: 13, color: AppColors.muted),
+        style: TextStyle(fontSize: 13, color: context.palette.muted),
       );
     }
 
@@ -1991,8 +1990,8 @@ class _BookScreenState extends State<BookScreen>
             ),
             child: Text(
               'Show all ${filtered.length} centers',
-              style: const TextStyle(
-                color: kCrimson,
+              style: TextStyle(
+                color: context.palette.primaryText,
                 fontWeight: FontWeight.w700,
                 fontSize: 12,
               ),
@@ -2008,23 +2007,23 @@ class _BookScreenState extends State<BookScreen>
     style: const TextStyle(fontSize: 13),
     decoration: InputDecoration(
       hintText: 'Search by name or barangay',
-      hintStyle: const TextStyle(fontSize: 13, color: kTextMuted),
-      prefixIcon: const Icon(Icons.search_rounded, size: 18, color: kTextMuted),
+      hintStyle: TextStyle(fontSize: 13, color: context.palette.muted),
+      prefixIcon: Icon(Icons.search_rounded, size: 18, color: context.palette.muted),
       isDense: true,
       filled: true,
-      fillColor: kInputFill,
+      fillColor: context.palette.surfaceAlt,
       contentPadding: const EdgeInsets.symmetric(vertical: 10),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: kBorder),
+        borderSide: BorderSide(color: context.palette.border),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: kBorder),
+        borderSide: BorderSide(color: context.palette.border),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: kCrimson, width: 1.5),
+        borderSide: BorderSide(color: context.palette.primaryText, width: 1.5),
       ),
     ),
   );
@@ -2056,9 +2055,9 @@ class _BookScreenState extends State<BookScreen>
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: selected ? AppColors.accentBg : Colors.white,
+          color: selected ? context.palette.accentBg : context.palette.surface,
           border: Border.all(
-            color: selected ? kCrimson : AppColors.border,
+            color: selected ? context.palette.primaryText : context.palette.border,
             width: selected ? 1.5 : 1,
           ),
           borderRadius: BorderRadius.circular(14),
@@ -2073,12 +2072,12 @@ class _BookScreenState extends State<BookScreen>
                   height: 40,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: AppColors.infoBg,
+                    color: context.palette.infoBg,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
                     _facilityTypeIcon(f['facility_type']?.toString()),
-                    color: AppColors.info,
+                    color: context.palette.info,
                     size: 20,
                   ),
                 ),
@@ -2091,10 +2090,10 @@ class _BookScreenState extends State<BookScreen>
                         name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: kTextPrimary,
+                          color: context.palette.foreground,
                         ),
                       ),
                       if (subtitle.isNotEmpty)
@@ -2102,9 +2101,9 @@ class _BookScreenState extends State<BookScreen>
                           subtitle,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            color: kTextMuted,
+                            color: context.palette.muted,
                           ),
                         ),
                     ],
@@ -2122,7 +2121,7 @@ class _BookScreenState extends State<BookScreen>
                     border: selected
                         ? null
                         : Border.all(
-                            color: AppColors.border,
+                            color: context.palette.border,
                             width: 1.5,
                           ),
                   ),
@@ -2179,16 +2178,16 @@ class _BookScreenState extends State<BookScreen>
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(
+                Icon(
                   Icons.location_on_rounded,
                   size: 12,
-                  color: kCrimson,
+                  color: context.palette.primaryText,
                 ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     addressLine,
-                    style: const TextStyle(fontSize: 12, color: kTextPrimary),
+                    style: TextStyle(fontSize: 12, color: context.palette.foreground),
                   ),
                 ),
               ],
@@ -2197,11 +2196,11 @@ class _BookScreenState extends State<BookScreen>
         if (contact != null && contact.isNotEmpty)
           Row(
             children: [
-              const Icon(Icons.call_rounded, size: 12, color: kCrimson),
+              Icon(Icons.call_rounded, size: 12, color: context.palette.primaryText),
               const SizedBox(width: 6),
               Text(
                 contact,
-                style: const TextStyle(fontSize: 12, color: kTextPrimary),
+                style: TextStyle(fontSize: 12, color: context.palette.foreground),
               ),
             ],
           ),
@@ -2227,9 +2226,9 @@ class _BookScreenState extends State<BookScreen>
 
   Widget _timeSlotContent() {
     if (selectedFacilityId == null) {
-      return const Text(
+      return Text(
         "Choose a donation center to see its available times.",
-        style: TextStyle(fontSize: 13, color: AppColors.muted),
+        style: TextStyle(fontSize: 13, color: context.palette.muted),
       );
     }
 
@@ -2239,16 +2238,16 @@ class _BookScreenState extends State<BookScreen>
         height: 48,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: AppColors.mutedBg,
-          border: Border.all(color: AppColors.border),
+          color: context.palette.surfaceAlt,
+          border: Border.all(color: context.palette.border),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: const SizedBox(
+        child: SizedBox(
           width: 16,
           height: 16,
           child: CircularProgressIndicator(
             strokeWidth: 2,
-            color: AppColors.primary,
+            color: context.palette.primaryText,
           ),
         ),
       );
@@ -2257,12 +2256,12 @@ class _BookScreenState extends State<BookScreen>
     if (_slotsError) {
       return Row(
         children: [
-          const Icon(Icons.wifi_off_rounded, color: AppColors.muted, size: 18),
+          Icon(Icons.wifi_off_rounded, color: context.palette.muted, size: 18),
           const SizedBox(width: 8),
-          const Expanded(
+          Expanded(
             child: Text(
               "Couldn't load time slots",
-              style: TextStyle(fontSize: 13, color: AppColors.muted),
+              style: TextStyle(fontSize: 13, color: context.palette.muted),
             ),
           ),
           TextButton(
@@ -2273,10 +2272,10 @@ class _BookScreenState extends State<BookScreen>
               });
               _fetchTimeSlots();
             },
-            child: const Text(
+            child: Text(
               "Retry",
               style: TextStyle(
-                color: AppColors.primary,
+                color: context.palette.primaryText,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -2287,9 +2286,9 @@ class _BookScreenState extends State<BookScreen>
 
     final slots = _slotsForSelectedFacility;
     if (slots.isEmpty) {
-      return const Text(
+      return Text(
         "No time slots are available at this center right now. Please choose another center.",
-        style: TextStyle(fontSize: 13, color: AppColors.muted),
+        style: TextStyle(fontSize: 13, color: context.palette.muted),
       );
     }
 
@@ -2298,19 +2297,19 @@ class _BookScreenState extends State<BookScreen>
     final groups = <(IconData, Color, String, List<TimeSlot>)>[
       (
         Icons.wb_sunny_rounded,
-        AppColors.warning,
+        context.palette.warning,
         'Morning',
         slots.where((s) => s.period == 'morning').toList(),
       ),
       (
         Icons.wb_twilight_rounded,
-        AppColors.orange,
+        context.palette.orange,
         'Afternoon',
         slots.where((s) => s.period == 'afternoon').toList(),
       ),
       (
         Icons.nights_stay_rounded,
-        AppColors.info,
+        context.palette.info,
         'Evening',
         slots.where((s) => s.period == 'evening').toList(),
       ),
@@ -2334,10 +2333,10 @@ class _BookScreenState extends State<BookScreen>
       const SizedBox(width: 6),
       Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w700,
-          color: kTextMuted,
+          color: context.palette.muted,
         ),
       ),
     ],
@@ -2361,9 +2360,9 @@ class _BookScreenState extends State<BookScreen>
               },
               child: Container(
                 decoration: BoxDecoration(
-                  color: selected ? kCrimson : Colors.white,
+                  color: selected ? kCrimson : context.palette.surface,
                   border: Border.all(
-                    color: selected ? kCrimson : AppColors.border,
+                    color: selected ? context.palette.primaryText : context.palette.border,
                   ),
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -2384,7 +2383,7 @@ class _BookScreenState extends State<BookScreen>
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: selected ? Colors.white : kTextPrimary,
+                        color: selected ? Colors.white : context.palette.foreground,
                       ),
                     ),
                   ],
@@ -2439,7 +2438,7 @@ class _BookScreenState extends State<BookScreen>
               width: 58,
               height: 64,
               decoration: BoxDecoration(
-                color: AppColors.accentBg,
+                color: context.palette.accentBg,
                 borderRadius: BorderRadius.circular(12),
               ),
               alignment: Alignment.center,
@@ -2448,18 +2447,18 @@ class _BookScreenState extends State<BookScreen>
                 children: [
                   Text(
                     monthsShort[d.month - 1],
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: kCrimson,
+                      color: context.palette.primaryText,
                     ),
                   ),
                   Text(
                     '${d.day}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w900,
-                      color: kTextPrimary,
+                      color: context.palette.foreground,
                     ),
                   ),
                 ],
@@ -2472,20 +2471,20 @@ class _BookScreenState extends State<BookScreen>
                 children: [
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.confirmation_number_rounded,
                         size: 16,
-                        color: AppColors.success,
+                        color: context.palette.success,
                       ),
                       const SizedBox(width: 6),
                       Text(
                         isReschedule
                             ? 'New Schedule Summary'
                             : 'Booking Summary',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          color: kTextPrimary,
+                          color: context.palette.foreground,
                         ),
                       ),
                     ],
@@ -2495,31 +2494,31 @@ class _BookScreenState extends State<BookScreen>
                     _selectedFacility?['facility_name']?.toString() ?? '',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: kTextPrimary,
+                      color: context.palette.foreground,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.schedule_rounded,
                         size: 13,
-                        color: kTextMuted,
+                        color: context.palette.muted,
                       ),
                       const SizedBox(width: 4),
                       Text(
                         selectedTime!,
-                        style: const TextStyle(fontSize: 12, color: kTextMuted),
+                        style: TextStyle(fontSize: 12, color: context.palette.muted),
                       ),
                     ],
                   ),
                   const SizedBox(height: 2),
                   Text(
                     weekdaysShort[d.weekday - 1],
-                    style: const TextStyle(fontSize: 11, color: kTextMuted),
+                    style: TextStyle(fontSize: 11, color: context.palette.muted),
                   ),
                 ],
               ),
@@ -2528,17 +2527,17 @@ class _BookScreenState extends State<BookScreen>
         ),
         bottom: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
+          children: [
             Icon(
               Icons.info_outline_rounded,
               size: 14,
-              color: AppColors.info,
+              color: context.palette.info,
             ),
             SizedBox(width: 8),
             Expanded(
               child: Text(
                 'Arrive 10 minutes early and bring a valid ID.',
-                style: TextStyle(fontSize: 11.5, color: AppColors.infoDark),
+                style: TextStyle(fontSize: 11.5, color: context.palette.infoText),
               ),
             ),
           ],
@@ -2585,7 +2584,7 @@ class _BookingSkeletonState extends State<_BookingSkeleton>
     width: double.infinity,
     height: height,
     decoration: BoxDecoration(
-      color: AppColors.mutedBg,
+      color: context.palette.surfaceAlt,
       borderRadius: BorderRadius.circular(16),
     ),
   );
@@ -2624,10 +2623,10 @@ class _TicketCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: context.palette.surface,
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: AppColors.border),
-      boxShadow: kBookSoftShadow,
+      border: Border.all(color: context.palette.border),
+      boxShadow: context.palette.shadow,
     ),
     child: Column(
       children: [
@@ -2666,7 +2665,7 @@ class _TicketDashedDivider extends StatelessWidget {
       clipBehavior: Clip.none,
       alignment: Alignment.centerLeft,
       children: [
-        Positioned.fill(child: CustomPaint(painter: _DashedLinePainter())),
+        Positioned.fill(child: CustomPaint(painter: _DashedLinePainter(context.palette.border))),
         const Positioned(left: -8, child: _TicketNotch()),
         const Positioned(right: -8, child: _TicketNotch()),
       ],
@@ -2681,18 +2680,22 @@ class _TicketNotch extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     width: 16,
     height: 16,
-    decoration: const BoxDecoration(
+    decoration: BoxDecoration(
       shape: BoxShape.circle,
-      color: AppColors.mutedBg,
+      color: context.palette.surfaceAlt,
     ),
   );
 }
 
 class _DashedLinePainter extends CustomPainter {
+  final Color color;
+
+  const _DashedLinePainter(this.color);
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = AppColors.border
+      ..color = color
       ..strokeWidth = 1;
     const dash = 6.0, gap = 4.0;
     final y = size.height / 2;
@@ -2705,10 +2708,11 @@ class _DashedLinePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _DashedLinePainter oldDelegate) => false;
+  bool shouldRepaint(covariant _DashedLinePainter oldDelegate) =>
+      oldDelegate.color != color;
 }
 
-Widget _appointmentDateBlock(
+Widget _appointmentDateBlock(BuildContext context, 
   String? rawDate,
   String Function(String?) formatDate,
 ) {
@@ -2739,29 +2743,29 @@ Widget _appointmentDateBlock(
         width: 58,
         height: 64,
         decoration: BoxDecoration(
-          color: AppColors.accentBg,
+          color: context.palette.accentBg,
           borderRadius: BorderRadius.circular(12),
         ),
         alignment: Alignment.center,
         child: d == null
-            ? const Icon(Icons.calendar_today_rounded, color: AppColors.primary)
+            ? Icon(Icons.calendar_today_rounded, color: context.palette.primaryText)
             : Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
                     monthsShort[d.month - 1],
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
+                      color: context.palette.primaryText,
                     ),
                   ),
                   Text(
                     '${d.day}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w900,
-                      color: AppColors.foreground,
+                      color: context.palette.foreground,
                     ),
                   ),
                 ],
@@ -2773,17 +2777,17 @@ Widget _appointmentDateBlock(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text(
+            Text(
               'Date',
-              style: TextStyle(fontSize: 11, color: AppColors.muted),
+              style: TextStyle(fontSize: 11, color: context.palette.muted),
             ),
             const SizedBox(height: 2),
             Text(
               formatDate(rawDate),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
-                color: AppColors.foreground,
+                color: context.palette.foreground,
               ),
             ),
           ],
@@ -2835,22 +2839,22 @@ class _AppointmentManagementView extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppColors.accentBg,
+                  color: context.palette.accentBg,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.event_available_rounded,
-                  color: AppColors.primary,
+                  color: context.palette.primaryText,
                   size: 20,
                 ),
               ),
               const SizedBox(width: 10),
-              const Text(
+              Text(
                 "Your Appointment",
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 17,
-                  color: AppColors.foreground,
+                  color: context.palette.foreground,
                 ),
               ),
             ],
@@ -2870,7 +2874,7 @@ class _AppointmentManagementView extends StatelessWidget {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: context.palette.surface,
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Row(
@@ -2893,9 +2897,9 @@ class _AppointmentManagementView extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     subtitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: AppColors.muted,
+                      color: context.palette.muted,
                     ),
                   ),
                 ],
@@ -2909,25 +2913,25 @@ class _AppointmentManagementView extends StatelessWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppColors.infoBg,
+                      color: context.palette.infoBg,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppColors.infoBorder),
+                      border: Border.all(color: context.palette.infoBorder),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.info_outline_rounded,
-                          color: AppColors.info,
+                          color: context.palette.info,
                           size: 18,
                         ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             "You're all set for this appointment. Reschedule only if something comes up — this keeps a slot open for another donor in the meantime.",
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: AppColors.infoDark,
+                              color: context.palette.infoText,
                               height: 1.5,
                             ),
                           ),
@@ -2937,50 +2941,50 @@ class _AppointmentManagementView extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                 ],
-                _appointmentDateBlock(
+                _appointmentDateBlock(context, 
                   appointment['appointment_date']?.toString(),
                   formatDate,
                 ),
                 const SizedBox(height: 14),
-                _infoRow(
+                _infoRow(context, 
                   icon: Icons.access_time_rounded,
                   label: "Time",
                   value: formatTime(
                     appointment['appointment_time']?.toString(),
                   ),
                 ),
-                const Divider(height: 24, color: AppColors.mutedBg),
-                _infoRow(
+                Divider(height: 24, color: context.palette.surfaceAlt),
+                _infoRow(context, 
                   icon: Icons.location_on_rounded,
                   label: "Donation Center",
                   value: appointment['donation_center']?.toString() ?? "N/A",
                 ),
-                const Divider(height: 24, color: AppColors.mutedBg),
+                Divider(height: 24, color: context.palette.surfaceAlt),
                 Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.confirmation_number_outlined,
                       size: 16,
-                      color: AppColors.muted,
+                      color: context.palette.muted,
                     ),
                     const SizedBox(width: 8),
                     Text(
                       appointment['appointment_id'] != null
                           ? 'Appointment #${appointment['appointment_id']}'
                           : 'Appointment',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.foreground,
+                        color: context.palette.foreground,
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'Show this at the donation center',
-                  style: TextStyle(fontSize: 11, color: AppColors.muted),
+                  style: TextStyle(fontSize: 11, color: context.palette.muted),
                 ),
               ],
             ),
@@ -3004,8 +3008,8 @@ class _AppointmentManagementView extends StatelessWidget {
                       ),
                     ),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      side: const BorderSide(color: AppColors.primary),
+                      foregroundColor: context.palette.primaryText,
+                      side: BorderSide(color: context.palette.primaryText),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -3023,8 +3027,8 @@ class _AppointmentManagementView extends StatelessWidget {
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
-                      disabledBackgroundColor: AppColors.border,
-                      disabledForegroundColor: AppColors.muted,
+                      disabledBackgroundColor: context.palette.border,
+                      disabledForegroundColor: context.palette.muted,
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
@@ -3035,9 +3039,9 @@ class _AppointmentManagementView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        const Text(
+        Text(
           "You can only manage one active appointment at a time. Pull down to refresh once your appointment status changes.",
-          style: TextStyle(fontSize: 11, color: AppColors.muted),
+          style: TextStyle(fontSize: 11, color: context.palette.muted),
           textAlign: TextAlign.center,
         ),
       ],
@@ -3047,14 +3051,14 @@ class _AppointmentManagementView extends StatelessWidget {
 
 // ── SHARED HELPERS ──────────────────────────────────────────────────────────
 
-Widget _infoRow({
+Widget _infoRow(BuildContext context, {
   required IconData icon,
   required String label,
   required String value,
 }) {
   return Row(
     children: [
-      Icon(icon, size: 18, color: AppColors.muted),
+      Icon(icon, size: 18, color: context.palette.muted),
       const SizedBox(width: 10),
       Expanded(
         child: Column(
@@ -3062,15 +3066,15 @@ Widget _infoRow({
           children: [
             Text(
               label,
-              style: const TextStyle(fontSize: 11, color: AppColors.muted),
+              style: TextStyle(fontSize: 11, color: context.palette.muted),
             ),
             const SizedBox(height: 2),
             Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
-                color: AppColors.foreground,
+                color: context.palette.foreground,
               ),
             ),
           ],
@@ -3131,26 +3135,26 @@ class _DonationSuccessView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        FadeSlideIn(index: 0, child: _hero()),
+        FadeSlideIn(index: 0, child: _hero(context)),
         const SizedBox(height: 20),
-        FadeSlideIn(index: 1, child: _nextEligibleCard()),
+        FadeSlideIn(index: 1, child: _nextEligibleCard(context)),
         const SizedBox(height: 16),
-        FadeSlideIn(index: 2, child: _detailsCard()),
+        FadeSlideIn(index: 2, child: _detailsCard(context)),
         const SizedBox(height: 16),
-        FadeSlideIn(index: 3, child: _impactBanner()),
+        FadeSlideIn(index: 3, child: _impactBanner(context)),
         const SizedBox(height: 16),
-        FadeSlideIn(index: 4, child: _aftercareCard()),
+        FadeSlideIn(index: 4, child: _aftercareCard(context)),
         const SizedBox(height: 16),
-        const Text(
+        Text(
           "Booking will reopen automatically on your next eligible date. Pull down to refresh.",
-          style: TextStyle(fontSize: 11, color: AppColors.muted),
+          style: TextStyle(fontSize: 11, color: context.palette.muted),
           textAlign: TextAlign.center,
         ),
       ],
     );
   }
 
-  Widget _hero() {
+  Widget _hero(BuildContext context) {
     return Column(
       children: [
         TweenAnimationBuilder<double>(
@@ -3164,39 +3168,39 @@ class _DonationSuccessView extends StatelessWidget {
             height: 110,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.successBg,
-              border: Border.all(color: AppColors.successBorder, width: 3),
+              color: context.palette.successBg,
+              border: Border.all(color: context.palette.successBorder, width: 3),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.success.withValues(alpha: 0.18),
+                  color: context.palette.success.withValues(alpha: 0.18),
                   blurRadius: 24,
                   offset: const Offset(0, 8),
                 ),
               ],
             ),
-            child: const Icon(
+            child: Icon(
               Icons.volunteer_activism_rounded,
               size: 50,
-              color: AppColors.success,
+              color: context.palette.success,
             ),
           ),
         ),
         const SizedBox(height: 20),
-        const Text(
+        Text(
           "Thank You for Donating!",
           style: TextStyle(
             fontSize: 21,
             fontWeight: FontWeight.bold,
-            color: AppColors.foreground,
+            color: context.palette.foreground,
           ),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 10),
-        const Text(
+        Text(
           "Your donation was completed successfully. One donation can help save up to 3 lives.",
           style: TextStyle(
             fontSize: 13,
-            color: AppColors.muted,
+            color: context.palette.muted,
             height: 1.55,
           ),
           textAlign: TextAlign.center,
@@ -3205,17 +3209,17 @@ class _DonationSuccessView extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
           decoration: BoxDecoration(
-            color: AppColors.successBg,
+            color: context.palette.successBg,
             borderRadius: BorderRadius.circular(99),
-            border: Border.all(color: AppColors.successBorder),
+            border: Border.all(color: context.palette.successBorder),
           ),
-          child: const Row(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 Icons.check_circle_rounded,
                 size: 15,
-                color: AppColors.success,
+                color: context.palette.success,
               ),
               SizedBox(width: 7),
               Text(
@@ -3223,7 +3227,7 @@ class _DonationSuccessView extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.success,
+                  color: context.palette.success,
                 ),
               ),
             ],
@@ -3233,7 +3237,7 @@ class _DonationSuccessView extends StatelessWidget {
     );
   }
 
-  Widget _nextEligibleCard() {
+  Widget _nextEligibleCard(BuildContext context) {
     final elig = eligibility;
     final daysRemaining = (elig?['days_remaining'] as num?)?.toInt();
     final totalWaitDays = (elig?['total_wait_days'] as num?)?.toInt();
@@ -3250,19 +3254,19 @@ class _DonationSuccessView extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: AppColors.border),
+        color: context.palette.surface,
+        border: Border.all(color: context.palette.border),
         borderRadius: BorderRadius.circular(16),
-        boxShadow: kBookSoftShadow,
+        boxShadow: context.palette.shadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
               Icon(
                 Icons.event_repeat_rounded,
-                color: AppColors.primary,
+                color: context.palette.primaryText,
                 size: 20,
               ),
               SizedBox(width: 8),
@@ -3271,28 +3275,28 @@ class _DonationSuccessView extends StatelessWidget {
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
-                  color: AppColors.foreground,
+                  color: context.palette.foreground,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 14),
           if (elig == null)
-            const Text(
+            Text(
               "We'll let you know when you can donate again.",
               style: TextStyle(
                 fontSize: 13,
-                color: AppColors.muted,
+                color: context.palette.muted,
                 height: 1.5,
               ),
             )
           else ...[
             Text(
               formatDate(nextEligibleDate),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: AppColors.foreground,
+                color: context.palette.foreground,
               ),
             ),
             if (daysRemaining != null) ...[
@@ -3301,10 +3305,10 @@ class _DonationSuccessView extends StatelessWidget {
                 daysRemaining == 1
                     ? "1 day to go"
                     : "$daysRemaining days to go",
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.primary,
+                  color: context.palette.primaryText,
                 ),
               ),
             ],
@@ -3315,8 +3319,8 @@ class _DonationSuccessView extends StatelessWidget {
                 child: LinearProgressIndicator(
                   value: progress,
                   minHeight: 8,
-                  color: AppColors.success,
-                  backgroundColor: AppColors.border,
+                  color: context.palette.success,
+                  backgroundColor: context.palette.border,
                 ),
               ),
               const SizedBox(height: 10),
@@ -3325,16 +3329,16 @@ class _DonationSuccessView extends StatelessWidget {
                 children: [
                   Text(
                     "Donated ${formatDate(donationDate)}",
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
-                      color: AppColors.muted,
+                      color: context.palette.muted,
                     ),
                   ),
                   Text(
                     "Eligible ${formatDate(nextEligibleDate)}",
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
-                      color: AppColors.muted,
+                      color: context.palette.muted,
                     ),
                   ),
                 ],
@@ -3346,7 +3350,7 @@ class _DonationSuccessView extends StatelessWidget {
     );
   }
 
-  Widget _detailsCard() {
+  Widget _detailsCard(BuildContext context) {
     final donationDateRaw = donation['donation_date']?.toString();
     final bloodTypeRaw = donation['blood_type']?.toString();
     final unitsRaw = donation['blood_units'];
@@ -3356,9 +3360,9 @@ class _DonationSuccessView extends StatelessWidget {
     final rows = <Widget>[];
     void addRow(IconData icon, String label, String value) {
       if (rows.isNotEmpty) {
-        rows.add(const Divider(height: 24, color: AppColors.mutedBg));
+        rows.add(Divider(height: 24, color: context.palette.surfaceAlt));
       }
-      rows.add(_infoRow(icon: icon, label: label, value: value));
+      rows.add(_infoRow(context, icon: icon, label: label, value: value));
     }
 
     if (donationDateRaw != null && donationDateRaw.isNotEmpty) {
@@ -3390,19 +3394,19 @@ class _DonationSuccessView extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: AppColors.border),
+        color: context.palette.surface,
+        border: Border.all(color: context.palette.border),
         borderRadius: BorderRadius.circular(16),
-        boxShadow: kBookSoftShadow,
+        boxShadow: context.palette.shadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
               Icon(
                 Icons.receipt_long_rounded,
-                color: AppColors.primary,
+                color: context.palette.primaryText,
                 size: 20,
               ),
               SizedBox(width: 8),
@@ -3411,7 +3415,7 @@ class _DonationSuccessView extends StatelessWidget {
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
-                  color: AppColors.foreground,
+                  color: context.palette.foreground,
                 ),
               ),
             ],
@@ -3423,7 +3427,7 @@ class _DonationSuccessView extends StatelessWidget {
     );
   }
 
-  Widget _impactBanner() {
+  Widget _impactBanner(BuildContext context) {
     final text = totalDonations > 1
         ? "This was your ${_ordinal(totalDonations)} donation — together they could help save up to ${totalDonations * 3} lives."
         : "This was your first donation — welcome to the eDonate donor community!";
@@ -3432,25 +3436,25 @@ class _DonationSuccessView extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.infoBg,
+        color: context.palette.infoBg,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.infoBorder),
+        border: Border.all(color: context.palette.infoBorder),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
+          Icon(
             Icons.favorite_rounded,
-            color: AppColors.info,
+            color: context.palette.info,
             size: 18,
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
-                color: AppColors.infoDark,
+                color: context.palette.infoText,
                 height: 1.5,
               ),
             ),
@@ -3460,23 +3464,23 @@ class _DonationSuccessView extends StatelessWidget {
     );
   }
 
-  Widget _aftercareCard() => Container(
+  Widget _aftercareCard(BuildContext context) => Container(
     width: double.infinity,
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: Colors.white,
-      border: Border.all(color: AppColors.border, width: 2),
+      color: context.palette.surface,
+      border: Border.all(color: context.palette.border, width: 2),
       borderRadius: BorderRadius.circular(16),
-      boxShadow: AppColors.cardShadow,
+      boxShadow: context.palette.shadow,
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Row(
+        Row(
           children: [
             Icon(
               Icons.health_and_safety_rounded,
-              color: AppColors.primary,
+              color: context.palette.primaryText,
               size: 20,
             ),
             SizedBox(width: 8),
@@ -3485,38 +3489,38 @@ class _DonationSuccessView extends StatelessWidget {
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
-                color: AppColors.foreground,
+                color: context.palette.foreground,
               ),
             ),
           ],
         ),
         const SizedBox(height: 12),
-        _aftercareRow("Drink extra fluids for the next 24–48 hours."),
-        _aftercareRow("Avoid heavy lifting or strenuous exercise today."),
-        _aftercareRow(
+        _aftercareRow(context, "Drink extra fluids for the next 24–48 hours."),
+        _aftercareRow(context, "Avoid heavy lifting or strenuous exercise today."),
+        _aftercareRow(context, 
           "Eat iron-rich foods like leafy greens, beans, and lean meat.",
         ),
       ],
     ),
   );
 
-  Widget _aftercareRow(String text) => Padding(
+  Widget _aftercareRow(BuildContext context, String text) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 5),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(
+        Icon(
           Icons.check_circle_rounded,
           size: 16,
-          color: AppColors.success,
+          color: context.palette.success,
         ),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
-              color: AppColors.foreground,
+              color: context.palette.foreground,
               height: 1.4,
             ),
           ),
@@ -3539,46 +3543,46 @@ class _AppointmentFetchError extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: AppColors.border),
+        color: context.palette.surface,
+        border: Border.all(color: context.palette.border),
         borderRadius: BorderRadius.circular(16),
-        boxShadow: kBookSoftShadow,
+        boxShadow: context.palette.shadow,
       ),
       child: Column(
         children: [
-          const Icon(
+          Icon(
             Icons.wifi_off_rounded,
-            color: AppColors.muted,
+            color: context.palette.muted,
             size: 30,
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             "Couldn't check your appointment status",
             style: TextStyle(
               fontWeight: FontWeight.w600,
               fontSize: 14,
-              color: AppColors.foreground,
+              color: context.palette.foreground,
             ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 4),
-          const Text(
+          Text(
             "Please check your connection and try again.",
-            style: TextStyle(fontSize: 12, color: AppColors.muted),
+            style: TextStyle(fontSize: 12, color: context.palette.muted),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 14),
           TextButton.icon(
             onPressed: onRetry,
-            icon: const Icon(
+            icon: Icon(
               Icons.refresh_rounded,
               size: 18,
-              color: AppColors.primary,
+              color: context.palette.primaryText,
             ),
-            label: const Text(
+            label: Text(
               "Retry",
               style: TextStyle(
-                color: AppColors.primary,
+                color: context.palette.primaryText,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -3644,14 +3648,14 @@ class _EligibilityGate extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Color accent = _isNotEligible
-        ? AppColors.primary
-        : AppColors.warning;
+        ? context.palette.primaryText
+        : context.palette.warning;
     final Color accentBg = _isNotEligible
-        ? AppColors.accentBg
-        : AppColors.warningBg;
+        ? context.palette.accentBg
+        : context.palette.warningBg;
     final Color accentBorder = _isNotEligible
-        ? AppColors.primaryBorder
-        : AppColors.warningBorder;
+        ? context.palette.primaryBorder
+        : context.palette.warningBorder;
     final IconData icon = _isNotEligible
         ? Icons.block_rounded
         : Icons.hourglass_top_rounded;
@@ -3691,10 +3695,10 @@ class _EligibilityGate extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: context.palette.surface,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.border),
-            boxShadow: kBookSoftShadow,
+            border: Border.all(color: context.palette.border),
+            boxShadow: context.palette.shadow,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -3720,19 +3724,19 @@ class _EligibilityGate extends StatelessWidget {
               const SizedBox(height: 24),
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 21,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.foreground,
+                  color: context.palette.foreground,
                 ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 10),
               Text(
                 message,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
-                  color: AppColors.muted,
+                  color: context.palette.muted,
                   height: 1.55,
                 ),
                 textAlign: TextAlign.center,
@@ -3827,16 +3831,16 @@ class _EligibilityGate extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: AppColors.infoBg,
+                  color: context.palette.infoBg,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.infoBorder),
+                  border: Border.all(color: context.palette.infoBorder),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.info_outline_rounded,
-                      color: AppColors.info,
+                      color: context.palette.info,
                       size: 18,
                     ),
                     const SizedBox(width: 10),
@@ -3847,9 +3851,9 @@ class _EligibilityGate extends StatelessWidget {
                             : _isNotEligible
                             ? "Complete the eligibility screening in the Check tab. Once you're eligible, you'll be able to book an appointment."
                             : "Once your screening has been reviewed, this page will update automatically and you'll be able to book an appointment.",
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.infoDark,
+                          color: context.palette.infoText,
                           height: 1.5,
                         ),
                       ),
@@ -3881,8 +3885,8 @@ class _EligibilityGate extends StatelessWidget {
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
-                      disabledBackgroundColor: AppColors.border,
-                      disabledForegroundColor: AppColors.muted,
+                      disabledBackgroundColor: context.palette.border,
+                      disabledForegroundColor: context.palette.muted,
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
@@ -3893,10 +3897,10 @@ class _EligibilityGate extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 10),
-              const Text(
+              Text(
                 "Pull down to refresh this page after your status changes.",
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 11, color: AppColors.muted),
+                style: TextStyle(fontSize: 11, color: context.palette.muted),
               ),
             ],
           ),

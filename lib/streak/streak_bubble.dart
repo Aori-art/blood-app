@@ -14,6 +14,7 @@ import 'milestone_celebration.dart';
 import 'streak_controller.dart';
 import 'streak_ladder_screen.dart';
 import 'streak_particles.dart';
+import '../app_palette.dart';
 
 /// Tests set this to make the bubble's timing and chat choices repeatable.
 @visibleForTesting
@@ -432,7 +433,7 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
     HapticFeedback.mediumImpact();
     final hide = await showModalBottomSheet<bool>(
       context: ctx,
-      backgroundColor: Colors.white,
+      backgroundColor: context.palette.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -449,18 +450,18 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: AppColors.border,
+                    color: context.palette.border,
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Floating streak',
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.bold,
-                  color: kTextPrimary,
+                  color: context.palette.foreground,
                 ),
               ),
               const SizedBox(height: 12),
@@ -470,13 +471,16 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
                 child: Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: kInputFill,
-                    border: Border.all(color: AppColors.border),
+                    color: context.palette.surfaceAlt,
+                    border: Border.all(color: context.palette.border),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(Icons.visibility_off_rounded, color: kCrimson),
+                      Icon(
+                        Icons.visibility_off_rounded,
+                        color: context.palette.primaryText,
+                      ),
                       SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -487,7 +491,7 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
-                                color: kTextPrimary,
+                                color: context.palette.foreground,
                               ),
                             ),
                             SizedBox(height: 2),
@@ -495,7 +499,7 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
                               'You can turn it back on in Streak Ladder > Settings.',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: kTextMuted,
+                                color: context.palette.muted,
                                 height: 1.35,
                               ),
                             ),
@@ -668,11 +672,11 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
       child: IgnorePointer(
         child: Opacity(
           opacity: opacity,
-          child: const Center(
+          child: Center(
             child: Text(
               '+1',
               style: TextStyle(
-                color: kCrimson,
+                color: context.palette.primaryText,
                 fontSize: 20,
                 fontWeight: FontWeight.w900,
                 shadows: [

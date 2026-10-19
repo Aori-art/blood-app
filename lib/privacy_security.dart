@@ -18,6 +18,7 @@ import 'streak/streak_controller.dart';
 import 'unread_notifications.dart';
 import 'donor_avatar.dart';
 import 'streak/streak_screen.dart';
+import 'app_palette.dart';
 
 class PrivacySecurityScreen extends StatefulWidget {
   final bool showChangePin;
@@ -290,20 +291,20 @@ class _DeleteAccountRow extends StatelessWidget {
                 width: 32,
                 height: 32,
                 alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                  color: AppColors.accentBg,
+                decoration: BoxDecoration(
+                  color: context.palette.accentBg,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.delete_forever_rounded,
-                  color: kCrimson,
+                  color: context.palette.primaryText,
                   size: 19,
                 ),
               ),
             ),
           ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -312,7 +313,7 @@ class _DeleteAccountRow extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: kCrimson,
+                    color: context.palette.primaryText,
                   ),
                 ),
                 SizedBox(height: 3),
@@ -320,29 +321,29 @@ class _DeleteAccountRow extends StatelessWidget {
                   'Permanently remove your account and personal data',
                   style: TextStyle(
                     fontSize: 12,
-                    color: kTextMuted,
+                    color: context.palette.muted,
                     height: 1.35,
                   ),
                 ),
               ],
             ),
           ),
-          const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+          Icon(Icons.chevron_right_rounded, color: context.palette.muted),
         ],
       ),
     ),
   );
 }
 
-const TextStyle _dialogTitleStyle = TextStyle(
+TextStyle _dialogTitleStyle(BuildContext context) => TextStyle(
   fontWeight: FontWeight.bold,
   fontSize: 16,
-  color: kTextPrimary,
+  color: context.palette.foreground,
 );
 
-const TextStyle _dialogBodyStyle = TextStyle(
+TextStyle _dialogBodyStyle(BuildContext context) => TextStyle(
   fontSize: 13,
-  color: kTextMuted,
+  color: context.palette.muted,
   height: 1.5,
 );
 
@@ -432,14 +433,14 @@ class _PasswordDialogState extends State<_PasswordDialog> {
     child: AlertDialog(
       scrollable: true,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: const Text('Confirm your password', style: _dialogTitleStyle),
+      title: Text('Confirm your password', style: _dialogTitleStyle(context)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Enter your password to continue.',
-            style: _dialogBodyStyle,
+            style: _dialogBodyStyle(context),
           ),
           const SizedBox(height: 14),
           TextField(
@@ -451,15 +452,15 @@ class _PasswordDialogState extends State<_PasswordDialog> {
             enableSuggestions: false,
             textInputAction: TextInputAction.done,
             onSubmitted: (_) => _continue(),
-            style: const TextStyle(color: kTextPrimary, fontSize: 14),
+            style: TextStyle(color: context.palette.foreground, fontSize: 14),
             decoration: InputDecoration(
               hintText: 'Password',
               hintStyle: TextStyle(
-                color: kTextMuted,
+                color: context.palette.muted,
                 fontSize: 14,
               ),
               filled: true,
-              fillColor: kInputFill,
+              fillColor: context.palette.surfaceAlt,
               errorText: _error,
               errorMaxLines: 3,
               contentPadding: const EdgeInsets.symmetric(
@@ -474,15 +475,15 @@ class _PasswordDialogState extends State<_PasswordDialog> {
                       ? Icons.visibility_off_outlined
                       : Icons.visibility_outlined,
                   size: 20,
-                  color: kTextMuted,
+                  color: context.palette.muted,
                 ),
               ),
-              border: _border(kBorder),
-              enabledBorder: _border(kBorder),
-              disabledBorder: _border(kBorder),
-              focusedBorder: _border(kCrimson, 1.5),
-              errorBorder: _border(kCrimson),
-              focusedErrorBorder: _border(kCrimson, 1.5),
+              border: _border(context.palette.border),
+              enabledBorder: _border(context.palette.border),
+              disabledBorder: _border(context.palette.border),
+              focusedBorder: _border(context.palette.primaryText, 1.5),
+              errorBorder: _border(context.palette.primaryText),
+              focusedErrorBorder: _border(context.palette.primaryText, 1.5),
             ),
           ),
         ],
@@ -490,7 +491,7 @@ class _PasswordDialogState extends State<_PasswordDialog> {
       actions: [
         TextButton(
           onPressed: _loading ? null : () => Navigator.pop(context),
-          child: const Text('Cancel', style: TextStyle(color: kTextMuted)),
+          child: Text('Cancel', style: TextStyle(color: context.palette.muted)),
         ),
         ElevatedButton(
           onPressed: _loading ? null : _continue,
@@ -542,10 +543,10 @@ class _FinalConfirmDialogState extends State<_FinalConfirmDialog> {
     children: [
       Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 12.5,
           fontWeight: FontWeight.w700,
-          color: kTextPrimary,
+          color: context.palette.foreground,
         ),
       ),
       const SizedBox(height: 6),
@@ -555,11 +556,11 @@ class _FinalConfirmDialogState extends State<_FinalConfirmDialog> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(top: 6, right: 8),
-                child: Icon(Icons.circle, size: 5, color: kTextMuted),
+                child: Icon(Icons.circle, size: 5, color: context.palette.muted),
               ),
-              Expanded(child: Text(item, style: _dialogBodyStyle)),
+              Expanded(child: Text(item, style: _dialogBodyStyle(context))),
             ],
           ),
         ),
@@ -575,20 +576,20 @@ class _FinalConfirmDialogState extends State<_FinalConfirmDialog> {
         width: 56,
         height: 56,
         alignment: Alignment.center,
-        decoration: const BoxDecoration(
-          color: AppColors.accentBg,
+        decoration: BoxDecoration(
+          color: context.palette.accentBg,
           shape: BoxShape.circle,
         ),
-        child: const Icon(
+        child: Icon(
           Icons.delete_forever_rounded,
-          color: kCrimson,
+          color: context.palette.primaryText,
           size: 30,
         ),
       ),
-      title: const Text(
+      title: Text(
         'Delete your account?',
         textAlign: TextAlign.center,
-        style: _dialogTitleStyle,
+        style: _dialogTitleStyle(context),
       ),
       content: SingleChildScrollView(
         child: Column(
@@ -604,21 +605,21 @@ class _FinalConfirmDialogState extends State<_FinalConfirmDialog> {
             const SizedBox(height: 10),
             _group('Kept without your identity', const ['Donation records']),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'This cannot be undone.',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
-                color: kCrimson,
+                color: context.palette.primaryText,
               ),
             ),
             if (_error != null) ...[
               const SizedBox(height: 10),
               Text(
                 _error!,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12.5,
-                  color: kCrimson,
+                  color: context.palette.primaryText,
                   height: 1.4,
                 ),
               ),
@@ -629,7 +630,7 @@ class _FinalConfirmDialogState extends State<_FinalConfirmDialog> {
       actions: [
         TextButton(
           onPressed: _deleting ? null : () => Navigator.pop(context),
-          child: const Text('Cancel', style: TextStyle(color: kTextMuted)),
+          child: Text('Cancel', style: TextStyle(color: context.palette.muted)),
         ),
         ElevatedButton(
           onPressed: _deleting ? null : _delete,

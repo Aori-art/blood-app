@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:blood/shared_design.dart';
 import 'package:blood/streak/streak_screen.dart';
 import 'register2.dart';
+import '../../app_palette.dart';
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
 
@@ -83,15 +84,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
       initialDate: initial,
       firstDate: DateTime(1900),
       lastDate: DateTime.now(),
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: const ColorScheme.light(
-            primary: kCrimson,
-            onPrimary: Colors.white,
-          ),
-        ),
-        child: child!,
-      ),
+      // Light keeps its look; dark inherits the app's dark theme.
+      builder: (ctx, child) => ctx.palette.isDark
+          ? child!
+          : Theme(
+              data: Theme.of(ctx).copyWith(
+                colorScheme: const ColorScheme.light(
+                  primary: kCrimson,
+                  onPrimary: Colors.white,
+                ),
+              ),
+              child: child!,
+            ),
     );
     if (picked != null) {
       _bdayCtrl.text =
@@ -272,7 +276,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         child: Text(
                           '11-digit number starting with 09',
                           style: TextStyle(
-                              color: kTextMuted,
+                              color: context.palette.muted,
                               fontSize: 11),
                         ),
                       ),
@@ -285,8 +289,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         readOnly: true,
                         prefixIcon: Icons.cake_outlined,
                         onTap: _pickDate,
-                        suffix: const Icon(Icons.calendar_today_outlined,
-                            color: kTextMuted, size: 18),
+                        suffix: Icon(Icons.calendar_today_outlined,
+                            color: context.palette.muted, size: 18),
                       ),
                       const SizedBox(height: 14),
 

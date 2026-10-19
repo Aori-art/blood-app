@@ -4,9 +4,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'app_colors.dart';
 import 'post_comments_api.dart';
 import 'shared_design.dart' show kCrimson;
+import 'app_palette.dart';
 
 /// What the donor picked in the comment options menu.
 enum CommentMenuAction { hide, delete, reported }
@@ -56,7 +56,7 @@ class _CommentMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: context.palette.surface,
       borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       clipBehavior: Clip.antiAlias,
       child: SafeArea(
@@ -70,7 +70,7 @@ class _CommentMenu extends StatelessWidget {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: AppColors.border,
+                  color: context.palette.border,
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -79,7 +79,7 @@ class _CommentMenu extends StatelessWidget {
                 _item(
                   icon: Icons.delete_outline_rounded,
                   label: 'Delete comment',
-                  color: kCrimson,
+                  color: context.palette.primaryText,
                   onTap: () => Navigator.of(
                     context,
                   ).pop(const CommentMenuResult(CommentMenuAction.delete)),
@@ -88,7 +88,7 @@ class _CommentMenu extends StatelessWidget {
                 _item(
                   icon: Icons.visibility_off_outlined,
                   label: 'Hide comment',
-                  color: AppColors.foreground,
+                  color: context.palette.foreground,
                   onTap: () => Navigator.of(
                     context,
                   ).pop(const CommentMenuResult(CommentMenuAction.hide)),
@@ -96,7 +96,7 @@ class _CommentMenu extends StatelessWidget {
                 _item(
                   icon: Icons.flag_outlined,
                   label: 'Report comment',
-                  color: kCrimson,
+                  color: context.palette.primaryText,
                   onTap: () => _report(context),
                 ),
               ],
@@ -245,7 +245,7 @@ class _ReportSheetState extends State<_ReportSheet> {
                 child: ScaffoldMessenger(
                   key: _messenger,
                   child: Scaffold(
-                    backgroundColor: Colors.white,
+                    backgroundColor: context.palette.surface,
                     resizeToAvoidBottomInset: false,
                     body: _body(),
                     bottomNavigationBar: _footer(mq),
@@ -269,7 +269,7 @@ class _ReportSheetState extends State<_ReportSheet> {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: AppColors.border,
+              color: context.palette.border,
               borderRadius: BorderRadius.circular(999),
             ),
           ),
@@ -277,26 +277,26 @@ class _ReportSheetState extends State<_ReportSheet> {
         const SizedBox(height: 14),
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
                 'Report comment',
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.foreground,
+                  color: context.palette.foreground,
                 ),
               ),
             ),
             IconButton(
               tooltip: 'Close',
               onPressed: _sending ? null : () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.close_rounded, color: AppColors.muted),
+              icon: Icon(Icons.close_rounded, color: context.palette.muted),
             ),
           ],
         ),
-        const Text(
+        Text(
           'Why are you reporting this comment?',
-          style: TextStyle(fontSize: 13, color: AppColors.muted),
+          style: TextStyle(fontSize: 13, color: context.palette.muted),
         ),
         const SizedBox(height: 10),
         RadioGroup<String>(
@@ -312,16 +312,18 @@ class _ReportSheetState extends State<_ReportSheet> {
                   child: Container(
                     decoration: BoxDecoration(
                       color: _reason == value
-                          ? AppColors.accentBg
-                          : Colors.white,
+                          ? context.palette.accentBg
+                          : context.palette.surface,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: _reason == value ? kCrimson : AppColors.border,
+                        color: _reason == value
+                            ? context.palette.primaryText
+                            : context.palette.border,
                       ),
                     ),
                     child: RadioListTile<String>(
                       value: value,
-                      activeColor: kCrimson,
+                      activeColor: context.palette.primaryText,
                       dense: true,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 8),
                       shape: RoundedRectangleBorder(
@@ -329,10 +331,10 @@ class _ReportSheetState extends State<_ReportSheet> {
                       ),
                       title: Text(
                         label,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.foreground,
+                          color: context.palette.foreground,
                         ),
                       ),
                     ),
@@ -349,12 +351,12 @@ class _ReportSheetState extends State<_ReportSheet> {
           minLines: 2,
           maxLines: 4,
           textCapitalization: TextCapitalization.sentences,
-          style: const TextStyle(fontSize: 14, color: AppColors.foreground),
+          style: TextStyle(fontSize: 14, color: context.palette.foreground),
           decoration: InputDecoration(
             hintText: 'Add details (optional)',
-            hintStyle: const TextStyle(color: AppColors.muted, fontSize: 14),
+            hintStyle: TextStyle(color: context.palette.muted, fontSize: 14),
             filled: true,
-            fillColor: AppColors.mutedBg,
+            fillColor: context.palette.surfaceAlt,
             contentPadding: const EdgeInsets.all(14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
@@ -367,10 +369,10 @@ class _ReportSheetState extends State<_ReportSheet> {
   );
 
   Widget _footer(MediaQueryData mq) => Material(
-    color: Colors.white,
+    color: context.palette.surface,
     child: DecoratedBox(
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: AppColors.border)),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: context.palette.border)),
       ),
       child: MediaQuery.removePadding(
         context: context,
@@ -387,7 +389,7 @@ class _ReportSheetState extends State<_ReportSheet> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: kCrimson,
                   foregroundColor: Colors.white,
-                  disabledBackgroundColor: AppColors.hint,
+                  disabledBackgroundColor: context.palette.hint,
                   disabledForegroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(

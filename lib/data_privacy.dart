@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'app_colors.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'privacy_statement.dart';
 import 'profile_page_widgets.dart';
-import 'shared_design.dart';
 import 'streak/streak_screen.dart';
+import 'app_palette.dart';
 
 class DataPrivacyScreen extends StatefulWidget {
   const DataPrivacyScreen({super.key});
@@ -65,31 +64,31 @@ class _DataPrivacyScreenState extends State<DataPrivacyScreen> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const PrivacyStatementView(sectionFill: Colors.white),
+        PrivacyStatementView(sectionFill: context.palette.surface),
         if (_acceptedOn != null) ...[
           const SizedBox(height: 14),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppColors.successBg,
-              border: Border.all(color: AppColors.successBorder),
+              color: context.palette.successBg,
+              border: Border.all(color: context.palette.successBorder),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.check_circle_outline_rounded,
                   size: 18,
-                  color: AppColors.success,
+                  color: context.palette.success,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     'You accepted this version on $_acceptedOn',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12.5,
-                      color: kTextPrimary,
+                      color: context.palette.foreground,
                       height: 1.4,
                     ),
                   ),

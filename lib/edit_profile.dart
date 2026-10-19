@@ -8,6 +8,7 @@ import 'config.dart';
 import 'profile_page_widgets.dart';
 import 'shared_design.dart';
 import 'streak/streak_screen.dart';
+import 'app_palette.dart';
 
 class _Location {
   final String code;
@@ -354,10 +355,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       title: 'Edit Profile',
       subtitle: 'Update your personal information',
       child: loading
-          ? const Center(
+          ? Center(
               child: Padding(
                 padding: EdgeInsets.all(24),
-                child: CircularProgressIndicator(color: kCrimson),
+                child: CircularProgressIndicator(
+                  color: context.palette.primaryText,
+                ),
               ),
             )
           : Form(
@@ -366,11 +369,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   profileInfoCard(
+                    context,
                     'Profile information can only be updated once every 7 days.',
                   ),
                   if (!canEdit) ...[
                     const SizedBox(height: 12),
                     profileInfoCard(
+                      context,
                       'Editing is currently unavailable. You can update your profile again' +
                           (nextEdit == null ? '.' : ' on ' + nextEdit! + '.'),
                       icon: Icons.lock_outline,
@@ -379,6 +384,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   if (!online) ...[
                     const SizedBox(height: 12),
                     profileInfoCard(
+                      context,
                       'Saved information is shown below. Internet connection is required to update your profile.',
                       icon: Icons.cloud_off_outlined,
                     ),
@@ -388,12 +394,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Personal Information',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
-                            color: kTextPrimary,
+                            color: context.palette.foreground,
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -562,14 +568,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           decoration: InputDecoration(
             counterText: '',
             filled: true,
-            fillColor: kInputFill,
+            fillColor: context.palette.surfaceAlt,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: kBorder),
+              borderSide: BorderSide(color: context.palette.border),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: kBorder),
+              borderSide: BorderSide(color: context.palette.border),
             ),
           ),
         ),
@@ -586,9 +592,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   ) {
     final present = items.any((x) => x.code == value);
     return isLoading
-        ? const SizedBox(
+        ? SizedBox(
             height: 52,
-            child: Center(child: CircularProgressIndicator(color: kCrimson)),
+            child: Center(
+              child: CircularProgressIndicator(
+                color: context.palette.primaryText,
+              ),
+            ),
           )
         : AppDropdown<String>(
             value: present ? value : null,
@@ -612,7 +622,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         Expanded(
           child: Text(
             label,
-            style: const TextStyle(color: kTextMuted, fontSize: 13),
+            style: TextStyle(color: context.palette.muted, fontSize: 13),
           ),
         ),
         Text(

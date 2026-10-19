@@ -3,6 +3,7 @@ import 'app_colors.dart';
 
 import 'anim.dart';
 import 'shared_design.dart';
+import 'app_palette.dart';
 
 class ProfilePage extends StatelessWidget {
   final String title;
@@ -17,7 +18,7 @@ class ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppColors.mutedBg,
+    backgroundColor: context.palette.background,
     body: Column(
       children: [
         Container(
@@ -91,10 +92,10 @@ class ProfileCard extends StatelessWidget {
     width: double.infinity,
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: context.palette.surface,
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: AppColors.border),
-      boxShadow: AppColors.cardShadow,
+      border: Border.all(color: context.palette.border),
+      boxShadow: context.palette.shadow,
     ),
     child: child,
   );
@@ -122,7 +123,7 @@ class SettingsRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
       child: Row(
         children: [
-          Icon(icon, color: AppColors.muted, size: 21),
+          Icon(icon, color: context.palette.muted, size: 21),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -130,19 +131,19 @@ class SettingsRow extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: kTextPrimary,
+                    color: context.palette.foreground,
                   ),
                 ),
                 if (subtitle != null) ...[
                   const SizedBox(height: 3),
                   Text(
                     subtitle!,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: kTextMuted,
+                      color: context.palette.muted,
                       height: 1.35,
                     ),
                   ),
@@ -153,9 +154,9 @@ class SettingsRow extends StatelessWidget {
           trailing ??
               (onTap == null
                   ? const SizedBox()
-                  : const Icon(
+                  : Icon(
                       Icons.chevron_right_rounded,
-                      color: AppColors.muted,
+                      color: context.palette.muted,
                     )),
         ],
       ),
@@ -163,30 +164,36 @@ class SettingsRow extends StatelessWidget {
   );
 }
 
-Widget profileInfoCard(String text, {IconData icon = Icons.info_outline}) =>
-    Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.accentBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primaryBorder),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: kCrimson),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                color: AppColors.primaryDark,
-                fontSize: 13,
-                height: 1.4,
-              ),
-            ),
+Widget profileInfoCard(
+  BuildContext context,
+  String text, {
+  IconData icon = Icons.info_outline,
+}) => Container(
+  width: double.infinity,
+  padding: const EdgeInsets.all(14),
+  decoration: BoxDecoration(
+    color: context.palette.accentBg,
+    borderRadius: BorderRadius.circular(16),
+    border: Border.all(color: context.palette.primaryBorder),
+  ),
+  child: Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Icon(icon, color: context.palette.primaryText),
+      const SizedBox(width: 10),
+      Expanded(
+        child: Text(
+          text,
+          style: TextStyle(
+            // The deeper red in light (as always); the readable red in dark.
+            color: context.palette.isDark
+                ? context.palette.primaryText
+                : AppColors.primaryDark,
+            fontSize: 13,
+            height: 1.4,
           ),
-        ],
+        ),
       ),
-    );
+    ],
+  ),
+);

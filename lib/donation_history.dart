@@ -12,6 +12,7 @@ import 'digital_id.dart';
 import 'digital_id_service.dart';
 import 'home.dart' show FloatingNavMetrics;
 import 'shared_design.dart';
+import 'app_palette.dart';
 
 class DonationHistoryScreen extends StatefulWidget {
   const DonationHistoryScreen({super.key});
@@ -246,11 +247,11 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
 
   Color get _statusTileColor {
     if (_checkingAppointment || _appointmentCheckFailed) {
-      return AppColors.muted;
+      return context.palette.muted;
     }
     return _hasActiveAppointment
-        ? AppColors.success
-        : AppColors.muted;
+        ? context.palette.success
+        : context.palette.muted;
   }
 
   // Mirrors book.dart's _appointmentStatusColor conventions applied to the
@@ -258,26 +259,26 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
   Color _donationStatusColor(String? raw) {
     switch ((raw ?? '').toLowerCase()) {
       case 'completed':
-        return AppColors.success;
+        return context.palette.success;
       case 'deferred':
-        return AppColors.warning;
+        return context.palette.warning;
       case 'failed':
-        return AppColors.primary;
+        return context.palette.primaryText;
       default:
-        return AppColors.muted;
+        return context.palette.muted;
     }
   }
 
   Color _donationStatusBg(String? raw) {
     switch ((raw ?? '').toLowerCase()) {
       case 'completed':
-        return AppColors.successBg;
+        return context.palette.successBg;
       case 'deferred':
-        return AppColors.warningBg;
+        return context.palette.warningBg;
       case 'failed':
-        return AppColors.accentBg;
+        return context.palette.accentBg;
       default:
-        return AppColors.mutedBg;
+        return context.palette.surfaceAlt;
     }
   }
 
@@ -301,7 +302,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
     Color? color,
     VoidCallback? onTap,
   }) {
-    final c = color ?? AppColors.primary;
+    final c = color ?? context.palette.primaryText;
     final content = Column(
       children: [
         Stack(
@@ -332,7 +333,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
         ),
         Text(
           label,
-          style: const TextStyle(fontSize: 11, color: AppColors.muted),
+          style: TextStyle(fontSize: 11, color: context.palette.muted),
         ),
       ],
     );
@@ -353,7 +354,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
             left: 11,
             top: 26,
             bottom: 0,
-            child: Container(width: 2, color: AppColors.mutedBg),
+            child: Container(width: 2, color: context.palette.surfaceAlt),
           ),
           Positioned(
             left: 6,
@@ -372,7 +373,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
       );
 
   Widget _statDivider() =>
-      Container(width: 1, height: 34, color: AppColors.border);
+      Container(width: 1, height: 34, color: context.palette.border);
 
   @override
   Widget build(BuildContext context) =>
@@ -380,7 +381,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
 
   Widget _buildScreen(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.mutedBg,
+      backgroundColor: context.palette.background,
       body: Column(
         children: [
           EdonateHeader(
@@ -406,13 +407,13 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
           Expanded(
             child: RefreshIndicator(
               onRefresh: _refresh,
-              color: AppColors.primary,
+              color: context.palette.primaryText,
               child: Padding(
                 padding: const EdgeInsets.all(15),
                 child: isLoading
-                    ? const Center(
+                    ? Center(
                         child: CircularProgressIndicator(
-                          color: AppColors.primary,
+                          color: context.palette.primaryText,
                         ),
                       )
                     : donations.isEmpty
@@ -434,12 +435,12 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
                               Icon(
                                 Icons.water_drop_outlined,
                                 size: 48,
-                                color: AppColors.border,
+                                color: context.palette.faint,
                               ),
                               const SizedBox(height: 12),
-                              const Text(
+                              Text(
                                 "No donation history found.",
-                                style: TextStyle(color: AppColors.muted),
+                                style: TextStyle(color: context.palette.muted),
                               ),
                               const SizedBox(height: 20),
                               SizedBox(
@@ -470,8 +471,8 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
                                   ),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: AppColors.primary,
-                                    disabledBackgroundColor: AppColors.border,
-                                    disabledForegroundColor: AppColors.muted,
+                                    disabledBackgroundColor: context.palette.border,
+                                    disabledForegroundColor: context.palette.muted,
                                     foregroundColor: Colors.white,
                                     elevation: 0,
                                     shape: RoundedRectangleBorder(
@@ -493,12 +494,12 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
                               padding: const EdgeInsets.all(14),
                               margin: const EdgeInsets.only(bottom: 15),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: context.palette.surface,
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: AppColors.border,
+                                  color: context.palette.border,
                                 ),
-                                boxShadow: AppColors.cardShadow,
+                                boxShadow: context.palette.shadow,
                               ),
                               child: Column(
                                 children: [
@@ -535,12 +536,12 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
                                   ),
                                   if (_completedCount > 0) ...[
                                     const SizedBox(height: 10),
-                                    const Text(
+                                    Text(
                                       "Every donation can help save up to 3 lives 🩸",
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
                                         fontSize: 11,
-                                        color: AppColors.muted,
+                                        color: context.palette.muted,
                                       ),
                                     ),
                                   ],
@@ -674,9 +675,9 @@ class _DonationCard extends StatelessWidget {
         curve: Curves.easeInOut,
         margin: const EdgeInsets.only(bottom: 10),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.palette.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border, width: 1.5),
+          border: Border.all(color: context.palette.border, width: 1.5),
           // An open card lifts with a soft red glow.
           boxShadow: isExpanded
               ? [
@@ -686,7 +687,7 @@ class _DonationCard extends StatelessWidget {
                     offset: const Offset(0, 3),
                   ),
                 ]
-              : AppColors.cardShadow,
+              : context.palette.shadow,
         ),
         child: Column(
           children: [
@@ -732,18 +733,18 @@ class _DonationCard extends StatelessWidget {
                         const SizedBox(height: 5),
                         Text(
                           title,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.foreground,
+                            color: context.palette.foreground,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           formattedDate,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            color: AppColors.muted,
+                            color: context.palette.muted,
                           ),
                         ),
                       ],
@@ -757,8 +758,8 @@ class _DonationCard extends StatelessWidget {
                     child: Icon(
                       Icons.keyboard_arrow_down_rounded,
                       color: isExpanded
-                          ? AppColors.primary
-                          : AppColors.border,
+                          ? context.palette.primaryText
+                          : context.palette.faint,
                       size: 22,
                     ),
                   ),
@@ -778,7 +779,7 @@ class _DonationCard extends StatelessWidget {
                 children: [
                   Divider(
                     height: 1,
-                    color: AppColors.mutedBg,
+                    color: context.palette.surfaceAlt,
                     indent: 14,
                     endIndent: 14,
                   ),
@@ -850,7 +851,7 @@ class _DonationCard extends StatelessWidget {
                           width: double.infinity,
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: AppColors.accentBg,
+                            color: context.palette.accentBg,
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
@@ -872,13 +873,13 @@ class _DonationCard extends StatelessWidget {
                           spacing: 14,
                           runSpacing: 6,
                           children: [
-                            _footerStat(
+                            _footerStat(context, 
                               Icons.water_drop_rounded,
                               "$units unit(s)",
                             ),
                             if (bloodType != null && bloodType.isNotEmpty)
-                              _footerStat(Icons.bloodtype_rounded, bloodType),
-                            _footerStat(
+                              _footerStat(context, Icons.bloodtype_rounded, bloodType),
+                            _footerStat(context, 
                               Icons.access_time_rounded,
                               formattedTimestamp,
                             ),
@@ -896,12 +897,12 @@ class _DonationCard extends StatelessWidget {
     );
   }
 
-  Widget _footerStat(IconData icon, String text) => Row(
+  Widget _footerStat(BuildContext context, IconData icon, String text) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      Icon(icon, size: 13, color: AppColors.muted),
+      Icon(icon, size: 13, color: context.palette.muted),
       const SizedBox(width: 4),
-      Text(text, style: TextStyle(fontSize: 11, color: AppColors.muted)),
+      Text(text, style: TextStyle(fontSize: 11, color: context.palette.muted)),
     ],
   );
 }

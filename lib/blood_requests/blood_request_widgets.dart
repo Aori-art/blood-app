@@ -9,6 +9,7 @@ import 'package:blood/app_colors.dart';
 import '../anim.dart';
 import '../shared_design.dart';
 import 'blood_request_models.dart';
+import '../app_palette.dart';
 
 // ─── Blood drop badge ─────────────────────────────────────────────────────────
 
@@ -40,7 +41,7 @@ class BloodDropBadge extends StatelessWidget {
           child: Text(
             bloodType?.isNotEmpty == true ? bloodType! : '?',
             style: TextStyle(
-              color: inverted ? kCrimson : Colors.white,
+              color: inverted ? context.palette.primaryText : Colors.white,
               fontWeight: FontWeight.w800,
               fontSize: size * 0.26,
             ),
@@ -136,21 +137,21 @@ class _UrgencyChipState extends State<UrgencyChip>
     bool showDot = true;
     switch (widget.urgency) {
       case 'critical':
-        fg = AppColors.critical;
-        bg = AppColors.accentBg;
-        border = AppColors.primaryBorder;
+        fg = context.palette.criticalText;
+        bg = context.palette.accentBg;
+        border = context.palette.primaryBorder;
         label = 'CRITICAL';
         break;
       case 'high':
-        fg = AppColors.orange;
-        bg = AppColors.orangeBg;
-        border = AppColors.orangeBorder;
+        fg = context.palette.orange;
+        bg = context.palette.orangeBg;
+        border = context.palette.orangeBorder;
         label = 'URGENT';
         break;
       default:
-        fg = AppColors.info;
-        bg = AppColors.infoBg;
-        border = AppColors.infoBorder;
+        fg = context.palette.info;
+        bg = context.palette.infoBg;
+        border = context.palette.infoBorder;
         label = 'NORMAL';
         showDot = false;
     }
@@ -172,7 +173,7 @@ class _UrgencyChipState extends State<UrgencyChip>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: widget.onGradient ? Colors.white : bg,
+        color: widget.onGradient ? context.palette.surface : bg,
         border: Border.all(color: widget.onGradient ? Colors.white : border),
         borderRadius: BorderRadius.circular(999),
       ),
@@ -214,52 +215,52 @@ class RequestStatusChip extends StatelessWidget {
     late IconData icon;
     switch (status) {
       case 'pending_review':
-        fg = AppColors.warning;
-        bg = AppColors.warningBg;
-        border = AppColors.warningBorder;
+        fg = context.palette.warning;
+        bg = context.palette.warningBg;
+        border = context.palette.warningBorder;
         icon = Icons.hourglass_top_rounded;
         break;
       case 'open':
-        fg = AppColors.success;
-        bg = AppColors.successBg;
-        border = AppColors.successBorder;
+        fg = context.palette.success;
+        bg = context.palette.successBg;
+        border = context.palette.successBorder;
         icon = Icons.radio_button_checked_rounded;
         break;
       case 'fulfilled':
-        fg = AppColors.successDark;
-        bg = AppColors.successBg;
-        border = AppColors.successBorder;
+        fg = context.palette.successDark;
+        bg = context.palette.successBg;
+        border = context.palette.successBorder;
         icon = Icons.check_circle_rounded;
         break;
       case 'cancelled':
-        fg = AppColors.muted;
-        bg = AppColors.mutedBg;
-        border = AppColors.border;
+        fg = context.palette.muted;
+        bg = context.palette.surfaceAlt;
+        border = context.palette.border;
         icon = Icons.block_rounded;
         break;
       case 'expired':
-        fg = AppColors.muted;
-        bg = AppColors.mutedBg;
-        border = AppColors.border;
+        fg = context.palette.muted;
+        bg = context.palette.surfaceAlt;
+        border = context.palette.border;
         icon = Icons.timer_off_rounded;
         break;
       case 'rejected':
-        fg = AppColors.critical;
-        bg = AppColors.accentBg;
-        border = AppColors.primaryBorder;
+        fg = context.palette.criticalText;
+        bg = context.palette.accentBg;
+        border = context.palette.primaryBorder;
         icon = Icons.gpp_bad_rounded;
         break;
       default:
-        fg = AppColors.muted;
-        bg = AppColors.mutedBg;
-        border = AppColors.border;
+        fg = context.palette.muted;
+        bg = context.palette.surfaceAlt;
+        border = context.palette.border;
         icon = Icons.info_outline_rounded;
     }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: onGradient ? Colors.white : bg,
+        color: onGradient ? context.palette.surface : bg,
         border: Border.all(color: onGradient ? Colors.white : border),
         borderRadius: BorderRadius.circular(999),
       ),
@@ -291,23 +292,23 @@ class MatchBadge extends StatelessWidget {
     late IconData icon;
     switch (matchType) {
       case 'exact':
-        fg = AppColors.success;
-        bg = AppColors.successBg;
-        border = AppColors.successBorder;
+        fg = context.palette.success;
+        bg = context.palette.successBg;
+        border = context.palette.successBorder;
         label = 'Exact match';
         icon = Icons.verified_rounded;
         break;
       case 'compatible':
-        fg = AppColors.info;
-        bg = AppColors.infoBg;
-        border = AppColors.infoBorder;
+        fg = context.palette.info;
+        bg = context.palette.infoBg;
+        border = context.palette.infoBorder;
         label = 'Compatible';
         icon = Icons.check_circle_outline_rounded;
         break;
       case 'replacement_any':
-        fg = const Color(0xFF9333EA);
-        bg = const Color(0xFFFAF5FF);
-        border = const Color(0xFFE9D5FF);
+        fg = context.palette.purple;
+        bg = context.palette.purpleBg;
+        border = context.palette.purpleBorder;
         label = 'Any type accepted';
         icon = Icons.all_inclusive_rounded;
         break;
@@ -353,7 +354,7 @@ class DonorProgressBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final full = required > 0 && volunteers >= required;
     final ratio = required <= 0 ? 0.0 : (volunteers / required).clamp(0.0, 1.0);
-    final color = full ? AppColors.success : kCrimson;
+    final color = full ? context.palette.success : context.palette.primaryText;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -363,16 +364,16 @@ class DonorProgressBar extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   'Donors',
-                  style: TextStyle(fontSize: 11, color: kTextMuted),
+                  style: TextStyle(fontSize: 11, color: context.palette.muted),
                 ),
                 Text(
                   '$volunteers of $required',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: kTextPrimary,
+                    color: context.palette.foreground,
                   ),
                 ),
               ],
@@ -387,7 +388,7 @@ class DonorProgressBar extends StatelessWidget {
             builder: (_, value, _) => LinearProgressIndicator(
               value: value,
               minHeight: 6,
-              backgroundColor: AppColors.border,
+              backgroundColor: context.palette.border,
               valueColor: AlwaysStoppedAnimation(color),
             ),
           ),
@@ -410,7 +411,7 @@ class BloodRequestCard extends StatelessWidget {
     this.ownerView = false,
   });
 
-  Widget _rightBadge() {
+  Widget _rightBadge(BuildContext context) {
     if (ownerView) {
       return RequestStatusChip(
         status: request.status,
@@ -421,21 +422,21 @@ class BloodRequestCard extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: AppColors.successBg,
-          border: Border.all(color: AppColors.successBorder),
+          color: context.palette.successBg,
+          border: Border.all(color: context.palette.successBorder),
           borderRadius: BorderRadius.circular(999),
         ),
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.favorite_rounded, size: 12, color: AppColors.success),
+            Icon(Icons.favorite_rounded, size: 12, color: context.palette.success),
             SizedBox(width: 4),
             Text(
               "You're donating",
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
-                color: AppColors.success,
+                color: context.palette.success,
               ),
             ),
           ],
@@ -446,16 +447,16 @@ class BloodRequestCard extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: AppColors.mutedBg,
-          border: Border.all(color: AppColors.border),
+          color: context.palette.surfaceAlt,
+          border: Border.all(color: context.palette.border),
           borderRadius: BorderRadius.circular(999),
         ),
-        child: const Text(
+        child: Text(
           'Fully matched',
           style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.w700,
-            color: AppColors.muted,
+            color: context.palette.muted,
           ),
         ),
       );
@@ -482,9 +483,9 @@ class BloodRequestCard extends StatelessWidget {
       child: Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          color: critical ? AppColors.accentBg : Colors.white,
+          color: critical ? context.palette.accentBg : context.palette.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: context.palette.border),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: .04),
@@ -524,9 +525,9 @@ class BloodRequestCard extends StatelessWidget {
                                     if (request.createdAgo != null)
                                       Text(
                                         request.createdAgo!,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 11,
-                                          color: AppColors.muted,
+                                          color: context.palette.muted,
                                         ),
                                       ),
                                   ],
@@ -536,10 +537,10 @@ class BloodRequestCard extends StatelessWidget {
                                   request.facility?.name ?? 'Blood facility',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w700,
-                                    color: kTextPrimary,
+                                    color: context.palette.foreground,
                                   ),
                                 ),
                                 if (locationBits.isNotEmpty)
@@ -547,7 +548,7 @@ class BloodRequestCard extends StatelessWidget {
                                     locationBits,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 11, color: kTextMuted),
+                                    style: TextStyle(fontSize: 11, color: context.palette.muted),
                                   ),
                               ],
                             ),
@@ -558,18 +559,18 @@ class BloodRequestCard extends StatelessWidget {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.groups_rounded,
                             size: 14,
-                            color: AppColors.foreground,
+                            color: context.palette.foreground,
                           ),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
                               request.requirementText,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
-                                color: AppColors.foreground,
+                                color: context.palette.foreground,
                                 height: 1.4,
                               ),
                             ),
@@ -591,27 +592,27 @@ class BloodRequestCard extends StatelessWidget {
                                 vertical: 6,
                               ),
                               decoration: BoxDecoration(
-                                color: AppColors.mutedBg,
-                                border: Border.all(color: AppColors.border),
+                                color: context.palette.surfaceAlt,
+                                border: Border.all(color: context.palette.border),
                                 borderRadius: BorderRadius.circular(999),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(
+                                  Icon(
                                     Icons.event_rounded,
                                     size: 13,
-                                    color: kTextMuted,
+                                    color: context.palette.muted,
                                   ),
                                   const SizedBox(width: 5),
                                   Flexible(
                                     child: Text(
                                       neededBits,
                                       overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w600,
-                                        color: kTextPrimary,
+                                        color: context.palette.foreground,
                                       ),
                                     ),
                                   ),
@@ -620,7 +621,7 @@ class BloodRequestCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          _rightBadge(),
+                          _rightBadge(context),
                         ],
                       ),
                     ],
@@ -680,7 +681,7 @@ class BrEmptyState extends StatelessWidget {
               CircleAvatar(
                 radius: 40,
                 backgroundColor: kCrimson.withValues(alpha: .1),
-                child: Icon(icon, size: 40, color: kCrimson),
+                child: Icon(icon, size: 40, color: context.palette.primaryText),
               ),
             ],
           ),
@@ -689,17 +690,17 @@ class BrEmptyState extends StatelessWidget {
         Text(
           title,
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: kTextPrimary,
+            color: context.palette.foreground,
           ),
         ),
         const SizedBox(height: 8),
         Text(
           message,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 13, color: kTextMuted, height: 1.5),
+          style: TextStyle(fontSize: 13, color: context.palette.muted, height: 1.5),
         ),
         if (actionLabel != null && onAction != null) ...[
           const SizedBox(height: 20),
@@ -750,7 +751,7 @@ class _BrSkeletonCardState extends State<BrSkeletonCard>
     width: width,
     height: height,
     decoration: BoxDecoration(
-      color: AppColors.mutedBg,
+      color: context.palette.surfaceAlt,
       borderRadius: BorderRadius.circular(6),
     ),
   );
@@ -761,9 +762,9 @@ class _BrSkeletonCardState extends State<BrSkeletonCard>
     child: Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.palette.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: context.palette.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -774,7 +775,7 @@ class _BrSkeletonCardState extends State<BrSkeletonCard>
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: AppColors.mutedBg,
+                  color: context.palette.surfaceAlt,
                   borderRadius: BorderRadius.circular(26),
                 ),
               ),

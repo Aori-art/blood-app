@@ -11,6 +11,7 @@ import 'blood_request_api.dart';
 import 'blood_request_detail_screen.dart';
 import 'blood_request_models.dart';
 import 'blood_request_widgets.dart';
+import '../app_palette.dart';
 
 // Mirrors the backend's donor-compatibility table so the "Compatible donors"
 // hint can be shown instantly, without a round trip.
@@ -345,7 +346,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(c, true),
-            child: const Text('Discard', style: TextStyle(color: kCrimson)),
+            child: Text('Discard', style: TextStyle(color: context.palette.primaryText)),
           ),
         ],
       ),
@@ -357,7 +358,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
     final selected = await showModalBottomSheet<BloodRequestFacility>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: context.palette.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -383,16 +384,19 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
       initialDate: _neededBy ?? today,
       firstDate: today,
       lastDate: today.add(Duration(days: maxDays)),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: const ColorScheme.light(
-            primary: kCrimson,
-            onPrimary: Colors.white,
-            onSurface: kTextPrimary,
-          ),
-        ),
-        child: child!,
-      ),
+      // Light keeps its look; dark inherits the app's dark theme.
+      builder: (context, child) => context.palette.isDark
+          ? child!
+          : Theme(
+              data: Theme.of(context).copyWith(
+                colorScheme: const ColorScheme.light(
+                  primary: kCrimson,
+                  onPrimary: Colors.white,
+                  onSurface: AppColors.foreground,
+                ),
+              ),
+              child: child!,
+            ),
     );
     if (picked != null) {
       setState(() {
@@ -485,16 +489,16 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loadingOptions) {
-      return const Scaffold(
-        backgroundColor: AppColors.mutedBg,
+      return Scaffold(
+        backgroundColor: context.palette.background,
         body: SafeArea(
-          child: Center(child: CircularProgressIndicator(color: kCrimson)),
+          child: Center(child: CircularProgressIndicator(color: context.palette.primaryText)),
         ),
       );
     }
     if (_optionsError) {
       return Scaffold(
-        backgroundColor: AppColors.mutedBg,
+        backgroundColor: context.palette.background,
         body: SafeArea(
           child: BrEmptyState(
             icon: Icons.wifi_off_rounded,
@@ -510,16 +514,16 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
     final options = _options!;
     if (!options.canRequest) {
       return Scaffold(
-        backgroundColor: AppColors.mutedBg,
+        backgroundColor: context.palette.background,
         body: SafeArea(
           child: Column(
             children: [
               Align(
                 alignment: Alignment.topLeft,
                 child: IconButton(
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.arrow_back_rounded,
-                    color: kTextPrimary,
+                    color: context.palette.foreground,
                   ),
                   onPressed: () => Navigator.pop(context),
                 ),
@@ -556,7 +560,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
         if (!didPop) _confirmDiscard();
       },
       child: Scaffold(
-        backgroundColor: AppColors.mutedBg,
+        backgroundColor: context.palette.background,
         body: SafeArea(
           child: Column(
             children: [
@@ -622,7 +626,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
   );
 
   Widget _stepIndicator() => Container(
-    color: Colors.white,
+    color: context.palette.surface,
     padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
     child: Column(
       children: [
@@ -635,7 +639,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
                 margin: EdgeInsets.only(right: i < 2 ? 6 : 0),
                 height: 5,
                 decoration: BoxDecoration(
-                  color: active ? kCrimson : AppColors.border,
+                  color: active ? kCrimson : context.palette.border,
                   borderRadius: BorderRadius.circular(99),
                 ),
               ),
@@ -653,7 +657,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
                 style: TextStyle(
                   fontSize: 10.5,
                   fontWeight: FontWeight.w600,
-                  color: current ? kCrimson : kTextMuted,
+                  color: current ? context.palette.primaryText : context.palette.muted,
                 ),
               ),
             );
@@ -666,9 +670,9 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
   Widget _bottomBar() {
     final valid = _currentStepValid;
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: kBorder)),
+      decoration: BoxDecoration(
+        color: context.palette.surface,
+        border: Border(top: BorderSide(color: context.palette.border)),
       ),
       child: SafeArea(
         top: false,
@@ -694,8 +698,8 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: valid
                           ? kCrimson
-                          : AppColors.border,
-                      foregroundColor: valid ? Colors.white : kTextMuted,
+                          : context.palette.border,
+                      foregroundColor: valid ? Colors.white : context.palette.muted,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
@@ -729,20 +733,20 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
 
   InputDecoration _inputDecoration(String hint) => InputDecoration(
     hintText: hint,
-    hintStyle: const TextStyle(color: kTextMuted, fontSize: 13),
+    hintStyle: TextStyle(color: context.palette.muted, fontSize: 13),
     filled: true,
-    fillColor: kInputFill,
+    fillColor: context.palette.surfaceAlt,
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
-      borderSide: const BorderSide(color: kBorder),
+      borderSide: BorderSide(color: context.palette.border),
     ),
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
-      borderSide: const BorderSide(color: kBorder),
+      borderSide: BorderSide(color: context.palette.border),
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
-      borderSide: const BorderSide(color: kCrimson, width: 1.5),
+      borderSide: BorderSide(color: context.palette.primaryText, width: 1.5),
     ),
     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
   );
@@ -751,38 +755,38 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
     padding: const EdgeInsets.only(bottom: 8),
     child: Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w600,
-        color: AppColors.foreground,
+        color: context.palette.foreground,
       ),
     ),
   );
 
   Widget _fieldError(String text) => Padding(
     padding: const EdgeInsets.only(top: 6),
-    child: Text(text, style: const TextStyle(fontSize: 11, color: kCrimson)),
+    child: Text(text, style: TextStyle(fontSize: 11, color: context.palette.primaryText)),
   );
 
   Widget _infoBanner(IconData icon, String text) => Container(
     width: double.infinity,
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
-      color: AppColors.infoBg,
-      border: Border.all(color: AppColors.infoBorder),
+      color: context.palette.infoBg,
+      border: Border.all(color: context.palette.infoBorder),
       borderRadius: BorderRadius.circular(14),
     ),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: AppColors.info, size: 18),
+        Icon(icon, color: context.palette.info, size: 18),
         const SizedBox(width: 10),
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
-              color: AppColors.infoDark,
+              color: context.palette.infoText,
               height: 1.4,
             ),
           ),
@@ -794,21 +798,21 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
   Widget _autoFilledPill() => Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
     decoration: BoxDecoration(
-      color: AppColors.infoBg,
-      border: Border.all(color: AppColors.infoBorder),
+      color: context.palette.infoBg,
+      border: Border.all(color: context.palette.infoBorder),
       borderRadius: BorderRadius.circular(999),
     ),
-    child: const Row(
+    child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.person_rounded, size: 13, color: AppColors.info),
+        Icon(Icons.person_rounded, size: 13, color: context.palette.info),
         SizedBox(width: 5),
         Text(
           'Filled from your profile',
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w600,
-            color: AppColors.info,
+            color: context.palette.info,
           ),
         ),
       ],
@@ -871,8 +875,8 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
               decoration: BoxDecoration(
-                color: selected ? kCrimson : Colors.white,
-                border: Border.all(color: selected ? kCrimson : kBorder),
+                color: selected ? kCrimson : context.palette.surface,
+                border: Border.all(color: selected ? context.palette.primaryText : context.palette.border),
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Row(
@@ -891,7 +895,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: selected ? Colors.white : kTextPrimary,
+                      color: selected ? Colors.white : context.palette.foreground,
                     ),
                   ),
                 ],
@@ -910,46 +914,46 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           decoration: BoxDecoration(
-            color: kInputFill,
-            border: Border.all(color: kBorder),
+            color: context.palette.surfaceAlt,
+            border: Border.all(color: context.palette.border),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.local_hospital_outlined,
-                color: kTextMuted,
+                color: context.palette.muted,
                 size: 18,
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: _facility == null
-                    ? const Text(
+                    ? Text(
                         'Select a hospital or facility',
-                        style: TextStyle(color: kTextMuted, fontSize: 14),
+                        style: TextStyle(color: context.palette.muted, fontSize: 14),
                       )
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             _facility!.name,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 14,
-                              color: kTextPrimary,
+                              color: context.palette.foreground,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
                           Text(
                             '${_facility!.typeLabel} · ${_facility!.locationLine}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
-                              color: kTextMuted,
+                              color: context.palette.muted,
                             ),
                           ),
                         ],
                       ),
               ),
-              const Icon(Icons.keyboard_arrow_down_rounded, color: kTextMuted),
+              Icon(Icons.keyboard_arrow_down_rounded, color: context.palette.muted),
             ],
           ),
         ),
@@ -962,9 +966,9 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
         decoration: _inputDecoration('e.g. PT-0042'),
       ),
       const SizedBox(height: 6),
-      const Text(
+      Text(
         'Patient or chart number, if the hospital gave you one.',
-        style: TextStyle(fontSize: 11, color: kTextMuted),
+        style: TextStyle(fontSize: 11, color: context.palette.muted),
       ),
     ],
   );
@@ -1005,12 +1009,12 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
                           end: Alignment.bottomRight,
                         )
                       : null,
-                  color: selected ? null : Colors.white,
+                  color: selected ? null : context.palette.surface,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
                     color: selected
                         ? Colors.transparent
-                        : AppColors.border,
+                        : context.palette.border,
                     width: 1.5,
                   ),
                   boxShadow: selected
@@ -1029,7 +1033,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
                     CustomPaint(
                       size: const Size(16, 20),
                       painter: _MiniDropPainter(
-                        color: selected ? Colors.white : kCrimson,
+                        color: selected ? Colors.white : context.palette.primaryText,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -1038,7 +1042,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
-                        color: selected ? Colors.white : kTextPrimary,
+                        color: selected ? Colors.white : context.palette.foreground,
                       ),
                     ),
                   ],
@@ -1080,7 +1084,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
         const SizedBox(height: 10),
         Text(
           'Compatible donors: ${_compatibleDonors(_bloodType!).join(', ')}',
-          style: const TextStyle(fontSize: 12, color: kTextMuted),
+          style: TextStyle(fontSize: 12, color: context.palette.muted),
         ),
       ],
       const SizedBox(height: 24),
@@ -1098,16 +1102,16 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
         }),
       ),
       const SizedBox(height: 6),
-      const Text(
+      Text(
         'Hospitals usually ask for 1–3 replacement donors per blood unit.',
-        style: TextStyle(fontSize: 11, color: kTextMuted),
+        style: TextStyle(fontSize: 11, color: context.palette.muted),
       ),
       const SizedBox(height: 18),
       Opacity(
         opacity: _isUnknownSelected ? 0.55 : 1.0,
         child: SwitchListTile(
           contentPadding: EdgeInsets.zero,
-          activeThumbColor: kCrimson,
+          activeThumbColor: context.palette.primaryText,
           value: _isUnknownSelected ? true : _allowOtherTypes,
           onChanged: _isUnknownSelected
               ? null
@@ -1124,7 +1128,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               if (_isUnknownSelected) ...[
-                const Icon(Icons.lock_rounded, size: 14, color: kTextMuted),
+                Icon(Icons.lock_rounded, size: 14, color: context.palette.muted),
                 const SizedBox(width: 6),
               ],
               Flexible(
@@ -1133,10 +1137,10 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
                   maxLines: 2,
                   softWrap: true,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: kTextPrimary,
+                    color: context.palette.foreground,
                   ),
                 ),
               ),
@@ -1150,9 +1154,9 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
             maxLines: 3,
             softWrap: true,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
-              color: kTextMuted,
+              color: context.palette.muted,
               height: 1.4,
             ),
           ),
@@ -1176,9 +1180,9 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
                           setState(() => _specificMatchRequired = v),
                     ),
                     const SizedBox(height: 6),
-                    const Text(
+                    Text(
                       'The rest can be any blood type.',
-                      style: TextStyle(fontSize: 11, color: kTextMuted),
+                      style: TextStyle(fontSize: 11, color: context.palette.muted),
                     ),
                   ],
                 ),
@@ -1201,36 +1205,36 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           decoration: BoxDecoration(
-            color: kInputFill,
-            border: Border.all(color: kBorder),
+            color: context.palette.surfaceAlt,
+            border: Border.all(color: context.palette.border),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
             children: [
-              const Icon(Icons.event_rounded, color: kTextMuted, size: 18),
+              Icon(Icons.event_rounded, color: context.palette.muted, size: 18),
               const SizedBox(width: 10),
               Expanded(
                 child: _neededBy == null
-                    ? const Text(
+                    ? Text(
                         'Select a date',
-                        style: TextStyle(color: kTextMuted, fontSize: 14),
+                        style: TextStyle(color: context.palette.muted, fontSize: 14),
                       )
                     : Row(
                         children: [
                           Text(
                             _formatFullDayDate(_neededBy!),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 14,
-                              color: kTextPrimary,
+                              color: context.palette.foreground,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
                           const SizedBox(width: 8),
                           Text(
                             brRelativeDay(_neededBy!),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: kTextMuted,
+                              color: context.palette.muted,
                             ),
                           ),
                         ],
@@ -1270,10 +1274,10 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
                     end: Alignment.bottomRight,
                   )
                 : null,
-            color: selected ? null : Colors.white,
+            color: selected ? null : context.palette.surface,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: selected ? Colors.transparent : AppColors.border,
+              color: selected ? Colors.transparent : context.palette.border,
               width: 1.5,
             ),
             boxShadow: selected
@@ -1291,7 +1295,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
               Icon(
                 Icons.help_outline_rounded,
                 size: 18,
-                color: selected ? Colors.white : kTextMuted,
+                color: selected ? Colors.white : context.palette.muted,
               ),
               const SizedBox(width: 8),
               Text(
@@ -1299,7 +1303,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
                 style: TextStyle(
                   fontSize: 13.5,
                   fontWeight: FontWeight.w700,
-                  color: selected ? Colors.white : kTextPrimary,
+                  color: selected ? Colors.white : context.palette.foreground,
                 ),
               ),
               const Spacer(),
@@ -1308,7 +1312,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: selected ? Colors.white : kTextMuted,
+                  color: selected ? Colors.white : context.palette.muted,
                 ),
               ),
             ],
@@ -1327,8 +1331,8 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
   }) => Container(
     padding: const EdgeInsets.symmetric(vertical: 14),
     decoration: BoxDecoration(
-      color: kInputFill,
-      border: Border.all(color: kBorder),
+      color: context.palette.surfaceAlt,
+      border: Border.all(color: context.palette.border),
       borderRadius: BorderRadius.circular(14),
     ),
     child: Row(
@@ -1342,15 +1346,15 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
           children: [
             Text(
               '$value',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.w800,
-                color: kTextPrimary,
+                color: context.palette.foreground,
               ),
             ),
             Text(
               unitLabel,
-              style: const TextStyle(fontSize: 11, color: kTextMuted),
+              style: TextStyle(fontSize: 11, color: context.palette.muted),
             ),
           ],
         ),
@@ -1376,8 +1380,8 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: onTap == null ? AppColors.border : Colors.white,
-        border: Border.all(color: kBorder),
+        color: onTap == null ? context.palette.border : context.palette.surface,
+        border: Border.all(color: context.palette.border),
         boxShadow: onTap == null
             ? null
             : const [
@@ -1388,17 +1392,17 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
                 ),
               ],
       ),
-      child: Icon(icon, size: 18, color: onTap == null ? kTextMuted : kCrimson),
+      child: Icon(icon, size: 18, color: onTap == null ? context.palette.muted : context.palette.primaryText),
     ),
   );
 
   Widget _urgencyCard(UrgencyOption u) {
     final selected = _urgency == u.value;
     final color = u.value == 'critical'
-        ? AppColors.critical
+        ? context.palette.criticalText
         : u.value == 'high'
-        ? AppColors.orange
-        : AppColors.info;
+        ? context.palette.orange
+        : context.palette.info;
     return GestureDetector(
       onTap: () {
         HapticFeedback.selectionClick();
@@ -1407,9 +1411,9 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: selected ? color.withValues(alpha: .06) : Colors.white,
+          color: selected ? color.withValues(alpha: .06) : context.palette.surface,
           border: Border.all(
-            color: selected ? color : kBorder,
+            color: selected ? color : context.palette.border,
             width: selected ? 1.5 : 1,
           ),
           borderRadius: BorderRadius.circular(14),
@@ -1428,15 +1432,15 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
                 children: [
                   Text(
                     u.label,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: kTextPrimary,
+                      color: context.palette.foreground,
                     ),
                   ),
                   Text(
                     u.description,
-                    style: const TextStyle(fontSize: 12, color: kTextMuted),
+                    style: TextStyle(fontSize: 12, color: context.palette.muted),
                   ),
                 ],
               ),
@@ -1445,7 +1449,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
               selected
                   ? Icons.radio_button_checked_rounded
                   : Icons.radio_button_unchecked_rounded,
-              color: selected ? color : kBorder,
+              color: selected ? color : context.palette.faint,
             ),
           ],
         ),
@@ -1468,9 +1472,9 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
       if (_errors['contact_number'] != null)
         _fieldError(_errors['contact_number']!),
       const SizedBox(height: 6),
-      const Text(
+      Text(
         'The eDonate team may call to confirm your request.',
-        style: TextStyle(fontSize: 11, color: kTextMuted),
+        style: TextStyle(fontSize: 11, color: context.palette.muted),
       ),
       const SizedBox(height: 20),
       _fieldLabel('Note for donors (optional)'),
@@ -1485,15 +1489,15 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
       ),
       Row(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          Icon(Icons.visibility_rounded, size: 13, color: AppColors.warning),
+        children: [
+          Icon(Icons.visibility_rounded, size: 13, color: context.palette.warning),
           SizedBox(width: 6),
           Expanded(
             child: Text(
               "Visible to all donors. Don't include the patient's name or diagnosis.",
               style: TextStyle(
                 fontSize: 11,
-                color: AppColors.warning,
+                color: context.palette.warning,
                 height: 1.4,
               ),
             ),
@@ -1506,16 +1510,16 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
       CheckboxListTile(
         contentPadding: EdgeInsets.zero,
         controlAffinity: ListTileControlAffinity.leading,
-        activeColor: kCrimson,
+        activeColor: context.palette.primaryText,
         value: _consent,
         onChanged: (v) => setState(() {
           _consent = v ?? false;
           _errors.remove('consent');
         }),
-        title: const Text(
+        title: Text(
           'I confirm this request is genuine and the patient is at the selected '
           'facility. False requests may lead to account suspension.',
-          style: TextStyle(fontSize: 12, color: kTextPrimary, height: 1.4),
+          style: TextStyle(fontSize: 12, color: context.palette.foreground, height: 1.4),
         ),
       ),
       if (_errors['consent'] != null) _fieldError(_errors['consent']!),
@@ -1524,7 +1528,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
         options.autoApprove
             ? 'Your request will be visible to matching donors right away.'
             : "The eDonate team reviews every request before it's shown to donors.",
-        style: const TextStyle(fontSize: 11, color: kTextMuted),
+        style: TextStyle(fontSize: 11, color: context.palette.muted),
       ),
     ],
   );
@@ -1533,10 +1537,10 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
     width: double.infinity,
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: Colors.white,
-      border: Border.all(color: kBorder),
+      color: context.palette.surface,
+      border: Border.all(color: context.palette.border),
       borderRadius: BorderRadius.circular(16),
-      boxShadow: AppColors.cardShadow,
+      boxShadow: context.palette.shadow,
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1558,10 +1562,10 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
                       Expanded(
                         child: Text(
                           _facility?.name ?? '—',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
-                            color: kTextPrimary,
+                            color: context.palette.foreground,
                           ),
                         ),
                       ),
@@ -1571,9 +1575,9 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
                   const SizedBox(height: 2),
                   Text(
                     _requirementText(),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: kTextMuted,
+                      color: context.palette.muted,
                       height: 1.4,
                     ),
                   ),
@@ -1591,27 +1595,27 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
               Expanded(
                 child: Text(
                   'Needed by ${_neededByShort()}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: kTextPrimary,
+                    color: context.palette.foreground,
                   ),
                 ),
               ),
             _editLink(1),
           ],
         ),
-        const Divider(height: 28, color: AppColors.mutedBg),
+        Divider(height: 28, color: context.palette.surfaceAlt),
         Row(
           children: [
-            const Icon(Icons.lock_rounded, size: 14, color: kTextMuted),
+            Icon(Icons.lock_rounded, size: 14, color: context.palette.muted),
             const SizedBox(width: 6),
-            const Text(
+            Text(
               'PRIVATE',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
-                color: kTextMuted,
+                color: context.palette.muted,
                 letterSpacing: 0.6,
               ),
             ),
@@ -1639,12 +1643,12 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
 
   Widget _editLink(int step) => GestureDetector(
     onTap: () => _goToStep(step),
-    child: const Text(
+    child: Text(
       'Edit',
       style: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w700,
-        color: kCrimson,
+        color: context.palette.primaryText,
       ),
     ),
   );
@@ -1654,15 +1658,15 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: kTextMuted)),
+        Text(label, style: TextStyle(fontSize: 12, color: context.palette.muted)),
         Flexible(
           child: Text(
             value,
             textAlign: TextAlign.right,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: kTextPrimary,
+              color: context.palette.foreground,
             ),
           ),
         ),
@@ -1757,7 +1761,7 @@ class _FacilityPickerSheetState extends State<_FacilityPickerSheet> {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: kBorder,
+              color: context.palette.border,
               borderRadius: BorderRadius.circular(999),
             ),
           ),
@@ -1770,18 +1774,18 @@ class _FacilityPickerSheetState extends State<_FacilityPickerSheet> {
                 hintText: 'Search by name or barangay',
                 prefixIcon: const Icon(Icons.search_rounded, size: 20),
                 filled: true,
-                fillColor: kInputFill,
+                fillColor: context.palette.surfaceAlt,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: kBorder),
+                  borderSide: BorderSide(color: context.palette.border),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: kBorder),
+                  borderSide: BorderSide(color: context.palette.border),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: kCrimson, width: 1.5),
+                  borderSide: BorderSide(color: context.palette.primaryText, width: 1.5),
                 ),
                 contentPadding: const EdgeInsets.symmetric(vertical: 12),
               ),
@@ -1789,10 +1793,10 @@ class _FacilityPickerSheetState extends State<_FacilityPickerSheet> {
           ),
           Expanded(
             child: filtered.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text(
                       'No facilities found',
-                      style: TextStyle(color: kTextMuted),
+                      style: TextStyle(color: context.palette.muted),
                     ),
                   )
                 : ListView(
@@ -1805,10 +1809,10 @@ class _FacilityPickerSheetState extends State<_FacilityPickerSheet> {
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               child: Text(
                                 entry.key,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700,
-                                  color: kTextMuted,
+                                  color: context.palette.muted,
                                   letterSpacing: 0.5,
                                 ),
                               ),
@@ -1829,14 +1833,14 @@ class _FacilityPickerSheetState extends State<_FacilityPickerSheet> {
                                         width: 36,
                                         height: 36,
                                         decoration: BoxDecoration(
-                                          color: AppColors.accentBg,
+                                          color: context.palette.accentBg,
                                           borderRadius: BorderRadius.circular(
                                             10,
                                           ),
                                         ),
                                         child: Icon(
                                           _iconFor(f.type),
-                                          color: kCrimson,
+                                          color: context.palette.primaryText,
                                           size: 18,
                                         ),
                                       ),
@@ -1848,26 +1852,26 @@ class _FacilityPickerSheetState extends State<_FacilityPickerSheet> {
                                           children: [
                                             Text(
                                               f.name,
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 fontSize: 14,
                                                 fontWeight: FontWeight.w600,
-                                                color: kTextPrimary,
+                                                color: context.palette.foreground,
                                               ),
                                             ),
                                             Text(
                                               f.locationLine,
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 fontSize: 11,
-                                                color: kTextMuted,
+                                                color: context.palette.muted,
                                               ),
                                             ),
                                           ],
                                         ),
                                       ),
                                       if (isSelected)
-                                        const Icon(
+                                        Icon(
                                           Icons.check_circle_rounded,
-                                          color: kCrimson,
+                                          color: context.palette.primaryText,
                                           size: 20,
                                         ),
                                     ],
@@ -1926,7 +1930,7 @@ class BloodRequestSubmittedScreen extends StatelessWidget {
           ];
 
     return Scaffold(
-      backgroundColor: AppColors.mutedBg,
+      backgroundColor: context.palette.background,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -1945,33 +1949,33 @@ class BloodRequestSubmittedScreen extends StatelessWidget {
                     height: 110,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: AppColors.successBg,
+                      color: context.palette.successBg,
                       border: Border.all(
-                        color: AppColors.successBorder,
+                        color: context.palette.successBorder,
                         width: 3,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.success.withValues(alpha: .2),
+                          color: context.palette.success.withValues(alpha: .2),
                           blurRadius: 30,
                           offset: const Offset(0, 10),
                         ),
                       ],
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.check_rounded,
                       size: 54,
-                      color: AppColors.success,
+                      color: context.palette.success,
                     ),
                   ),
                 ),
                 const SizedBox(height: 24),
                 Text(
                   _pending ? 'Request Submitted' : 'Your Request Is Live',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 21,
                     fontWeight: FontWeight.bold,
-                    color: kTextPrimary,
+                    color: context.palette.foreground,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -1983,8 +1987,8 @@ class BloodRequestSubmittedScreen extends StatelessWidget {
                       vertical: 12,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.mutedBg,
-                      border: Border.all(color: kBorder),
+                      color: context.palette.surfaceAlt,
+                      border: Border.all(color: context.palette.border),
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Row(
@@ -1992,18 +1996,18 @@ class BloodRequestSubmittedScreen extends StatelessWidget {
                       children: [
                         Text(
                           request.reference,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 1,
-                            color: kTextPrimary,
+                            color: context.palette.foreground,
                           ),
                         ),
                         const SizedBox(width: 10),
-                        const Icon(
+                        Icon(
                           Icons.copy_rounded,
                           size: 16,
-                          color: kTextMuted,
+                          color: context.palette.muted,
                         ),
                       ],
                     ),
@@ -2014,26 +2018,26 @@ class BloodRequestSubmittedScreen extends StatelessWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: context.palette.surface,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: kBorder),
-                    boxShadow: AppColors.cardShadow,
+                    border: Border.all(color: context.palette.border),
+                    boxShadow: context.palette.shadow,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'What happens next',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
-                          color: kTextPrimary,
+                          color: context.palette.foreground,
                         ),
                       ),
                       const SizedBox(height: 16),
                       ...List.generate(
                         steps.length,
-                        (i) => _stepRow(i + 1, steps[i], i == steps.length - 1),
+                        (i) => _stepRow(context, i + 1, steps[i], i == steps.length - 1),
                       ),
                     ],
                   ),
@@ -2052,9 +2056,9 @@ class BloodRequestSubmittedScreen extends StatelessWidget {
                 const SizedBox(height: 8),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text(
+                  child: Text(
                     'Done',
-                    style: TextStyle(color: kTextMuted),
+                    style: TextStyle(color: context.palette.muted),
                   ),
                 ),
               ],
@@ -2065,7 +2069,7 @@ class BloodRequestSubmittedScreen extends StatelessWidget {
     );
   }
 
-  Widget _stepRow(int number, String label, bool isLast) => Padding(
+  Widget _stepRow(BuildContext context, int number, String label, bool isLast) => Padding(
     padding: const EdgeInsets.only(bottom: 4),
     child: IntrinsicHeight(
       child: Row(
@@ -2092,7 +2096,7 @@ class BloodRequestSubmittedScreen extends StatelessWidget {
               ),
               if (!isLast)
                 Expanded(
-                  child: Container(width: 2, color: AppColors.border),
+                  child: Container(width: 2, color: context.palette.border),
                 ),
             ],
           ),
@@ -2102,9 +2106,9 @@ class BloodRequestSubmittedScreen extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 16, top: 3),
               child: Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
-                  color: kTextPrimary,
+                  color: context.palette.foreground,
                   height: 1.3,
                 ),
               ),

@@ -8,6 +8,7 @@ import 'config.dart';
 import 'profile_page_widgets.dart';
 import 'shared_design.dart';
 import 'streak/streak_screen.dart';
+import 'app_palette.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -189,7 +190,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   v == null || v.isEmpty ? 'Please enter your password.' : null,
           decoration: InputDecoration(
             filled: true,
-            fillColor: kInputFill,
+            fillColor: context.palette.surfaceAlt,
             suffixIcon: IconButton(
               tooltip: visible ? 'Hide password' : 'Show password',
               onPressed: () => changed(!visible),
@@ -201,11 +202,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: kBorder),
+              borderSide: BorderSide(color: context.palette.border),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: kBorder),
+              borderSide: BorderSide(color: context.palette.border),
             ),
           ),
         ),

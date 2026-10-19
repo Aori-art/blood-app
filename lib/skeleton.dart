@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'app_colors.dart';
-
-const Color _kSkeleton = AppColors.border;
+import 'app_palette.dart';
 
 /// Makes the skeleton shapes inside it breathe slowly. With reduced motion
 /// they just stay still.
@@ -78,7 +76,7 @@ class SkeletonBox extends StatelessWidget {
     width: width,
     height: height,
     decoration: BoxDecoration(
-      color: _kSkeleton,
+      color: context.palette.border,
       shape: circle ? BoxShape.circle : BoxShape.rectangle,
       borderRadius: circle ? null : BorderRadius.circular(radius),
     ),

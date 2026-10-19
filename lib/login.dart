@@ -14,14 +14,10 @@ import 'forgot_password.dart';
 import 'streak/streak_controller.dart';
 import 'unread_notifications.dart';
 import 'streak/streak_screen.dart';
+import 'app_palette.dart';
 
-// Design tokens now come from shared_design.dart (kCrimson, kSurface, etc.)
+// Design tokens now come from shared_design.dart (kCrimson) and context.palette
 // so this screen matches the rest of the app instead of its own palette.
-const Color _kCrimson = kCrimson;
-const Color _kSurface = kSurface;
-const Color _kInputFill = kInputFill;
-const Color _kTextPrimary = kTextPrimary;
-const Color _kTextMuted = kTextMuted;
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -126,33 +122,33 @@ class _LoginScreenState extends State<LoginScreen>
   void _snack(String msg) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
 
-  InputDecoration _inputDeco(String hint, {IconData? prefix, Widget? suffix}) =>
-      InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(color: _kTextMuted, fontSize: 14),
-        filled: true,
-        fillColor: _kInputFill,
-        prefixIcon: prefix != null
-            ? Icon(prefix, color: _kTextMuted, size: 18)
-            : null,
-        suffixIcon: suffix,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: kBorder),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: kBorder),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: _kCrimson, width: 1.5),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
-        ),
-      );
+  InputDecoration _inputDeco(
+    String hint, {
+    IconData? prefix,
+    Widget? suffix,
+  }) => InputDecoration(
+    hintText: hint,
+    hintStyle: TextStyle(color: context.palette.muted, fontSize: 14),
+    filled: true,
+    fillColor: context.palette.surfaceAlt,
+    prefixIcon: prefix != null
+        ? Icon(prefix, color: context.palette.muted, size: 18)
+        : null,
+    suffixIcon: suffix,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(color: context.palette.border),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(color: context.palette.border),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(color: context.palette.primaryText, width: 1.5),
+    ),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+  );
 
   @override
   Widget build(BuildContext context) =>
@@ -217,8 +213,8 @@ class _LoginScreenState extends State<LoginScreen>
                   position: _slideUp,
                   child: Container(
                     width: double.infinity,
-                    decoration: const BoxDecoration(
-                      color: _kSurface,
+                    decoration: BoxDecoration(
+                      color: context.palette.surface,
                       borderRadius: BorderRadius.vertical(
                         top: Radius.circular(32),
                       ),
@@ -241,13 +237,13 @@ class _LoginScreenState extends State<LoginScreen>
                                 Icon(
                                   Icons.arrow_back_rounded,
                                   size: 14,
-                                  color: _kTextMuted,
+                                  color: context.palette.muted,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
                                   'Back to Feed',
                                   style: TextStyle(
-                                    color: _kTextMuted,
+                                    color: context.palette.muted,
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -256,10 +252,10 @@ class _LoginScreenState extends State<LoginScreen>
                             ),
                           ),
                           const SizedBox(height: 16),
-                          const Text(
+                          Text(
                             'Welcome back!',
                             style: TextStyle(
-                              color: _kTextPrimary,
+                              color: context.palette.foreground,
                               fontSize: 24,
                               fontWeight: FontWeight.w800,
                             ),
@@ -267,15 +263,18 @@ class _LoginScreenState extends State<LoginScreen>
                           const SizedBox(height: 4),
                           Text(
                             'Sign in to continue saving lives',
-                            style: TextStyle(color: _kTextMuted, fontSize: 14),
+                            style: TextStyle(
+                              color: context.palette.muted,
+                              fontSize: 14,
+                            ),
                           ),
                           const SizedBox(height: 32),
 
                           // Email
-                          const Text(
+                          Text(
                             'Email Address',
                             style: TextStyle(
-                              color: _kTextPrimary,
+                              color: context.palette.foreground,
                               fontWeight: FontWeight.w600,
                               fontSize: 13,
                             ),
@@ -284,8 +283,8 @@ class _LoginScreenState extends State<LoginScreen>
                           TextField(
                             controller: _emailCtrl,
                             keyboardType: TextInputType.emailAddress,
-                            style: const TextStyle(
-                              color: _kTextPrimary,
+                            style: TextStyle(
+                              color: context.palette.foreground,
                               fontSize: 14,
                             ),
                             decoration: _inputDeco(
@@ -296,10 +295,10 @@ class _LoginScreenState extends State<LoginScreen>
                           const SizedBox(height: 16),
 
                           // Password
-                          const Text(
+                          Text(
                             'Password',
                             style: TextStyle(
-                              color: _kTextPrimary,
+                              color: context.palette.foreground,
                               fontWeight: FontWeight.w600,
                               fontSize: 13,
                             ),
@@ -308,8 +307,8 @@ class _LoginScreenState extends State<LoginScreen>
                           TextField(
                             controller: _passCtrl,
                             obscureText: _passHidden,
-                            style: const TextStyle(
-                              color: _kTextPrimary,
+                            style: TextStyle(
+                              color: context.palette.foreground,
                               fontSize: 14,
                             ),
                             decoration: _inputDeco(
@@ -322,7 +321,7 @@ class _LoginScreenState extends State<LoginScreen>
                                   _passHidden
                                       ? Icons.visibility_off_outlined
                                       : Icons.visibility_outlined,
-                                  color: _kTextMuted,
+                                  color: context.palette.muted,
                                   size: 20,
                                 ),
                               ),
@@ -339,10 +338,10 @@ class _LoginScreenState extends State<LoginScreen>
                                   builder: (_) => const ForgotPasswordScreen(),
                                 ),
                               ),
-                              child: const Text(
+                              child: Text(
                                 'Forgot Password?',
                                 style: TextStyle(
-                                  color: _kCrimson,
+                                  color: context.palette.primaryText,
                                   fontWeight: FontWeight.w700,
                                   fontSize: 13,
                                 ),
@@ -357,7 +356,7 @@ class _LoginScreenState extends State<LoginScreen>
                             height: 52,
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: _kCrimson,
+                                backgroundColor: kCrimson,
                                 foregroundColor: Colors.white,
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(
@@ -391,7 +390,7 @@ class _LoginScreenState extends State<LoginScreen>
                               Text(
                                 'New to eDonate? ',
                                 style: TextStyle(
-                                  color: _kTextMuted,
+                                  color: context.palette.muted,
                                   fontSize: 13,
                                 ),
                               ),
@@ -402,10 +401,10 @@ class _LoginScreenState extends State<LoginScreen>
                                     builder: (_) => const RegisterScreen(),
                                   ),
                                 ),
-                                child: const Text(
+                                child: Text(
                                   'Create Account',
                                   style: TextStyle(
-                                    color: _kCrimson,
+                                    color: context.palette.primaryText,
                                     fontWeight: FontWeight.w700,
                                     fontSize: 13,
                                   ),

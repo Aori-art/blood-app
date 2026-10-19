@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'app_colors.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,6 +11,7 @@ import 'config.dart';
 import 'privacy_statement.dart';
 import 'shared_design.dart';
 import 'streak/streak_screen.dart';
+import 'app_palette.dart';
 
 // ─── Consent receipt ─────────────────────────────────────────────────────────
 // An anonymous record that this install accepted a policy version. It never
@@ -112,22 +112,29 @@ class _PrivacyConsentScreenState extends State<PrivacyConsentScreen> {
           'Confirm your consent',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
-        content: const Text(
+        content: Text(
           'By continuing, you agree to the Data Privacy Statement. You can '
           'review it anytime in Profile > Privacy & Security.',
-          style: TextStyle(fontSize: 13, color: kTextMuted, height: 1.5),
+          style: TextStyle(
+            fontSize: 13,
+            color: context.palette.muted,
+            height: 1.5,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Go Back', style: TextStyle(color: kTextMuted)),
+            child: Text(
+              'Go Back',
+              style: TextStyle(color: context.palette.muted),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: kCrimson,
-              disabledBackgroundColor: AppColors.border,
-              disabledForegroundColor: AppColors.muted,
+              disabledBackgroundColor: context.palette.border,
+              disabledForegroundColor: context.palette.muted,
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(
@@ -187,24 +194,28 @@ class _PrivacyConsentScreenState extends State<PrivacyConsentScreen> {
           'Consent required',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
-        content: const Text(
+        content: Text(
           'You need to accept the Data Privacy Statement to use eDonate.',
-          style: TextStyle(fontSize: 13, color: kTextMuted, height: 1.5),
+          style: TextStyle(
+            fontSize: 13,
+            color: context.palette.muted,
+            height: 1.5,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text(
+            child: Text(
               'Review Again',
-              style: TextStyle(color: kTextMuted),
+              style: TextStyle(color: context.palette.muted),
             ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: kCrimson,
-              disabledBackgroundColor: AppColors.border,
-              disabledForegroundColor: AppColors.muted,
+              disabledBackgroundColor: context.palette.border,
+              disabledForegroundColor: context.palette.muted,
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(
@@ -231,7 +242,7 @@ class _PrivacyConsentScreenState extends State<PrivacyConsentScreen> {
   Widget _buildScreen(BuildContext context) => PopScope(
     canPop: false,
     child: Scaffold(
-      backgroundColor: AppColors.mutedBg,
+      backgroundColor: context.palette.background,
       body: Column(
         children: [
           // Fixed chrome: cap its text scaling so a large system font can't
@@ -266,10 +277,10 @@ class _PrivacyConsentScreenState extends State<PrivacyConsentScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: context.palette.surface,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.border),
-                  boxShadow: AppColors.cardShadow,
+                  border: Border.all(color: context.palette.border),
+                  boxShadow: context.palette.shadow,
                 ),
                 child: const PrivacyStatementView(),
               ),
@@ -284,8 +295,8 @@ class _PrivacyConsentScreenState extends State<PrivacyConsentScreen> {
   Widget _bottomPanel() => Container(
     width: double.infinity,
     decoration: BoxDecoration(
-      color: Colors.white,
-      border: const Border(top: BorderSide(color: AppColors.border)),
+      color: context.palette.surface,
+      border: Border(top: BorderSide(color: context.palette.border)),
       boxShadow: [
         BoxShadow(
           color: Colors.black.withValues(alpha: .06),
@@ -317,12 +328,12 @@ class _PrivacyConsentScreenState extends State<PrivacyConsentScreen> {
                   children: [
                     Checkbox(
                       value: _agreed,
-                      activeColor: kCrimson,
+                      activeColor: context.palette.primaryText,
                       onChanged: _saving
                           ? null
                           : (v) => setState(() => _agreed = v ?? false),
                     ),
-                    const Expanded(
+                    Expanded(
                       child: Padding(
                         padding: EdgeInsets.only(top: 12, right: 4),
                         child: Text(
@@ -331,7 +342,7 @@ class _PrivacyConsentScreenState extends State<PrivacyConsentScreen> {
                           'processing of my personal information as described.',
                           style: TextStyle(
                             fontSize: 12.5,
-                            color: kTextPrimary,
+                            color: context.palette.foreground,
                             height: 1.4,
                           ),
                         ),
@@ -348,10 +359,10 @@ class _PrivacyConsentScreenState extends State<PrivacyConsentScreen> {
               ),
               TextButton(
                 onPressed: _saving ? null : _onDecline,
-                child: const Text(
+                child: Text(
                   'Decline',
                   style: TextStyle(
-                    color: kTextMuted,
+                    color: context.palette.muted,
                     fontWeight: FontWeight.w600,
                   ),
                 ),

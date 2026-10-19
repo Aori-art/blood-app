@@ -9,6 +9,7 @@ import 'package:blood/app_colors.dart';
 import 'package:blood/login.dart';
 import 'package:blood/shared_design.dart';
 import 'package:blood/streak/streak_screen.dart';
+import '../../app_palette.dart';
 
 class OtpScreen extends StatefulWidget {
   final String email;
@@ -116,10 +117,10 @@ class _OtpScreenState extends State<OtpScreen>
         textAlign: TextAlign.center,
         keyboardType: TextInputType.number,
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        style: const TextStyle(
+        style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w800,
-            color: kTextPrimary),
+            color: context.palette.foreground),
         onChanged: (val) {
           if (val.length > 1) {
             final digits = val.replaceAll(RegExp(r'\D'), '');
@@ -148,18 +149,18 @@ class _OtpScreenState extends State<OtpScreen>
         decoration: InputDecoration(
           counterText: '',
           filled: true,
-          fillColor: filled ? kCrimson.withOpacity(0.08) : kInputFill,
+          fillColor: filled ? kCrimson.withOpacity(0.08) : context.palette.surfaceAlt,
           border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide.none),
           enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(
-                  color: filled ? kCrimson : Colors.transparent,
+                  color: filled ? context.palette.primaryText : Colors.transparent,
                   width: 1.5)),
           focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: kCrimson, width: 2)),
+              borderSide: BorderSide(color: context.palette.primaryText, width: 2)),
         ),
       ),
     );
@@ -271,13 +272,13 @@ class _OtpScreenState extends State<OtpScreen>
                         children: [
                           Text("Didn't receive it?  ",
                               style: TextStyle(
-                                  color: kTextMuted, fontSize: 13)),
+                                  color: context.palette.muted, fontSize: 13)),
                           GestureDetector(
                             onTap: _resending ? null : _resend,
                             child: Text(
                               _resending ? 'Sending...' : 'Resend OTP',
-                              style: const TextStyle(
-                                  color: kCrimson,
+                              style: TextStyle(
+                                  color: context.palette.primaryText,
                                   fontWeight: FontWeight.w700,
                                   fontSize: 13),
                             ),
@@ -290,23 +291,23 @@ class _OtpScreenState extends State<OtpScreen>
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: AppColors.warningBg,
+                          color: context.palette.warningBg,
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                              color: AppColors.warningBorder,
+                              color: context.palette.warningBorder,
                               width: 1),
                         ),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.shield_outlined,
-                                color: AppColors.warning, size: 18),
+                            Icon(Icons.shield_outlined,
+                                color: context.palette.warning, size: 18),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
                                 'This code is valid for 10 minutes. Never share this code with anyone.',
                                 style: TextStyle(
-                                    color: kTextMuted,
+                                    color: context.palette.muted,
                                     fontSize: 11,
                                     height: 1.5),
                               ),
