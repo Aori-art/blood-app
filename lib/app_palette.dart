@@ -38,6 +38,9 @@ class AppPalette extends ThemeExtension<AppPalette> {
   final Color info, infoBg, infoBorder, infoText;
   final Color orange, orangeBg, orangeBorder;
 
+  // Category accents (purple eligibility / privacy, pink donations).
+  final Color purple, purpleBg, purpleBorder, pink, pinkBg;
+
   /// The shadow under cards; none in dark, where the 1 px border does the job.
   final List<BoxShadow> shadow;
 
@@ -70,6 +73,11 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.orange,
     required this.orangeBg,
     required this.orangeBorder,
+    required this.purple,
+    required this.purpleBg,
+    required this.purpleBorder,
+    required this.pink,
+    required this.pinkBg,
     required this.shadow,
   });
 
@@ -103,6 +111,11 @@ class AppPalette extends ThemeExtension<AppPalette> {
     orange: AppColors.orange,
     orangeBg: AppColors.orangeBg,
     orangeBorder: AppColors.orangeBorder,
+    purple: Color(0xFF9333EA),
+    purpleBg: Color(0xFFFAF5FF),
+    purpleBorder: Color(0xFFE9D5FF),
+    pink: Color(0xFFEC4899),
+    pinkBg: Color(0xFFFDF2F8),
     shadow: AppColors.cardShadow,
   );
 
@@ -135,6 +148,11 @@ class AppPalette extends ThemeExtension<AppPalette> {
     orange: Color(0xFFFB923C),
     orangeBg: Color(0xFF2A1A0F),
     orangeBorder: Color(0xFF5A3514),
+    purple: Color(0xFFC084FC),
+    purpleBg: Color(0xFF231530),
+    purpleBorder: Color(0xFF4A2A6B),
+    pink: Color(0xFFF472B6),
+    pinkBg: Color(0xFF2A1521),
     shadow: <BoxShadow>[],
   );
 
@@ -168,6 +186,11 @@ class AppPalette extends ThemeExtension<AppPalette> {
     Color? orange,
     Color? orangeBg,
     Color? orangeBorder,
+    Color? purple,
+    Color? purpleBg,
+    Color? purpleBorder,
+    Color? pink,
+    Color? pinkBg,
     List<BoxShadow>? shadow,
   }) => AppPalette(
     isDark: isDark ?? this.isDark,
@@ -198,6 +221,11 @@ class AppPalette extends ThemeExtension<AppPalette> {
     orange: orange ?? this.orange,
     orangeBg: orangeBg ?? this.orangeBg,
     orangeBorder: orangeBorder ?? this.orangeBorder,
+    purple: purple ?? this.purple,
+    purpleBg: purpleBg ?? this.purpleBg,
+    purpleBorder: purpleBorder ?? this.purpleBorder,
+    pink: pink ?? this.pink,
+    pinkBg: pinkBg ?? this.pinkBg,
     shadow: shadow ?? this.shadow,
   );
 
@@ -235,6 +263,11 @@ class AppPalette extends ThemeExtension<AppPalette> {
       orange: c(orange, other.orange),
       orangeBg: c(orangeBg, other.orangeBg),
       orangeBorder: c(orangeBorder, other.orangeBorder),
+      purple: c(purple, other.purple),
+      purpleBg: c(purpleBg, other.purpleBg),
+      purpleBorder: c(purpleBorder, other.purpleBorder),
+      pink: c(pink, other.pink),
+      pinkBg: c(pinkBg, other.pinkBg),
       shadow: BoxShadow.lerpList(shadow, other.shadow, t) ?? const [],
     );
   }

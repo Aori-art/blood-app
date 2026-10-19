@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'app_colors.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'shared_design.dart';
 import 'theme_controller.dart' show kThemeModeKey;
+import 'app_palette.dart';
 
 // Bump this whenever the statement below changes in a way users must
 // re-consent to — the splash gate compares it with the stored value.
@@ -124,94 +123,107 @@ const List<_PrivacySection> _kSections = [
 // its own — the host screen provides the scroll view.
 class PrivacyStatementView extends StatelessWidget {
   // Fill of each section card, so the sections read against whichever
-  // surface the host places them on.
-  final Color sectionFill;
+  // surface the host places them on. Null = the palette's alternate surface.
+  final Color? sectionFill;
 
-  const PrivacyStatementView({super.key, this.sectionFill = kInputFill});
+  const PrivacyStatementView({super.key, this.sectionFill});
 
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const Text(
+      Text(
         _kIntro,
-        style: TextStyle(fontSize: 13, color: AppColors.muted, height: 1.5),
+        style: TextStyle(
+          fontSize: 13,
+          color: context.palette.muted,
+          height: 1.5,
+        ),
       ),
       const SizedBox(height: 14),
       for (final section in _kSections) ...[
-        _sectionCard(section),
+        _sectionCard(context, section),
         const SizedBox(height: 12),
       ],
-      const Center(
+      Center(
         child: Text(
           'Policy version: $kPrivacyPolicyVersion',
-          style: TextStyle(fontSize: 12, color: kTextMuted),
+          style: TextStyle(fontSize: 12, color: context.palette.muted),
         ),
       ),
     ],
   );
 
-  Widget _sectionCard(_PrivacySection section) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
-      color: sectionFill,
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: AppColors.border),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              alignment: Alignment.center,
-              decoration: const BoxDecoration(
-                color: AppColors.accentBg,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(section.icon, size: 17, color: kCrimson),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                section.heading,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: kTextPrimary,
-                ),
-              ),
-            ),
-          ],
+  Widget _sectionCard(BuildContext context, _PrivacySection section) =>
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: sectionFill ?? context.palette.surfaceAlt,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: context.palette.border),
         ),
-        const SizedBox(height: 10),
-        for (final bullet in section.bullets)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                const Padding(
-                  padding: EdgeInsets.only(top: 7, right: 8),
-                  child: Icon(Icons.circle, size: 5, color: kCrimson),
+                Container(
+                  width: 32,
+                  height: 32,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: context.palette.accentBg,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    section.icon,
+                    size: 17,
+                    color: context.palette.primaryText,
+                  ),
                 ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    bullet,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: AppColors.muted,
-                      height: 1.5,
+                    section.heading,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: context.palette.foreground,
                     ),
                   ),
                 ),
               ],
             ),
-          ),
-      ],
-    ),
-  );
+            const SizedBox(height: 10),
+            for (final bullet in section.bullets)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.only(top: 7, right: 8),
+                      child: Icon(
+                        Icons.circle,
+                        size: 5,
+                        color: context.palette.primaryText,
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        bullet,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: context.palette.muted,
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      );
 }

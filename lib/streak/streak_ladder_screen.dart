@@ -10,7 +10,6 @@ import 'streak_controller.dart';
 import 'streak_screen.dart';
 import 'streak_share.dart';
 
-const Color _kTrackGray = AppColors.border;
 
 /// Size of the big Dugtong in the summary card.
 const double _kDugtongSize = 110;
@@ -719,7 +718,7 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
           children: [
             DecoratedBox(
               decoration: BoxDecoration(
-                color: _kTrackGray,
+                color: AppColors.border,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),

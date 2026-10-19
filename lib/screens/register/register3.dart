@@ -7,6 +7,7 @@ import 'package:blood/config.dart';
 import 'package:blood/shared_design.dart';
 import 'package:blood/streak/streak_screen.dart';
 import 'otp.dart';
+import '../../app_palette.dart';
 
 class RegisterStep3 extends StatefulWidget {
   final String fullName, firstName, middleInitial, lastName, suffix;
@@ -164,14 +165,14 @@ class _RegisterStep3State extends State<RegisterStep3> {
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.lock_outlined,
-                                color: kCrimson, size: 20),
+                            Icon(Icons.lock_outlined,
+                                color: context.palette.primaryText, size: 20),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
                                 'Almost done! Create a strong password for your account.',
                                 style: TextStyle(
-                                    color: kTextMuted,
+                                    color: context.palette.muted,
                                     fontSize: 12,
                                     height: 1.4),
                               ),
@@ -194,7 +195,7 @@ class _RegisterStep3State extends State<RegisterStep3> {
                               _passHidden
                                   ? Icons.visibility_off_outlined
                                   : Icons.visibility_outlined,
-                              color: kTextMuted,
+                              color: context.palette.muted,
                               size: 20),
                         ),
                       ),
@@ -213,7 +214,7 @@ class _RegisterStep3State extends State<RegisterStep3> {
                               _confirmHidden
                                   ? Icons.visibility_off_outlined
                                   : Icons.visibility_outlined,
-                              color: kTextMuted,
+                              color: context.palette.muted,
                               size: 20),
                         ),
                       ),
@@ -223,15 +224,15 @@ class _RegisterStep3State extends State<RegisterStep3> {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: kInputFill,
+                          color: context.palette.surfaceAlt,
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Password requirements',
+                            Text('Password requirements',
                                 style: TextStyle(
-                                    color: kTextPrimary,
+                                    color: context.palette.foreground,
                                     fontWeight: FontWeight.w600,
                                     fontSize: 12)),
                             const SizedBox(height: 10),
@@ -297,7 +298,7 @@ class _Req extends StatelessWidget {
             decoration: BoxDecoration(
               color: met ? kCrimson : Colors.transparent,
               border: Border.all(
-                  color: met ? kCrimson : kTextMuted,
+                  color: met ? context.palette.primaryText : context.palette.muted,
                   width: 1.5),
               borderRadius: BorderRadius.circular(9),
             ),
@@ -308,7 +309,7 @@ class _Req extends StatelessWidget {
           const SizedBox(width: 10),
           Text(label,
               style: TextStyle(
-                  color: met ? kTextPrimary : kTextMuted,
+                  color: met ? context.palette.foreground : context.palette.muted,
                   fontSize: 12,
                   fontWeight:
                       met ? FontWeight.w600 : FontWeight.w400)),

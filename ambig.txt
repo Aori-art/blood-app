@@ -1,0 +1,5 @@
+lib/forgot_password.dart:491 primary (_stepRow//[/): ox(height: 12), _stepRow(Icons.lock_reset_rounded, AppColors.primary, 'Set your new password'), const Sized
+lib/forgot_password.dart:645 white ({//{/): s, Size size) { final paint = Paint() ..color = Colors.white ..style = PaintingStyle.fill; final path = Path(); 
+lib/screens/register/register1.dart:89 primary (ColorScheme.light/primary/copyWith/colorScheme):  colorScheme: const ColorScheme.light( primary: kCrimson, onPrimary: Colors.white, ), ), c
+lib/screens/register/register1.dart:90 white (ColorScheme.light/onPrimary/copyWith/colorScheme): ight( primary: kCrimson, onPrimary: Colors.white, ), ), child: child!, ), ); 
+lib/pin_screen.dart:80 primary (///): 0'.contains(pin); } // Brand colors const Color _crimson = AppColors.primary; const Color _crimsonMid = AppColors.primaryDark; const Color 

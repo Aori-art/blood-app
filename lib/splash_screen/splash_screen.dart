@@ -8,6 +8,7 @@ import 'package:blood/newsfeed.dart';
 import 'package:blood/privacy_consent.dart';
 import 'package:blood/privacy_statement.dart';
 import 'package:blood/streak/streak_screen.dart';
+import '../app_palette.dart';
 
 class SplashScreen extends StatefulWidget {
   final bool isLoggedIn;
@@ -258,7 +259,7 @@ class _SplashScreenState extends State<SplashScreen>
                                   height: 170,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: Colors.white
+                                    color: context.palette.surface
                                         .withOpacity(0.07 * _pulse.value),
                                   ),
                                 ),

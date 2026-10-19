@@ -7,6 +7,7 @@ import 'package:blood/config.dart';
 import 'package:blood/shared_design.dart';
 import 'package:blood/streak/streak_screen.dart';
 import 'register3.dart';
+import '../../app_palette.dart';
 
 class _LocationOption {
   final String code;
@@ -249,14 +250,14 @@ class _RegisterStep2State extends State<RegisterStep2> {
   Widget _loadingBox() => Container(
         height: 52,
         decoration: BoxDecoration(
-            color: kInputFill,
+            color: context.palette.surfaceAlt,
             borderRadius: BorderRadius.circular(14)),
-        child: const Center(
+        child: Center(
           child: SizedBox(
             width: 20,
             height: 20,
             child: CircularProgressIndicator(
-                strokeWidth: 2, color: kCrimson),
+                strokeWidth: 2, color: context.palette.primaryText),
           ),
         ),
       );

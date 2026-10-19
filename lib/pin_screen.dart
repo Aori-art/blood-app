@@ -15,6 +15,7 @@ import 'privacy_statement.dart';
 import 'streak/streak_controller.dart';
 import 'unread_notifications.dart';
 import 'donor_avatar.dart';
+import 'app_palette.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // eDonate PIN — a 4-digit PIN (like GCash's MPIN) that protects Home.
@@ -580,24 +581,28 @@ class _PinScreenState extends State<PinScreen> with TickerProviderStateMixin {
           'Switch account?',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
         ),
-        content: const Text(
+        content: Text(
           "You'll be signed out of eDonate on this device.",
-          style: TextStyle(fontSize: 13, color: AppColors.muted, height: 1.5),
+          style: TextStyle(
+            fontSize: 13,
+            color: context.palette.muted,
+            height: 1.5,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text(
+            child: Text(
               'Cancel',
-              style: TextStyle(color: AppColors.muted),
+              style: TextStyle(color: context.palette.muted),
             ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: _crimson,
-              disabledBackgroundColor: AppColors.border,
-              disabledForegroundColor: AppColors.muted,
+              disabledBackgroundColor: context.palette.border,
+              disabledForegroundColor: context.palette.muted,
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(
@@ -906,11 +911,7 @@ class _PinScreenState extends State<PinScreen> with TickerProviderStateMixin {
               ),
             ],
           ),
-          child: const Icon(
-            Icons.check_rounded,
-            color: AppColors.success,
-            size: 32,
-          ),
+          child: Icon(Icons.check_rounded, color: AppColors.success, size: 32),
         ),
       );
     }
@@ -1331,7 +1332,7 @@ class _EDonateLogo extends StatelessWidget {
       padding: EdgeInsets.symmetric(vertical: width * 0.06),
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Colors.white, // the colored logo sits on white in both modes
         borderRadius: BorderRadius.circular(width * 0.08),
         boxShadow: [
           BoxShadow(
@@ -1476,8 +1477,8 @@ class _ForgotPinSheetState extends State<_ForgotPinSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: bottomInset),
       child: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
+        decoration: BoxDecoration(
+          color: context.palette.surface,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         padding: const EdgeInsets.fromLTRB(22, 12, 22, 22),
@@ -1492,7 +1493,7 @@ class _ForgotPinSheetState extends State<_ForgotPinSheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: AppColors.border,
+                    color: context.palette.border,
                     borderRadius: BorderRadius.circular(99),
                   ),
                 ),
@@ -1503,8 +1504,8 @@ class _ForgotPinSheetState extends State<_ForgotPinSheet> {
                   Container(
                     width: 44,
                     height: 44,
-                    decoration: const BoxDecoration(
-                      color: AppColors.accentBg,
+                    decoration: BoxDecoration(
+                      color: context.palette.accentBg,
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
@@ -1514,7 +1515,7 @@ class _ForgotPinSheetState extends State<_ForgotPinSheet> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -1523,7 +1524,7 @@ class _ForgotPinSheetState extends State<_ForgotPinSheet> {
                           style: TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.foreground,
+                            color: context.palette.foreground,
                           ),
                         ),
                         SizedBox(height: 2),
@@ -1531,7 +1532,7 @@ class _ForgotPinSheetState extends State<_ForgotPinSheet> {
                           'Enter your eDonate account password to create a new PIN.',
                           style: TextStyle(
                             fontSize: 12.5,
-                            color: AppColors.muted,
+                            color: context.palette.muted,
                             height: 1.4,
                           ),
                         ),
@@ -1551,10 +1552,10 @@ class _ForgotPinSheetState extends State<_ForgotPinSheet> {
                 decoration: InputDecoration(
                   labelText: 'Password',
                   filled: true,
-                  fillColor: AppColors.mutedBg,
-                  prefixIcon: const Icon(
+                  fillColor: context.palette.surfaceAlt,
+                  prefixIcon: Icon(
                     Icons.lock_outline_rounded,
-                    color: AppColors.muted,
+                    color: context.palette.muted,
                   ),
                   suffixIcon: IconButton(
                     tooltip: _obscure ? 'Show password' : 'Hide password',
@@ -1563,16 +1564,16 @@ class _ForgotPinSheetState extends State<_ForgotPinSheet> {
                       _obscure
                           ? Icons.visibility_rounded
                           : Icons.visibility_off_rounded,
-                      color: AppColors.muted,
+                      color: context.palette.muted,
                     ),
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.border),
+                    borderSide: BorderSide(color: context.palette.border),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.border),
+                    borderSide: BorderSide(color: context.palette.border),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -1617,7 +1618,7 @@ class _ForgotPinSheetState extends State<_ForgotPinSheet> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _crimson,
                     foregroundColor: Colors.white,
-                    disabledBackgroundColor: AppColors.hint,
+                    disabledBackgroundColor: context.palette.hint,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -1645,10 +1646,10 @@ class _ForgotPinSheetState extends State<_ForgotPinSheet> {
               Center(
                 child: TextButton(
                   onPressed: _busy ? null : () => Navigator.of(context).pop(),
-                  child: const Text(
+                  child: Text(
                     'Cancel',
                     style: TextStyle(
-                      color: AppColors.muted,
+                      color: context.palette.muted,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
