@@ -15,6 +15,7 @@ import 'splash_screen/splash_screen.dart';
 import 'streak/streak_bubble.dart';
 import 'streak/streak_controller.dart';
 import 'streak/streak_screen.dart';
+import 'theme_controller.dart';
 
 /// The floating streak bubble lives above the Navigator, so it reaches routes,
 /// dialogs and sheets through this key.
@@ -96,6 +97,9 @@ Future<void> main() async {
   final String? donorId = prefs.getString('donorId');
   final bool isLoggedIn = loggedIn && donorId != null && donorId.isNotEmpty;
 
+  // The chosen mode is read before the first frame, so there is no light flash.
+  await ThemeController.instance.load();
+
   // Load the cached streak first so the bubble shows instantly, then ask the
   // server to record today (idempotent, and silent if offline).
   await StreakController.instance.init();
@@ -133,6 +137,14 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: ThemeController.instance,
+      builder: (context, _) => _buildApp(),
+    );
+  }
+
+  Widget _buildApp() {
+    final dark = ThemeController.instance.isDark;
     return MaterialApp(
       navigatorKey: appNavigatorKey,
       debugShowCheckedModeBanner: false,
@@ -142,17 +154,26 @@ class MyApp extends StatelessWidget {
       // itself with StreakScreen, and this observer follows the navigation.
       navigatorObservers: [streakRouteObserver],
 
-      builder: (context, child) => Stack(
-        fit: StackFit.expand,
-        children: [
-          child ?? const SizedBox.shrink(),
-          const StreakBubbleOverlay(),
-        ],
+      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+        // Status and navigation bar icons follow the mode. Screens that set
+        // their own style still win.
+        value: ThemeController.overlayStyle(dark),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            child ?? const SizedBox.shrink(),
+            const StreakBubbleOverlay(),
+          ],
+        ),
       ),
 
       // One theme for the whole app (see app_theme.dart): anything not styled by
       // hand follows the same palette as the newsfeed.
-      theme: buildAppTheme(),
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: dark ? ThemeMode.dark : ThemeMode.light,
+      themeAnimationDuration: const Duration(milliseconds: 250),
+      themeAnimationCurve: Curves.easeInOut,
 
       home: SplashScreen(isLoggedIn: isLoggedIn),
     );

@@ -1,7 +1,9 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'app_colors.dart';
+import 'app_palette.dart';
 import 'streak/streak_screen.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,6 +24,7 @@ import 'streak/streak_controller.dart';
 import 'unread_notifications.dart';
 import 'donor_avatar.dart';
 import 'streak/streak_ladder_screen.dart';
+import 'theme_controller.dart';
 import 'verify.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -405,6 +408,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               ),
                             ),
                           ),
+                          _darkModeRow(),
                         ]),
                       ),
                       const SizedBox(height: 16),
@@ -752,6 +756,94 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ],
         ),
       );
+  /// The Dark mode switch. It lives next to the other settings rows; toggling
+  /// it changes the whole app at once (the theme fades between the modes).
+  Widget _darkModeRow() => ListenableBuilder(
+    listenable: ThemeController.instance,
+    builder: (context, _) {
+      final dark = ThemeController.instance.isDark;
+      final p = context.palette;
+      void toggle(bool value) {
+        HapticFeedback.selectionClick();
+        ThemeController.instance.setDark(value);
+      }
+
+      return Semantics(
+        container: true,
+        label: 'Dark mode',
+        toggled: dark,
+        onTap: () => toggle(!dark),
+        excludeSemantics: true,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: () => toggle(!dark),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            child: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: p.accentBg,
+                  ),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    child: Icon(
+                      dark
+                          ? Icons.dark_mode_rounded
+                          : Icons.light_mode_rounded,
+                      key: ValueKey(dark),
+                      size: 18,
+                      color: p.primaryText,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Dark mode',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 14,
+                          color: p.foreground,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Easier on the eyes in low light',
+                        style: TextStyle(fontSize: 12, color: p.muted),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: dark,
+                  onChanged: toggle,
+                  thumbColor: WidgetStateProperty.all(Colors.white),
+                  trackColor: WidgetStateProperty.resolveWith(
+                    (states) => states.contains(WidgetState.selected)
+                        ? AppColors.primary
+                        : p.border,
+                  ),
+                  trackOutlineColor: WidgetStateProperty.resolveWith(
+                    (states) => states.contains(WidgetState.selected)
+                        ? AppColors.primary
+                        : p.border,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+
   Widget _menu(
     IconData icon,
     String label,

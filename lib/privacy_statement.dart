@@ -3,6 +3,7 @@ import 'app_colors.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'shared_design.dart';
+import 'theme_controller.dart' show kThemeModeKey;
 
 // Bump this whenever the statement below changes in a way users must
 // re-consent to — the splash gate compares it with the stored value.
@@ -18,6 +19,8 @@ const List<String> _kConsentKeys = [
   kPrivacyConsentAtKey,
   kPrivacyInstallIdKey,
   kPrivacyReceiptPendingKey,
+  // The chosen light/dark mode is a device preference: it outlives logout.
+  kThemeModeKey,
 ];
 
 // Keys of this prefix hold which streak frames a donor has already seen
