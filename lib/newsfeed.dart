@@ -17,6 +17,7 @@ import 'pin_screen.dart'; // PIN: "Go to Home" now goes through the PIN screen
 import 'config.dart';
 import 'donor_avatar.dart';
 import 'verify.dart';
+import 'app_palette.dart';
 // The palette lives in app_colors.dart; it is re-exported so files that took
 // AppColors from here keep working.
 export 'app_colors.dart';
@@ -184,7 +185,7 @@ class UrgencyBadge extends StatelessWidget {
     if (urgency == Urgency.normal) return const SizedBox.shrink();
 
     final isCritical = urgency == Urgency.critical;
-    final color = isCritical ? AppColors.critical : AppColors.orange;
+    final color = isCritical ? context.palette.criticalText : context.palette.orange;
     final label = isCritical ? "CRITICAL" : "URGENT";
 
     return Container(
@@ -232,16 +233,16 @@ Widget netImage(String url, {BoxFit fit = BoxFit.cover}) {
     url,
     fit: fit,
     errorBuilder: (context, error, stackTrace) => Container(
-      color: AppColors.mutedBg,
-      child: const Icon(
+      color: context.palette.surfaceAlt,
+      child: Icon(
         Icons.image_not_supported_outlined,
-        color: AppColors.muted,
+        color: context.palette.muted,
         size: 20,
       ),
     ),
     loadingBuilder: (context, child, progress) {
       if (progress == null) return child;
-      return Container(color: AppColors.mutedBg);
+      return Container(color: context.palette.surfaceAlt);
     },
   );
 }
@@ -427,14 +428,14 @@ class _ImageViewerPageState extends State<_ImageViewerPage> {
                                       children: [
                                         Icon(
                                           Icons.broken_image_outlined,
-                                          color: AppColors.muted,
+                                          color: context.palette.muted,
                                           size: 40,
                                         ),
                                         const SizedBox(height: 8),
                                         Text(
                                           "Couldn't load image",
                                           style: TextStyle(
-                                            color: AppColors.muted,
+                                            color: context.palette.muted,
                                             fontSize: 13,
                                           ),
                                         ),
@@ -669,21 +670,21 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
       final facilityType = _profile?['facility_type']?.toString();
       return (
         _facilityTypeIcon(facilityType),
-        AppColors.info,
-        AppColors.infoBg,
+        context.palette.info,
+        context.palette.infoBg,
       );
     }
     if (authorType == 'admin') {
       return (
         Icons.verified_rounded,
-        AppColors.primary,
-        AppColors.accentBg,
+        context.palette.primaryText,
+        context.palette.accentBg,
       );
     }
     return (
       Icons.groups_rounded,
-      AppColors.muted,
-      AppColors.mutedBg,
+      context.palette.muted,
+      context.palette.surfaceAlt,
     );
   }
 
@@ -696,7 +697,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.palette.surface,
         borderRadius: BorderRadius.circular(isFacility ? 23 : size / 2 + 3),
         boxShadow: const [
           BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
@@ -761,9 +762,9 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
       return _pill(
         icon: _facilityTypeIcon(facilityType),
         label: label,
-        fg: AppColors.info,
-        bg: AppColors.infoBg,
-        border: AppColors.infoBorder,
+        fg: context.palette.info,
+        bg: context.palette.infoBg,
+        border: context.palette.infoBorder,
       );
     }
     if (profile != null && authorType == 'admin') {
@@ -772,9 +773,9 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
       return _pill(
         icon: Icons.verified_rounded,
         label: label,
-        fg: AppColors.primary,
-        bg: AppColors.accentBg,
-        border: AppColors.primaryBorder,
+        fg: context.palette.primaryText,
+        bg: context.palette.accentBg,
+        border: context.palette.primaryBorder,
       );
     }
     // Loading / unlinked / error — fall back to whatever badge the post
@@ -783,9 +784,9 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
       return _pill(
         icon: Icons.emoji_events,
         label: widget.post.authorBadge!,
-        fg: AppColors.primary,
-        bg: AppColors.accentBg,
-        border: AppColors.primaryBorder,
+        fg: context.palette.primaryText,
+        bg: context.palette.accentBg,
+        border: context.palette.primaryBorder,
       );
     }
     return null;
@@ -795,11 +796,11 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
     width: 32,
     height: 32,
     decoration: BoxDecoration(
-      color: AppColors.accentBg,
+      color: context.palette.accentBg,
       borderRadius: BorderRadius.circular(10),
     ),
     alignment: Alignment.center,
-    child: Icon(icon, size: 16, color: AppColors.primary),
+    child: Icon(icon, size: 16, color: context.palette.primaryText),
   );
 
   Widget _addressBlock(Map<String, dynamic> profile) {
@@ -823,26 +824,26 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 "Address",
-                style: TextStyle(fontSize: 11, color: AppColors.muted),
+                style: TextStyle(fontSize: 11, color: context.palette.muted),
               ),
               const SizedBox(height: 2),
               Text(
                 address,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.foreground,
+                  color: context.palette.foreground,
                 ),
               ),
               if (subParts.isNotEmpty) ...[
                 const SizedBox(height: 2),
                 Text(
                   subParts.join(', '),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
-                    color: AppColors.muted,
+                    color: context.palette.muted,
                   ),
                 ),
               ],
@@ -872,23 +873,23 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 "Contact",
-                style: TextStyle(fontSize: 11, color: AppColors.muted),
+                style: TextStyle(fontSize: 11, color: context.palette.muted),
               ),
               const SizedBox(height: 2),
               Text(
                 contactNumber,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.foreground,
+                  color: context.palette.foreground,
                 ),
               ),
             ],
           ),
         ),
-        const Icon(Icons.copy_rounded, size: 14, color: AppColors.muted),
+        Icon(Icons.copy_rounded, size: 14, color: context.palette.muted),
       ],
     ),
   );
@@ -900,7 +901,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
     if (address != null && address.isNotEmpty) rows.add(_addressBlock(profile));
     if (contact != null && contact.isNotEmpty) {
       if (rows.isNotEmpty)
-        rows.add(const Divider(height: 20, color: AppColors.mutedBg));
+        rows.add(Divider(height: 20, color: context.palette.surfaceAlt));
       rows.add(_contactRow(contact));
     }
     if (rows.isEmpty) return const SizedBox.shrink();
@@ -909,8 +910,8 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.mutedBg,
-        border: Border.all(color: AppColors.border),
+        color: context.palette.surfaceAlt,
+        border: Border.all(color: context.palette.border),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(children: rows),
@@ -954,7 +955,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: AppColors.accentBg,
+            color: context.palette.accentBg,
             borderRadius: BorderRadius.circular(10),
           ),
           alignment: Alignment.center,
@@ -963,18 +964,18 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
             children: [
               Text(
                 monthLabel,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 10,
-                  color: AppColors.primary,
+                  color: context.palette.primaryText,
                   fontWeight: FontWeight.w700,
                 ),
               ),
               Text(
                 dayLabel,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.foreground,
+                  color: context.palette.foreground,
                 ),
               ),
             ],
@@ -987,19 +988,19 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
             children: [
               Text(
                 event['title']?.toString() ?? '',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.foreground,
+                  color: context.palette.foreground,
                 ),
               ),
               if (subtitle.isNotEmpty) ...[
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
-                    color: AppColors.muted,
+                    color: context.palette.muted,
                   ),
                 ),
               ],
@@ -1017,19 +1018,19 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           "Upcoming Donation Events",
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w700,
-            color: AppColors.muted,
+            color: context.palette.muted,
           ),
         ),
         const SizedBox(height: 8),
         if (list.isEmpty)
-          const Text(
+          Text(
             "No upcoming events right now.",
-            style: TextStyle(fontSize: 12, color: AppColors.muted),
+            style: TextStyle(fontSize: 12, color: context.palette.muted),
           )
         else
           for (final e in list) ...[
@@ -1051,22 +1052,22 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
             width: double.infinity,
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: AppColors.warningBg,
-              border: Border.all(color: AppColors.warningBorder),
+              color: context.palette.warningBg,
+              border: Border.all(color: context.palette.warningBorder),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Row(
+            child: Row(
               children: [
                 Icon(
                   Icons.info_outline_rounded,
                   size: 14,
-                  color: AppColors.warningDark,
+                  color: context.palette.warningText,
                 ),
                 SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     "This facility isn't accepting donations right now.",
-                    style: TextStyle(fontSize: 11, color: AppColors.warningDark),
+                    style: TextStyle(fontSize: 11, color: context.palette.warningText),
                   ),
                 ),
               ],
@@ -1085,21 +1086,21 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
     width: double.infinity,
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
-      color: AppColors.infoBg,
-      border: Border.all(color: AppColors.infoBorder),
+      color: context.palette.infoBg,
+      border: Border.all(color: context.palette.infoBorder),
       borderRadius: BorderRadius.circular(14),
     ),
-    child: const Row(
+    child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(Icons.shield_rounded, size: 16, color: AppColors.info),
+        Icon(Icons.shield_rounded, size: 16, color: context.palette.info),
         SizedBox(width: 8),
         Expanded(
           child: Text(
             "Posts from this account are official announcements from the eDonate team.",
             style: TextStyle(
               fontSize: 12,
-              color: AppColors.infoDark,
+              color: context.palette.infoText,
               height: 1.4,
             ),
           ),
@@ -1108,12 +1109,12 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
     ),
   );
 
-  Widget _basicNote() => const Padding(
+  Widget _basicNote() => Padding(
     padding: EdgeInsets.symmetric(vertical: 8),
     child: Text(
       "More details about this organization aren't available yet.",
       textAlign: TextAlign.center,
-      style: TextStyle(fontSize: 12, color: AppColors.muted),
+      style: TextStyle(fontSize: 12, color: context.palette.muted),
     ),
   );
 
@@ -1123,7 +1124,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
         width: double.infinity,
         height: 56,
         decoration: BoxDecoration(
-          color: AppColors.mutedBg,
+          color: context.palette.surfaceAlt,
           borderRadius: BorderRadius.circular(8),
         ),
       ),
@@ -1132,7 +1133,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
         width: double.infinity,
         height: 56,
         decoration: BoxDecoration(
-          color: AppColors.mutedBg,
+          color: context.palette.surfaceAlt,
           borderRadius: BorderRadius.circular(8),
         ),
       ),
@@ -1141,7 +1142,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
         width: double.infinity,
         height: 72,
         decoration: BoxDecoration(
-          color: AppColors.mutedBg,
+          color: context.palette.surfaceAlt,
           borderRadius: BorderRadius.circular(8),
         ),
       ),
@@ -1150,24 +1151,24 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
 
   Widget _errorSection() => Column(
     children: [
-      const Icon(Icons.wifi_off_rounded, color: AppColors.muted, size: 28),
+      Icon(Icons.wifi_off_rounded, color: context.palette.muted, size: 28),
       const SizedBox(height: 8),
-      const Text(
+      Text(
         "Couldn't load this profile",
-        style: TextStyle(fontSize: 13, color: AppColors.muted),
+        style: TextStyle(fontSize: 13, color: context.palette.muted),
       ),
       const SizedBox(height: 10),
       TextButton.icon(
         onPressed: _fetchProfile,
-        icon: const Icon(
+        icon: Icon(
           Icons.refresh_rounded,
           size: 16,
-          color: AppColors.primary,
+          color: context.palette.primaryText,
         ),
-        label: const Text(
+        label: Text(
           "Retry",
           style: TextStyle(
-            color: AppColors.primary,
+            color: context.palette.primaryText,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -1202,8 +1203,8 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
         maxHeight: MediaQuery.of(context).size.height * 0.85,
       ),
       child: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
+        decoration: BoxDecoration(
+          color: context.palette.surface,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
@@ -1215,7 +1216,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: AppColors.border,
+                  color: context.palette.border,
                   borderRadius: BorderRadius.circular(99),
                 ),
               ),
@@ -1227,10 +1228,10 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.foreground,
+                  color: context.palette.foreground,
                 ),
               ),
               if (pill != null) ...[const SizedBox(height: 8), pill],
@@ -1238,9 +1239,9 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
                 const SizedBox(height: 8),
                 Text(
                   "On eDonate since $memberSince",
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.muted,
+                    color: context.palette.muted,
                   ),
                 ),
               ],
@@ -1253,8 +1254,8 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
                 child: OutlinedButton(
                   onPressed: () => Navigator.of(context).pop(),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    side: const BorderSide(color: AppColors.primary),
+                    foregroundColor: context.palette.primaryText,
+                    side: BorderSide(color: context.palette.primaryText),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -1393,7 +1394,7 @@ class _PostCardState extends State<PostCard> {
     required void Function(BuildContext buttonContext) onTap,
     required IconData icon,
     required String label,
-    Color color = AppColors.muted,
+    Color? color,
     Widget? iconWidget,
   }) {
     return Expanded(
@@ -1407,7 +1408,12 @@ class _PostCardState extends State<PostCard> {
               mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
               children: [
-                iconWidget ?? Icon(icon, size: 17, color: color),
+                iconWidget ??
+                    Icon(
+                      icon,
+                      size: 17,
+                      color: color ?? context.palette.muted,
+                    ),
                 const SizedBox(width: 8),
                 Flexible(
                   child: Text(
@@ -1417,7 +1423,7 @@ class _PostCardState extends State<PostCard> {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: color,
+                      color: color ?? context.palette.muted,
                     ),
                   ),
                 ),
@@ -1508,9 +1514,9 @@ class _PostCardState extends State<PostCard> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.palette.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: context.palette.border),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.04),
@@ -1584,10 +1590,10 @@ class _PostCardState extends State<PostCard> {
                           children: [
                             Text(
                               post.author,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
-                                color: AppColors.foreground,
+                                color: context.palette.foreground,
                               ),
                             ),
                             if (post.urgency != null)
@@ -1598,35 +1604,35 @@ class _PostCardState extends State<PostCard> {
                         Row(
                           children: [
                             if (post.authorBadge != null) ...[
-                              const Icon(
+                              Icon(
                                 Icons.emoji_events,
                                 size: 10,
-                                color: AppColors.primary,
+                                color: context.palette.primaryText,
                               ),
                               const SizedBox(width: 4),
                               Text(
                                 post.authorBadge!,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w500,
-                                  color: AppColors.primary,
+                                  color: context.palette.primaryText,
                                 ),
                               ),
                               const SizedBox(width: 6),
-                              const Text(
+                              Text(
                                 "·",
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: AppColors.muted,
+                                  color: context.palette.muted,
                                 ),
                               ),
                               const SizedBox(width: 6),
                             ],
                             Text(
                               post.timeAgo,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 11,
-                                color: AppColors.muted,
+                                color: context.palette.muted,
                               ),
                             ),
                           ],
@@ -1644,10 +1650,10 @@ class _PostCardState extends State<PostCard> {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: Text(
               post.content,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13.5,
                 height: 1.5,
-                color: AppColors.foreground,
+                color: context.palette.foreground,
               ),
             ),
           ),
@@ -1664,7 +1670,7 @@ class _PostCardState extends State<PostCard> {
               child: Hero(
                 tag: 'post_image_${post.id}_0',
                 child: Container(
-                  color: AppColors.mutedBg,
+                  color: context.palette.surfaceAlt,
                   constraints: const BoxConstraints(maxHeight: 240),
                   width: double.infinity,
                   child: netImage(post.image!),
@@ -1686,9 +1692,9 @@ class _PostCardState extends State<PostCard> {
                   if (likeCount > 0)
                     Text(
                       _countLabel(likeCount, 'like', 'likes'),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.muted,
+                        color: context.palette.muted,
                       ),
                     ),
                   const Spacer(),
@@ -1703,9 +1709,9 @@ class _PostCardState extends State<PostCard> {
                         ),
                         child: Text(
                           _countLabel(commentCount, 'comment', 'comments'),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.muted,
+                            color: context.palette.muted,
                           ),
                         ),
                       ),
@@ -1717,8 +1723,8 @@ class _PostCardState extends State<PostCard> {
           // Action bar: Like, Comment, Share
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: AppColors.border)),
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: context.palette.border)),
             ),
             child: Row(
               children: [
@@ -1726,7 +1732,7 @@ class _PostCardState extends State<PostCard> {
                   onTap: (_) => _handleLike(),
                   icon: liked ? Icons.favorite : Icons.favorite_border,
                   label: liked ? "Liked" : "Like",
-                  color: liked ? AppColors.primary : AppColors.muted,
+                  color: liked ? context.palette.primaryText : context.palette.muted,
                   iconWidget: AnimatedScale(
                     scale: _likeIconScale,
                     duration: const Duration(milliseconds: 140),
@@ -1734,7 +1740,7 @@ class _PostCardState extends State<PostCard> {
                     child: Icon(
                       liked ? Icons.favorite : Icons.favorite_border,
                       size: 17,
-                      color: liked ? AppColors.primary : AppColors.muted,
+                      color: liked ? context.palette.primaryText : context.palette.muted,
                     ),
                   ),
                 ),
@@ -1772,12 +1778,12 @@ class _DonateBlockState extends State<_DonateBlock> {
 
   Widget _detailRow(IconData icon, String text) => Row(
     children: [
-      Icon(icon, size: 14, color: AppColors.primary),
+      Icon(icon, size: 14, color: context.palette.primaryText),
       const SizedBox(width: 6),
       Expanded(
         child: Text(
           text,
-          style: const TextStyle(fontSize: 12, color: AppColors.foreground),
+          style: TextStyle(fontSize: 12, color: context.palette.foreground),
         ),
       ),
     ],
@@ -2098,7 +2104,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
 
   Widget _buildScreen(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.mutedBg,
+      backgroundColor: context.palette.background,
       body: SafeArea(
         child: Column(
           children: [
@@ -2141,9 +2147,9 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
 
   Widget _buildVerificationBanner(BuildContext context) {
     final isPending = _verificationStatus == 'pending';
-    final bg = isPending ? AppColors.warningBg : AppColors.mutedBg;
-    final border = isPending ? AppColors.warningBorder : AppColors.border;
-    final fg = isPending ? AppColors.warningDark : AppColors.muted;
+    final bg = isPending ? context.palette.warningBg : context.palette.surfaceAlt;
+    final border = isPending ? context.palette.warningBorder : context.palette.border;
+    final fg = isPending ? context.palette.warningText : context.palette.muted;
     final icon = isPending
         ? Icons.hourglass_top_rounded
         : Icons.info_outline_rounded;
@@ -2268,10 +2274,10 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
 
   Widget _buildPostsList() {
     if (_loadingPosts) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.symmetric(vertical: 40),
         child: Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
+          child: CircularProgressIndicator(color: context.palette.primaryText),
         ),
       );
     }
@@ -2281,12 +2287,12 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
         padding: const EdgeInsets.symmetric(vertical: 40),
         child: Column(
           children: [
-            const Icon(Icons.wifi_off, color: AppColors.muted, size: 32),
+            Icon(Icons.wifi_off, color: context.palette.muted, size: 32),
             const SizedBox(height: 8),
             Text(
               _postsError!,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 13, color: AppColors.muted),
+              style: TextStyle(fontSize: 13, color: context.palette.muted),
             ),
             const SizedBox(height: 12),
             OutlinedButton(onPressed: _loadPosts, child: const Text("Retry")),
@@ -2296,12 +2302,12 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     }
 
     if (_posts.isEmpty) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.symmetric(vertical: 40),
         child: Center(
           child: Text(
             "No posts yet. Check back soon!",
-            style: TextStyle(fontSize: 13, color: AppColors.muted),
+            style: TextStyle(fontSize: 13, color: context.palette.muted),
           ),
         ),
       );
@@ -2331,7 +2337,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.palette.surface,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.04),
@@ -2361,12 +2367,12 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               RichText(
-                text: const TextSpan(
+                text: TextSpan(
                   children: [
                     TextSpan(
                       text: "e",
                       style: TextStyle(
-                        color: AppColors.primary,
+                        color: context.palette.primaryText,
                         fontWeight: FontWeight.w900,
                         fontSize: 18,
                       ),
@@ -2374,7 +2380,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
                     TextSpan(
                       text: "Donate",
                       style: TextStyle(
-                        color: AppColors.foreground,
+                        color: context.palette.foreground,
                         fontWeight: FontWeight.w900,
                         fontSize: 18,
                       ),
@@ -2382,12 +2388,12 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
                   ],
                 ),
               ),
-              const Text(
+              Text(
                 "BLOOD DONATION NETWORK",
                 style: TextStyle(
                   fontSize: 9,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.muted,
+                  color: context.palette.muted,
                   letterSpacing: 1.2,
                 ),
               ),
@@ -2421,9 +2427,9 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
           padding: EdgeInsets.zero,
           tooltip: 'Profile',
           onPressed: _openProfile,
-          icon: const Icon(
+          icon: Icon(
             Icons.person_outline_rounded,
-            color: AppColors.muted,
+            color: context.palette.muted,
             size: 20,
           ),
         ),
@@ -2629,34 +2635,37 @@ class _VerificationCard extends StatelessWidget {
     switch (status) {
       case 'pending':
         return _card(
+          context,
           icon: Icons.hourglass_top_rounded,
-          iconBg: AppColors.warningBg,
-          accent: AppColors.warning,
+          iconBg: context.palette.warningBg,
+          accent: context.palette.warning,
           title: "Verification in Progress",
           subtitle: "We're reviewing your ID — hang tight",
-          trailing: _outlinedButton("View", AppColors.warning),
+          trailing: _outlinedButton("View", context.palette.warning),
         );
       case 'rejected':
         return _card(
+          context,
           icon: Icons.gpp_bad_outlined,
-          iconBg: AppColors.accentBg,
-          accent: AppColors.critical,
+          iconBg: context.palette.accentBg,
+          accent: context.palette.criticalText,
           title: "Verification Unsuccessful",
           subtitle: "Please upload a clearer photo of your ID",
-          trailing: _filledButton("Retry"),
-          borderColor: AppColors.primaryBorder,
+          trailing: _filledButton(context, "Retry"),
+          borderColor: context.palette.primaryBorder,
         );
       case 'verified':
-        return _verifiedCard();
+        return _verifiedCard(context);
       case 'unverified':
       default:
         return _card(
+          context,
           icon: Icons.shield_outlined,
-          iconBg: AppColors.accentBg,
-          accent: AppColors.primary,
+          iconBg: context.palette.accentBg,
+          accent: context.palette.primaryText,
           title: "Verify Your Identity",
           subtitle: "Upload a valid ID to unlock full access",
-          trailing: _outlinedButton("Verify", AppColors.primary),
+          trailing: _outlinedButton("Verify", context.palette.primaryText),
         );
     }
   }
@@ -2677,12 +2686,12 @@ class _VerificationCard extends StatelessWidget {
     ),
   );
 
-  Widget _filledButton(String label) => ElevatedButton(
+  Widget _filledButton(BuildContext context, String label) => ElevatedButton(
     onPressed: onTap,
     style: ElevatedButton.styleFrom(
       backgroundColor: AppColors.primary,
-      disabledBackgroundColor: AppColors.border,
-      disabledForegroundColor: AppColors.muted,
+      disabledBackgroundColor: context.palette.border,
+      disabledForegroundColor: context.palette.muted,
       foregroundColor: Colors.white,
       elevation: 0,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -2696,7 +2705,7 @@ class _VerificationCard extends StatelessWidget {
     ),
   );
 
-  Widget _card({
+  Widget _card(BuildContext context, {
     required IconData icon,
     required Color iconBg,
     required Color accent,
@@ -2712,9 +2721,9 @@ class _VerificationCard extends StatelessWidget {
         margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.palette.surface,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: borderColor ?? AppColors.border),
+          border: Border.all(color: borderColor ?? context.palette.border),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.03),
@@ -2739,17 +2748,17 @@ class _VerificationCard extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.foreground,
+                      color: context.palette.foreground,
                     ),
                   ),
                   Text(
                     subtitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: AppColors.muted,
+                      color: context.palette.muted,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -2765,7 +2774,7 @@ class _VerificationCard extends StatelessWidget {
     );
   }
 
-  Widget _verifiedCard() {
+  Widget _verifiedCard(BuildContext context) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
@@ -2773,19 +2782,19 @@ class _VerificationCard extends StatelessWidget {
         margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [AppColors.successBg, AppColors.successSoft],
+          gradient: LinearGradient(
+            colors: [context.palette.successBg, context.palette.successSoft],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.successBorder, width: 1.5),
+          border: Border.all(color: context.palette.successBorder, width: 1.5),
         ),
         child: Stack(
           children: [
             Padding(
               padding: const EdgeInsets.only(right: 26),
-              child: _verifiedCardRow(),
+              child: _verifiedCardRow(context),
             ),
             Positioned(
               top: -4,
@@ -2803,10 +2812,10 @@ class _VerificationCard extends StatelessWidget {
                       color: Colors.white.withValues(alpha: .75),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.close_rounded,
                       size: 15,
-                      color: AppColors.successDark,
+                      color: context.palette.successDark,
                     ),
                   ),
                 ),
@@ -2818,7 +2827,7 @@ class _VerificationCard extends StatelessWidget {
     );
   }
 
-  Widget _verifiedCardRow() {
+  Widget _verifiedCardRow(BuildContext context) {
     return Row(
       children: [
         TweenAnimationBuilder<double>(
@@ -2830,20 +2839,20 @@ class _VerificationCard extends StatelessWidget {
           child: Container(
             width: 44,
             height: 44,
-            decoration: const BoxDecoration(
-              color: AppColors.successSoft,
+            decoration: BoxDecoration(
+              color: context.palette.successSoft,
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
-            child: const Icon(
+            child: Icon(
               Icons.verified_user_rounded,
               size: 20,
-              color: AppColors.success,
+              color: context.palette.success,
             ),
           ),
         ),
         const SizedBox(width: 12),
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -2852,12 +2861,12 @@ class _VerificationCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.foreground,
+                  color: context.palette.foreground,
                 ),
               ),
               Text(
                 "Your account has full access to eDonate",
-                style: TextStyle(fontSize: 12, color: AppColors.muted),
+                style: TextStyle(fontSize: 12, color: context.palette.muted),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),

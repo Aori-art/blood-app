@@ -10,6 +10,7 @@ import 'newsfeed.dart' show resolveMediaUrl;
 import 'shared_design.dart' show kCrimson;
 import 'streak/avatar_frame.dart';
 import 'streak/streak_controller.dart';
+import 'app_palette.dart';
 
 /// A donor's profile picture with their streak frame, drawn the same way
 /// everywhere (the newsfeed header, comments, the profile sheet).
@@ -55,7 +56,7 @@ class DonorAvatar extends StatelessWidget {
       child: Text(
         initialOf(name),
         style: TextStyle(
-          color: kCrimson,
+          color: context.palette.primaryText,
           fontSize: radius * 0.9,
           fontWeight: FontWeight.w700,
           height: 1,

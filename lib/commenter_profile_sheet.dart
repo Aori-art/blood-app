@@ -1,14 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'app_colors.dart';
 import 'package:flutter/services.dart';
 
 import 'donor_avatar.dart';
 import 'post_comments_api.dart';
-import 'shared_design.dart' show kCrimson;
 import 'skeleton.dart';
 import 'streak/streak_controller.dart';
+import 'app_palette.dart';
 
 /// Opens the brief profile of the donor behind [comment].
 Future<void> showCommenterProfile(
@@ -89,7 +88,7 @@ class _CommenterProfileSheetState extends State<CommenterProfileSheet> {
     return Align(
       alignment: Alignment.bottomCenter,
       child: Material(
-        color: Colors.white,
+        color: context.palette.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         clipBehavior: Clip.antiAlias,
         child: SafeArea(
@@ -103,7 +102,7 @@ class _CommenterProfileSheetState extends State<CommenterProfileSheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: AppColors.border,
+                    color: context.palette.border,
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
@@ -121,8 +120,11 @@ class _CommenterProfileSheetState extends State<CommenterProfileSheet> {
                   child: OutlinedButton(
                     onPressed: () => Navigator.of(context).maybePop(),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: kCrimson,
-                      side: const BorderSide(color: kCrimson, width: 1.3),
+                      foregroundColor: context.palette.primaryText,
+                      side: BorderSide(
+                        color: context.palette.primaryText,
+                        width: 1.3,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
@@ -180,10 +182,10 @@ class _CommenterProfileSheetState extends State<CommenterProfileSheet> {
         Text(
           name,
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
-            color: AppColors.foreground,
+            color: context.palette.foreground,
           ),
         ),
         const SizedBox(height: 14),
@@ -196,22 +198,22 @@ class _CommenterProfileSheetState extends State<CommenterProfileSheet> {
               _chip(
                 icon: Icons.verified_user_rounded,
                 text: 'Verified Donor',
-                color: AppColors.success,
-                bg: AppColors.successBg,
+                color: context.palette.success,
+                bg: context.palette.successBg,
               ),
             if (since != null)
               _chip(
                 icon: Icons.calendar_month_rounded,
                 text: 'On eDonate since $since',
-                color: AppColors.muted,
-                bg: AppColors.mutedBg,
+                color: context.palette.muted,
+                bg: context.palette.surfaceAlt,
               ),
             if (frameLabel != null)
               _chip(
                 icon: Icons.workspace_premium_rounded,
                 text: frameLabel,
-                color: kCrimson,
-                bg: AppColors.accentBg,
+                color: context.palette.primaryText,
+                bg: context.palette.accentBg,
               ),
           ],
         ),
@@ -257,7 +259,7 @@ class _CommenterProfileSheetState extends State<CommenterProfileSheet> {
         Icon(
           gone ? Icons.person_off_outlined : Icons.wifi_off_rounded,
           size: 40,
-          color: AppColors.muted,
+          color: context.palette.muted,
         ),
         const SizedBox(height: 12),
         Text(
@@ -265,17 +267,19 @@ class _CommenterProfileSheetState extends State<CommenterProfileSheet> {
               ? "This profile isn't available."
               : (r?.message ?? "Couldn't load this profile."),
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             height: 1.4,
-            color: AppColors.muted,
+            color: context.palette.muted,
           ),
         ),
         if (!gone) ...[
           const SizedBox(height: 12),
           TextButton(
             onPressed: _load,
-            style: TextButton.styleFrom(foregroundColor: kCrimson),
+            style: TextButton.styleFrom(
+              foregroundColor: context.palette.primaryText,
+            ),
             child: const Text(
               'Retry',
               style: TextStyle(fontWeight: FontWeight.w700),

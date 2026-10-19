@@ -12,12 +12,12 @@ import 'commenter_profile_sheet.dart';
 import 'config.dart';
 import 'donor_avatar.dart';
 import 'login.dart';
-import 'app_colors.dart';
 import 'post_comments_api.dart';
 import 'shared_design.dart' show kCrimson;
 import 'skeleton.dart';
 import 'streak/streak_controller.dart';
 import 'verify.dart';
+import 'app_palette.dart';
 
 // ── The sheet ────────────────────────────────────────────────────────────────
 
@@ -279,24 +279,28 @@ class _CommentsSheetState extends State<_CommentsSheet> {
           'Delete comment?',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
-        content: const Text(
+        content: Text(
           'This comment will be removed for everyone.',
-          style: TextStyle(fontSize: 13, color: AppColors.muted, height: 1.5),
+          style: TextStyle(
+            fontSize: 13,
+            color: context.palette.muted,
+            height: 1.5,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text(
+            child: Text(
               'Cancel',
-              style: TextStyle(color: AppColors.muted),
+              style: TextStyle(color: context.palette.muted),
             ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: kCrimson,
-              disabledBackgroundColor: AppColors.border,
-              disabledForegroundColor: AppColors.muted,
+              disabledBackgroundColor: context.palette.border,
+              disabledForegroundColor: context.palette.muted,
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(
@@ -507,12 +511,12 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                 child: ScaffoldMessenger(
                   key: _messenger,
                   child: Scaffold(
-                    backgroundColor: Colors.white,
+                    backgroundColor: context.palette.surface,
                     resizeToAvoidBottomInset: false,
                     body: Column(
                       children: [
                         _header(),
-                        const Divider(height: 1, color: AppColors.border),
+                        Divider(height: 1, color: context.palette.border),
                         Expanded(child: _body()),
                       ],
                     ),
@@ -536,7 +540,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: AppColors.border,
+              color: context.palette.border,
               borderRadius: BorderRadius.circular(999),
             ),
           ),
@@ -544,28 +548,28 @@ class _CommentsSheetState extends State<_CommentsSheet> {
         const SizedBox(height: 6),
         Row(
           children: [
-            const Text(
+            Text(
               'Comments',
               style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
-                color: AppColors.foreground,
+                color: context.palette.foreground,
               ),
             ),
             const SizedBox(width: 8),
             Text(
               '$_total',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: AppColors.muted,
+                color: context.palette.muted,
               ),
             ),
             const Spacer(),
             IconButton(
               tooltip: 'Close',
               onPressed: () => Navigator.of(context).maybePop(),
-              icon: const Icon(Icons.close_rounded, color: AppColors.muted),
+              icon: Icon(Icons.close_rounded, color: context.palette.muted),
             ),
           ],
         ),
@@ -575,7 +579,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
 
   Widget _body() {
     return RefreshIndicator(
-      color: kCrimson,
+      color: context.palette.primaryText,
       onRefresh: () => _load(refresh: true),
       child: _bodyList(),
     );
@@ -596,20 +600,20 @@ class _CommentsSheetState extends State<_CommentsSheet> {
         padding: const EdgeInsets.all(32),
         children: [
           const SizedBox(height: 24),
-          const Icon(Icons.wifi_off_rounded, color: AppColors.muted, size: 32),
+          Icon(Icons.wifi_off_rounded, color: context.palette.muted, size: 32),
           const SizedBox(height: 8),
           Text(
             _error!,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 13, color: AppColors.muted),
+            style: TextStyle(fontSize: 13, color: context.palette.muted),
           ),
           const SizedBox(height: 12),
           Center(
             child: OutlinedButton(
               onPressed: _load,
               style: OutlinedButton.styleFrom(
-                foregroundColor: kCrimson,
-                side: const BorderSide(color: kCrimson),
+                foregroundColor: context.palette.primaryText,
+                side: BorderSide(color: context.palette.primaryText),
               ),
               child: const Text('Retry'),
             ),
@@ -623,9 +627,9 @@ class _CommentsSheetState extends State<_CommentsSheet> {
         padding: const EdgeInsets.all(32),
         children: [
           const SizedBox(height: 40),
-          const Icon(
+          Icon(
             Icons.mode_comment_outlined,
-            color: AppColors.muted,
+            color: context.palette.muted,
             size: 32,
           ),
           const SizedBox(height: 10),
@@ -634,7 +638,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                 ? 'No comments yet. Be the first!'
                 : 'No comments yet.',
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 13.5, color: AppColors.muted),
+            style: TextStyle(fontSize: 13.5, color: context.palette.muted),
           ),
         ],
       );
@@ -655,14 +659,16 @@ class _CommentsSheetState extends State<_CommentsSheet> {
     child: Center(
       child: TextButton(
         onPressed: _loadingMore ? null : _loadOlder,
-        style: TextButton.styleFrom(foregroundColor: kCrimson),
+        style: TextButton.styleFrom(
+          foregroundColor: context.palette.primaryText,
+        ),
         child: _loadingMore
-            ? const SizedBox(
+            ? SizedBox(
                 width: 18,
                 height: 18,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: kCrimson,
+                  color: context.palette.primaryText,
                 ),
               )
             : const Text(
@@ -732,7 +738,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
               child: Container(
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
                 decoration: BoxDecoration(
-                  color: AppColors.mutedBg,
+                  color: context.palette.surfaceAlt,
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Column(
@@ -751,10 +757,10 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                                 c.authorName,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
-                                  color: AppColors.foreground,
+                                  color: context.palette.foreground,
                                 ),
                               ),
                             ),
@@ -763,9 +769,9 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                         const SizedBox(width: 8),
                         Text(
                           c.timeAgo,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            color: AppColors.muted,
+                            color: context.palette.muted,
                           ),
                         ),
                       ],
@@ -773,10 +779,10 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                     const SizedBox(height: 3),
                     Text(
                       c.content,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13.5,
                         height: 1.4,
-                        color: AppColors.foreground,
+                        color: context.palette.foreground,
                       ),
                     ),
                   ],
@@ -789,13 +795,13 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                 width: 36,
                 height: 36,
                 child: deleting
-                    ? const Center(
+                    ? Center(
                         child: SizedBox(
                           width: 16,
                           height: 16,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: AppColors.muted,
+                            color: context.palette.muted,
                           ),
                         ),
                       )
@@ -811,10 +817,10 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                             minHeight: 36,
                           ),
                           onPressed: () => _openMenu(c),
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.more_horiz_rounded,
                             size: 20,
-                            color: AppColors.muted,
+                            color: context.palette.muted,
                           ),
                         ),
                       ),
@@ -868,10 +874,10 @@ class _CommentsSheetState extends State<_CommentsSheet> {
       child = _textBox();
     }
     return Material(
-      color: Colors.white,
+      color: context.palette.surface,
       child: DecoratedBox(
-        decoration: const BoxDecoration(
-          border: Border(top: BorderSide(color: AppColors.border)),
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: context.palette.border)),
         ),
         // The keyboard's inset is already added around the whole sheet, so the
         // bottom safe area only counts when no keyboard is up.
@@ -898,21 +904,21 @@ class _CommentsSheetState extends State<_CommentsSheet> {
   }) => Container(
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
-      color: AppColors.accentBg,
+      color: context.palette.accentBg,
       borderRadius: BorderRadius.circular(14),
       border: Border.all(color: kCrimson.withValues(alpha: 0.15)),
     ),
     child: Row(
       children: [
-        Icon(icon, color: kCrimson, size: 22),
+        Icon(icon, color: context.palette.primaryText, size: 22),
         const SizedBox(width: 10),
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12.5,
               height: 1.4,
-              color: AppColors.foreground,
+              color: context.palette.foreground,
             ),
           ),
         ),
@@ -922,8 +928,8 @@ class _CommentsSheetState extends State<_CommentsSheet> {
             onPressed: onTap,
             style: ElevatedButton.styleFrom(
               backgroundColor: kCrimson,
-              disabledBackgroundColor: AppColors.border,
-              disabledForegroundColor: AppColors.muted,
+              disabledBackgroundColor: context.palette.border,
+              disabledForegroundColor: context.palette.muted,
               foregroundColor: Colors.white,
               elevation: 0,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -963,7 +969,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
           maxLength: _maxLength,
           textCapitalization: TextCapitalization.sentences,
           keyboardType: TextInputType.multiline,
-          style: const TextStyle(fontSize: 14, color: AppColors.foreground),
+          style: TextStyle(fontSize: 14, color: context.palette.foreground),
           // The counter only shows when the limit is getting close.
           buildCounter:
               (
@@ -977,16 +983,16 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                   style: TextStyle(
                     fontSize: 11,
                     color: currentLength >= (maxLength ?? _maxLength)
-                        ? kCrimson
-                        : AppColors.muted,
+                        ? context.palette.primaryText
+                        : context.palette.muted,
                   ),
                 )
               : null,
           decoration: InputDecoration(
             hintText: 'Write a comment...',
-            hintStyle: const TextStyle(color: AppColors.muted, fontSize: 14),
+            hintStyle: TextStyle(color: context.palette.muted, fontSize: 14),
             filled: true,
-            fillColor: AppColors.mutedBg,
+            fillColor: context.palette.surfaceAlt,
             isDense: true,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
@@ -1005,15 +1011,15 @@ class _CommentsSheetState extends State<_CommentsSheet> {
         child: IconButton(
           tooltip: 'Send',
           onPressed: _canSend ? _send : null,
-          color: kCrimson,
-          disabledColor: AppColors.border,
+          color: context.palette.primaryText,
+          disabledColor: context.palette.border,
           icon: _sending
-              ? const SizedBox(
+              ? SizedBox(
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2.2,
-                    color: kCrimson,
+                    color: context.palette.primaryText,
                   ),
                 )
               : const Icon(Icons.send_rounded),
@@ -1115,7 +1121,7 @@ class _SkeletonRow extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
             decoration: BoxDecoration(
-              color: AppColors.mutedBg,
+              color: context.palette.surfaceAlt,
               borderRadius: BorderRadius.circular(14),
             ),
             child: Column(

@@ -34,6 +34,7 @@ import 'streak/avatar_frame.dart';
 import 'streak/streak_controller.dart';
 import 'unread_notifications.dart';
 import 'verify.dart';
+import 'app_palette.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -149,7 +150,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       child: Scaffold(
-        backgroundColor: AppColors.mutedBg,
+        backgroundColor: context.palette.background,
         // The nav floats over the tabs and nothing is painted behind it. The
         // tabs resize for the keyboard themselves; the keyboard just covers
         // the nav, as it did before.
@@ -333,15 +334,25 @@ class _NavGlassPainter extends CustomPainter {
   final ValueGetter<double> depth;
   final bool frosted;
 
-  _NavGlassPainter(this.depth, this.frosted, Listenable repaint)
-    : super(repaint: repaint);
+  /// The surface color and the border: white / 60 % white in light, the dark
+  /// surface / 10 % white in dark.
+  final Color surface;
+  final Color border;
+
+  _NavGlassPainter(
+    this.depth,
+    this.frosted,
+    this.surface,
+    this.border,
+    Listenable repaint,
+  ) : super(repaint: repaint);
 
   @override
   void paint(Canvas canvas, Size size) {
     final path = _floatingNavPath(size, depth());
     canvas.drawPath(
       path,
-      Paint()..color = Colors.white.withValues(alpha: frosted ? 0.86 : 0.94),
+      Paint()..color = surface.withValues(alpha: frosted ? 0.86 : 0.94),
     );
     // The clip keeps the inner half of this 2 px stroke: a 1 px border.
     canvas.drawPath(
@@ -349,12 +360,13 @@ class _NavGlassPainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2
-        ..color = Colors.white.withValues(alpha: 0.60),
+        ..color = border,
     );
   }
 
   @override
-  bool shouldRepaint(covariant _NavGlassPainter old) => old.frosted != frosted;
+  bool shouldRepaint(covariant _NavGlassPainter old) =>
+      old.frosted != frosted || old.surface != surface || old.border != border;
 }
 
 class _RingPainter extends CustomPainter {
@@ -708,6 +720,9 @@ class _FloatingNavState extends State<_FloatingNav>
   Widget build(BuildContext context) {
     const barH = FloatingNavMetrics.barHeight;
     final frosted = FloatingNavMetrics.frosted;
+    final p = context.palette;
+    final glassSurface = p.surface;
+    final glassBorder = Colors.white.withValues(alpha: p.isDark ? 0.10 : 0.60);
 
     return MediaQuery.withClampedTextScaling(
       maxScaleFactor: 1.2,
@@ -744,11 +759,23 @@ class _FloatingNavState extends State<_FloatingNav>
                         ? BackdropFilter(
                             filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
                             child: CustomPaint(
-                              painter: _NavGlassPainter(_depth, true, _move),
+                              painter: _NavGlassPainter(
+                                _depth,
+                                true,
+                                glassSurface,
+                                glassBorder,
+                                _move,
+                              ),
                             ),
                           )
                         : CustomPaint(
-                            painter: _NavGlassPainter(_depth, false, _move),
+                            painter: _NavGlassPainter(
+                              _depth,
+                              false,
+                              glassSurface,
+                              glassBorder,
+                              _move,
+                            ),
                           ),
                   ),
                 ),
@@ -804,7 +831,7 @@ class _FloatingNavState extends State<_FloatingNav>
                   scale: 0.6 + 0.4 * vis,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: AppColors.accentBg.withValues(alpha: vis),
+                      color: context.palette.accentBg.withValues(alpha: vis),
                       borderRadius: BorderRadius.circular(20),
                     ),
                   ),
@@ -824,7 +851,7 @@ class _FloatingNavState extends State<_FloatingNav>
 
     Widget icon = TweenAnimationBuilder<Color?>(
       tween: ColorTween(
-        end: selected ? AppColors.primary : AppColors.muted,
+        end: selected ? context.palette.primaryText : context.palette.muted,
       ),
       duration: const Duration(milliseconds: 200),
       builder: (context, color, _) => Icon(def.icon, size: 24, color: color),
@@ -988,7 +1015,8 @@ class _FloatingNavState extends State<_FloatingNav>
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        border: Border.all(color: Colors.white, width: 3),
+        // The ring blends with the bar: white in light, the dark surface in dark.
+        border: Border.all(color: context.palette.surface, width: 3),
         boxShadow: g < 0.01
             ? const []
             : [
@@ -1401,7 +1429,7 @@ class _HomeContentState extends State<HomeContent> {
   Future<void> _showRequestBlockedSheet(VolunteerBlock? block) async {
     await showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: context.palette.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -1417,25 +1445,25 @@ class _HomeContentState extends State<HomeContent> {
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
-                  color: AppColors.border,
+                  color: context.palette.border,
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
             ),
-            const Text(
+            Text(
               'Unable to Request Blood',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: AppColors.foreground,
+                color: context.palette.foreground,
               ),
             ),
             const SizedBox(height: 10),
             Text(
               block?.message ?? 'You cannot create a request right now.',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
-                color: AppColors.muted,
+                color: context.palette.muted,
                 height: 1.5,
               ),
             ),
@@ -1454,8 +1482,8 @@ class _HomeContentState extends State<HomeContent> {
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
-                    disabledBackgroundColor: kBorder,
-                    disabledForegroundColor: kTextMuted,
+                    disabledBackgroundColor: context.palette.border,
+                    disabledForegroundColor: context.palette.muted,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -1474,8 +1502,8 @@ class _HomeContentState extends State<HomeContent> {
                 child: OutlinedButton(
                   onPressed: () => Navigator.pop(sheetContext),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.muted,
-                    side: const BorderSide(color: AppColors.border),
+                    foregroundColor: context.palette.muted,
+                    side: BorderSide(color: context.palette.border),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
@@ -1682,28 +1710,28 @@ class _HomeContentState extends State<HomeContent> {
   Color getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'cancelled':
-        return AppColors.primary;
+        return context.palette.primaryText;
       case 'pending':
-        return AppColors.warning;
+        return context.palette.warning;
       case 'approved':
       case 'completed':
-        return AppColors.success;
+        return context.palette.success;
       default:
-        return AppColors.hint;
+        return context.palette.hint;
     }
   }
 
   Color getStatusBg(String status) {
     switch (status.toLowerCase()) {
       case 'cancelled':
-        return AppColors.accentBg;
+        return context.palette.accentBg;
       case 'pending':
-        return AppColors.warningBg;
+        return context.palette.warningBg;
       case 'approved':
       case 'completed':
-        return AppColors.successBg;
+        return context.palette.successBg;
       default:
-        return AppColors.mutedBg;
+        return context.palette.surfaceAlt;
     }
   }
 
@@ -1716,15 +1744,15 @@ class _HomeContentState extends State<HomeContent> {
   Color getEligibilityStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'eligible':
-        return AppColors.success;
+        return context.palette.success;
       case 'pending':
       case 'for_review':
       case 'temporary_deferred':
       case 'not_checked':
-        return AppColors.warning;
+        return context.palette.warning;
       case 'not_eligible':
       default:
-        return AppColors.primary;
+        return context.palette.primaryText;
     }
   }
 
@@ -1874,13 +1902,14 @@ class _HomeContentState extends State<HomeContent> {
                     horizontal: 10,
                     vertical: 4,
                   ),
+                  // A white chip on the red card: the same in both modes.
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
                     donor.bloodType ?? '—',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w900,
                       color: AppColors.primary,
@@ -1897,6 +1926,7 @@ class _HomeContentState extends State<HomeContent> {
     );
   }
 
+  // The donor's initials on the red ID card: white and brand red in both modes.
   Widget _initialsCircle(String name) => Container(
     color: Colors.white,
     alignment: Alignment.center,
@@ -1927,10 +1957,10 @@ class _HomeContentState extends State<HomeContent> {
     width: double.infinity,
     padding: const EdgeInsets.all(18),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: context.palette.surface,
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: AppColors.border),
-      boxShadow: AppColors.cardShadow,
+      border: Border.all(color: context.palette.border),
+      boxShadow: context.palette.shadow,
     ),
     child: child,
   );
@@ -1942,17 +1972,17 @@ class _HomeContentState extends State<HomeContent> {
         height: 36,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: AppColors.accentBg,
+          color: context.palette.accentBg,
           borderRadius: BorderRadius.circular(10),
         ),
-        child: const Icon(
+        child: Icon(
           Icons.bloodtype_rounded,
-          color: AppColors.primary,
+          color: context.palette.primaryText,
           size: 20,
         ),
       ),
       const SizedBox(width: 10),
-      const Expanded(
+      Expanded(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1961,12 +1991,12 @@ class _HomeContentState extends State<HomeContent> {
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
-                color: AppColors.foreground,
+                color: context.palette.foreground,
               ),
             ),
             Text(
               'Request blood or help a patient in need',
-              style: TextStyle(fontSize: 11, color: AppColors.muted),
+              style: TextStyle(fontSize: 11, color: context.palette.muted),
             ),
           ],
         ),
@@ -1974,7 +2004,7 @@ class _HomeContentState extends State<HomeContent> {
       TextButton(
         onPressed: () => _openBloodRequestsHub(),
         style: TextButton.styleFrom(
-          foregroundColor: AppColors.primary,
+          foregroundColor: context.palette.primaryText,
           padding: EdgeInsets.zero,
         ),
         child: const Row(
@@ -2116,8 +2146,8 @@ class _HomeContentState extends State<HomeContent> {
           height: 118,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: AppColors.accentBg,
-            border: Border.all(color: AppColors.primaryBorder, width: 1.5),
+            color: context.palette.accentBg,
+            border: Border.all(color: context.palette.primaryBorder, width: 1.5),
             borderRadius: BorderRadius.circular(14),
           ),
           child: Column(
@@ -2128,25 +2158,25 @@ class _HomeContentState extends State<HomeContent> {
                 width: 36,
                 height: 36,
                 alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                  color: AppColors.accentBg,
+                decoration: BoxDecoration(
+                  color: context.palette.accentBg,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.volunteer_activism_rounded,
-                  color: AppColors.primary,
+                  color: context.palette.primaryText,
                   size: 20,
                 ),
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Help a Patient',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.foreground,
+                      color: context.palette.foreground,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -2156,9 +2186,9 @@ class _HomeContentState extends State<HomeContent> {
                         : summary.openCount > 0
                         ? '${summary.openCount} open request${summary.openCount == 1 ? '' : 's'}'
                         : 'No requests right now',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
-                      color: AppColors.muted,
+                      color: context.palette.muted,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -2202,12 +2232,12 @@ class _HomeContentState extends State<HomeContent> {
         children: [
           Row(
             children: [
-              const Text(
+              Text(
                 'YOUR REQUEST',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.muted,
+                  color: context.palette.muted,
                   letterSpacing: 0.8,
                 ),
               ),
@@ -2215,9 +2245,9 @@ class _HomeContentState extends State<HomeContent> {
                 const SizedBox(width: 6),
                 Text(
                   '+${summary.myActiveCount - 1} more',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 10,
-                    color: AppColors.muted,
+                    color: context.palette.muted,
                   ),
                 ),
               ],
@@ -2235,10 +2265,10 @@ class _HomeContentState extends State<HomeContent> {
                   children: [
                     Text(
                       r.reference,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.foreground,
+                        color: context.palette.foreground,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -2253,10 +2283,10 @@ class _HomeContentState extends State<HomeContent> {
                   children: [
                     Text(
                       '${r.volunteersCount}/${r.requiredDonors} donors',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.foreground,
+                        color: context.palette.foreground,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -2283,16 +2313,16 @@ class _HomeContentState extends State<HomeContent> {
         width: double.infinity,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: AppColors.successBg,
-          border: Border.all(color: AppColors.successBorder),
+          color: context.palette.successBg,
+          border: Border.all(color: context.palette.successBorder),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
-            const Icon(
+            Icon(
               Icons.favorite_rounded,
               size: 18,
-              color: AppColors.success,
+              color: context.palette.success,
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -2301,10 +2331,10 @@ class _HomeContentState extends State<HomeContent> {
                 children: [
                   Text(
                     "You're donating for ${r.reference}",
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.successDark,
+                      color: context.palette.successDark,
                     ),
                   ),
                   Text(
@@ -2314,9 +2344,9 @@ class _HomeContentState extends State<HomeContent> {
                           ? 'needed by ${brShortDate(r.neededBy)}'
                           : null,
                     ].where((e) => e != null && e.isNotEmpty).join(' · '),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
-                      color: AppColors.successDark,
+                      color: context.palette.successDark,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -2324,7 +2354,7 @@ class _HomeContentState extends State<HomeContent> {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: AppColors.success),
+            Icon(Icons.chevron_right_rounded, color: context.palette.success),
           ],
         ),
       ),
@@ -2337,18 +2367,18 @@ class _HomeContentState extends State<HomeContent> {
         width: 36,
         height: 36,
         decoration: BoxDecoration(
-          color: AppColors.mutedBg,
+          color: context.palette.surfaceAlt,
           borderRadius: BorderRadius.circular(10),
         ),
       ),
       const SizedBox(width: 10),
-      const Expanded(
+      Expanded(
         child: Text(
           'Blood Requests',
           style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.bold,
-            color: AppColors.foreground,
+            color: context.palette.foreground,
           ),
         ),
       ),
@@ -2358,7 +2388,7 @@ class _HomeContentState extends State<HomeContent> {
   Widget _brSkeletonTile() => Container(
     height: 118,
     decoration: BoxDecoration(
-      color: AppColors.mutedBg,
+      color: context.palette.surfaceAlt,
       borderRadius: BorderRadius.circular(14),
     ),
   );
@@ -2385,21 +2415,21 @@ class _HomeContentState extends State<HomeContent> {
       const SizedBox(height: 14),
       Row(
         children: [
-          const Icon(
+          Icon(
             Icons.wifi_off_rounded,
             size: 16,
-            color: AppColors.muted,
+            color: context.palette.muted,
           ),
           const SizedBox(width: 8),
-          const Text(
+          Text(
             "Couldn't load blood requests",
-            style: TextStyle(fontSize: 12, color: AppColors.muted),
+            style: TextStyle(fontSize: 12, color: context.palette.muted),
           ),
           const Spacer(),
           TextButton(
             onPressed: loadBloodRequestSummary,
             style: TextButton.styleFrom(
-              foregroundColor: AppColors.primary,
+              foregroundColor: context.palette.primaryText,
               padding: EdgeInsets.zero,
             ),
             child: const Text(
@@ -2436,7 +2466,7 @@ class _HomeContentState extends State<HomeContent> {
             ],
           ),
           if (summary.myActiveRequest != null) ...[
-            const Divider(height: 28, color: AppColors.mutedBg),
+            Divider(height: 28, color: context.palette.surfaceAlt),
             _brYourRequestSection(summary),
           ],
           if (summary.myCommitment != null) ...[
@@ -2457,7 +2487,7 @@ class _HomeContentState extends State<HomeContent> {
     final firstName = userName.split(' ').first;
 
     return Scaffold(
-      backgroundColor: AppColors.mutedBg,
+      backgroundColor: context.palette.background,
       body: Column(
         children: [
           EdonateHeader(
@@ -2520,7 +2550,7 @@ class _HomeContentState extends State<HomeContent> {
           ),
           Expanded(
             child: RefreshIndicator(
-              color: AppColors.primary,
+              color: context.palette.primaryText,
               onRefresh: _refreshHomeData,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
@@ -2541,8 +2571,8 @@ class _HomeContentState extends State<HomeContent> {
                               label: 'Blood Type',
                               value: isProfileLoading ? '...' : bloodType,
                               icon: Icons.water_drop_rounded,
-                              iconColor: AppColors.primary,
-                              iconBg: AppColors.accentBg,
+                              iconColor: context.palette.primaryText,
+                              iconBg: context.palette.accentBg,
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -2553,8 +2583,8 @@ class _HomeContentState extends State<HomeContent> {
                                   ? '...'
                                   : totalDonations.toString(),
                               icon: Icons.favorite_rounded,
-                              iconColor: const Color(0xFFEC4899),
-                              iconBg: const Color(0xFFFDF2F8),
+                              iconColor: context.palette.pink,
+                              iconBg: context.palette.pinkBg,
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -2565,8 +2595,8 @@ class _HomeContentState extends State<HomeContent> {
                                   ? '...'
                                   : '${totalDonations * 3}',
                               icon: Icons.people_rounded,
-                              iconColor: AppColors.success,
-                              iconBg: AppColors.successBg,
+                              iconColor: context.palette.success,
+                              iconBg: context.palette.successBg,
                             ),
                           ),
                         ],
@@ -2583,10 +2613,10 @@ class _HomeContentState extends State<HomeContent> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(18),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: context.palette.surface,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: AppColors.border),
-                          boxShadow: AppColors.cardShadow,
+                          border: Border.all(color: context.palette.border),
+                          boxShadow: context.palette.shadow,
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2596,22 +2626,22 @@ class _HomeContentState extends State<HomeContent> {
                                 Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: AppColors.accentBg,
+                                    color: context.palette.accentBg,
                                     borderRadius: BorderRadius.circular(10),
                                   ),
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.verified_user_rounded,
-                                    color: AppColors.primary,
+                                    color: context.palette.primaryText,
                                     size: 20,
                                   ),
                                 ),
                                 const SizedBox(width: 10),
-                                const Text(
+                                Text(
                                   'Donation Eligibility',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 15,
-                                    color: AppColors.foreground,
+                                    color: context.palette.foreground,
                                   ),
                                 ),
                               ],
@@ -2623,7 +2653,7 @@ class _HomeContentState extends State<HomeContent> {
                                   ? 'Loading...'
                                   : nextEligibleDate,
                               Icons.calendar_today_rounded,
-                              AppColors.info,
+                              context.palette.info,
                             ),
                             const SizedBox(height: 8),
                             _eligibilityRow(
@@ -2651,8 +2681,8 @@ class _HomeContentState extends State<HomeContent> {
                                 ),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.primary,
-                                  disabledBackgroundColor: kBorder,
-                                  disabledForegroundColor: kTextMuted,
+                                  disabledBackgroundColor: context.palette.border,
+                                  disabledForegroundColor: context.palette.muted,
                                   foregroundColor: Colors.white,
                                   elevation: 0,
                                   shape: RoundedRectangleBorder(
@@ -2678,8 +2708,8 @@ class _HomeContentState extends State<HomeContent> {
                           Expanded(
                             child: _actionCard(
                               icon: Icons.calendar_month_rounded,
-                              iconColor: AppColors.info,
-                              iconBg: AppColors.infoBg,
+                              iconColor: context.palette.info,
+                              iconBg: context.palette.infoBg,
                               title: 'Book Appointment',
                               subtitle: 'Schedule your donation',
                               onTap: () => widget.onNavigateToTab(1),
@@ -2689,8 +2719,8 @@ class _HomeContentState extends State<HomeContent> {
                           Expanded(
                             child: _actionCard(
                               icon: Icons.history_rounded,
-                              iconColor: const Color(0xFF9333EA),
-                              iconBg: const Color(0xFFFAF5FF),
+                              iconColor: context.palette.purple,
+                              iconBg: context.palette.purpleBg,
                               title: 'Donation History',
                               subtitle: 'View past donations',
                               onTap: () => widget.onNavigateToTab(3),
@@ -2705,22 +2735,22 @@ class _HomeContentState extends State<HomeContent> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
+                          Text(
                             'Upcoming Appointment',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 15,
-                              color: AppColors.foreground,
+                              color: context.palette.foreground,
                             ),
                           ),
                           if (!isAppointmentsLoading && appointments.isNotEmpty)
                             GestureDetector(
                               onTap: () => widget.onNavigateToTab(3),
-                              child: const Text(
+                              child: Text(
                                 'See all',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: AppColors.primary,
+                                  color: context.palette.primaryText,
                                 ),
                               ),
                             ),
@@ -2729,9 +2759,9 @@ class _HomeContentState extends State<HomeContent> {
                     ),
                     const SizedBox(height: 10),
                     if (isAppointmentsLoading)
-                      const Center(
+                      Center(
                         child: CircularProgressIndicator(
-                          color: AppColors.primary,
+                          color: context.palette.primaryText,
                         ),
                       )
                     else if (appointments.isEmpty)
@@ -2741,31 +2771,31 @@ class _HomeContentState extends State<HomeContent> {
                           width: double.infinity,
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: context.palette.surface,
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppColors.border),
-                            boxShadow: AppColors.cardShadow,
+                            border: Border.all(color: context.palette.border),
+                            boxShadow: context.palette.shadow,
                           ),
                           child: Column(
                             children: [
                               Icon(
                                 Icons.calendar_today_outlined,
-                                color: AppColors.border,
+                                color: context.palette.border,
                                 size: 36,
                               ),
                               const SizedBox(height: 8),
-                              const Text(
+                              Text(
                                 'No upcoming appointments.',
                                 style: TextStyle(
-                                  color: AppColors.muted,
+                                  color: context.palette.muted,
                                   fontSize: 13,
                                 ),
                               ),
                               const SizedBox(height: 4),
-                              const Text(
+                              Text(
                                 'Book one to get started!',
                                 style: TextStyle(
-                                  color: AppColors.border,
+                                  color: context.palette.border,
                                   fontSize: 11,
                                 ),
                               ),
@@ -2844,15 +2874,15 @@ class _HomeContentState extends State<HomeContent> {
                           vertical: 12,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.successBg,
+                          color: context.palette.successBg,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.successBorder),
+                          border: Border.all(color: context.palette.successBorder),
                         ),
-                        child: const Row(
+                        child: Row(
                           children: [
                             Icon(
                               Icons.volunteer_activism_rounded,
-                              color: AppColors.success,
+                              color: context.palette.success,
                               size: 18,
                             ),
                             SizedBox(width: 10),
@@ -2860,7 +2890,7 @@ class _HomeContentState extends State<HomeContent> {
                               child: Text(
                                 'Thank you for being a hero in your community. Every donation makes a difference.',
                                 style: TextStyle(
-                                  color: AppColors.successDark,
+                                  color: context.palette.successDark,
                                   fontSize: 11,
                                   height: 1.4,
                                 ),
@@ -2897,10 +2927,10 @@ class _HomeContentState extends State<HomeContent> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.palette.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-        boxShadow: AppColors.cardShadow,
+        border: Border.all(color: context.palette.border),
+        boxShadow: context.palette.shadow,
       ),
       child: Column(
         children: [
@@ -2912,17 +2942,17 @@ class _HomeContentState extends State<HomeContent> {
           const SizedBox(height: 8),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: AppColors.foreground,
+              color: context.palette.foreground,
             ),
           ),
           const SizedBox(height: 2),
           Text(
             label,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 10, color: AppColors.muted),
+            style: TextStyle(fontSize: 10, color: context.palette.muted),
           ),
         ],
       ),
@@ -2941,7 +2971,7 @@ class _HomeContentState extends State<HomeContent> {
         const SizedBox(width: 6),
         Text(
           '$label: ',
-          style: const TextStyle(fontSize: 13, color: AppColors.muted),
+          style: TextStyle(fontSize: 13, color: context.palette.muted),
         ),
         Expanded(
           child: Text(
@@ -2970,10 +3000,10 @@ class _HomeContentState extends State<HomeContent> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.palette.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
-          boxShadow: AppColors.cardShadow,
+          border: Border.all(color: context.palette.border),
+          boxShadow: context.palette.shadow,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2989,16 +3019,16 @@ class _HomeContentState extends State<HomeContent> {
             const SizedBox(height: 12),
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
-                color: AppColors.foreground,
+                color: context.palette.foreground,
               ),
             ),
             const SizedBox(height: 3),
             Text(
               subtitle,
-              style: const TextStyle(fontSize: 11, color: AppColors.muted),
+              style: TextStyle(fontSize: 11, color: context.palette.muted),
             ),
           ],
         ),
@@ -3018,22 +3048,22 @@ class _HomeContentState extends State<HomeContent> {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.palette.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-        boxShadow: AppColors.cardShadow,
+        border: Border.all(color: context.palette.border),
+        boxShadow: context.palette.shadow,
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: AppColors.accentBg,
+              color: context.palette.accentBg,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.calendar_month_rounded,
-              color: AppColors.primary,
+              color: context.palette.primaryText,
               size: 24,
             ),
           ),
@@ -3044,26 +3074,26 @@ class _HomeContentState extends State<HomeContent> {
               children: [
                 Text(
                   date,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
-                    color: AppColors.foreground,
+                    color: context.palette.foreground,
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   time,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.muted,
+                    color: context.palette.muted,
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.muted,
+                    color: context.palette.muted,
                   ),
                 ),
               ],
