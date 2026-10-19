@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'profile_page_widgets.dart';
 import 'shared_design.dart';
+import 'app_palette.dart';
 
 class HelpSupportScreen extends StatelessWidget {
   const HelpSupportScreen({super.key});
@@ -99,19 +100,27 @@ Thank you.''';
           child: Column(
             children: [
               _faq(
+                context,
                 "Why can't I book an appointment?",
                 'Your eligibility status may need to be eligible, and an existing appointment can affect booking.',
               ),
               _faq(
+                context,
                 "Why didn't I receive a push notification?",
                 'Check Notification Settings in eDonate, check phone notification permission, ensure internet is available, and reopen the application if necessary.',
               ),
-              _faq('How often can I edit my profile?', 'Once every 7 days.'),
               _faq(
+                context,
+                'How often can I edit my profile?',
+                'Once every 7 days.',
+              ),
+              _faq(
+                context,
                 'How do I change my password?',
                 'Profile → Privacy & Security → Change Password.',
               ),
               _faq(
+                context,
                 'My eligibility status looks incorrect. What should I do?',
                 'Review your screening information and contact eDonate support if assistance is required.',
               ),
@@ -124,9 +133,12 @@ Thank you.''';
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(
+              Row(
                 children: [
-                  Icon(Icons.support_agent_rounded, color: kCrimson),
+                  Icon(
+                    Icons.support_agent_rounded,
+                    color: context.palette.primaryText,
+                  ),
                   SizedBox(width: 10),
                   Text(
                     'Contact Support',
@@ -135,9 +147,9 @@ Thank you.''';
                 ],
               ),
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 'Need assistance? Send our support team an email.',
-                style: TextStyle(fontSize: 12, color: kTextMuted),
+                style: TextStyle(fontSize: 12, color: context.palette.muted),
               ),
               const SizedBox(height: 3),
               const Text(
@@ -153,8 +165,8 @@ Thank you.''';
                   label: const Text('Contact Support'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: kCrimson,
-                    disabledBackgroundColor: kBorder,
-                    disabledForegroundColor: kTextMuted,
+                    disabledBackgroundColor: context.palette.border,
+                    disabledForegroundColor: context.palette.muted,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -167,12 +179,13 @@ Thank you.''';
         ),
         const SizedBox(height: 14),
         profileInfoCard(
+          context,
           'For your security, never send passwords through email.',
           icon: Icons.lock_outline,
         ),
         const SizedBox(height: 16),
         ProfileCard(
-          child: const Column(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
@@ -180,8 +193,14 @@ Thank you.''';
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               SizedBox(height: 8),
-              Text('eDonate Donor App', style: TextStyle(color: kTextMuted)),
-              Text('oedonate@gmail.com', style: TextStyle(color: kTextMuted)),
+              Text(
+                'eDonate Donor App',
+                style: TextStyle(color: context.palette.muted),
+              ),
+              Text(
+                'oedonate@gmail.com',
+                style: TextStyle(color: context.palette.muted),
+              ),
             ],
           ),
         ),
@@ -189,23 +208,28 @@ Thank you.''';
     ),
   );
 
-  Widget _faq(String question, String answer) => ExpansionTile(
-    tilePadding: EdgeInsets.zero,
-    childrenPadding: const EdgeInsets.only(bottom: 12),
-    title: Text(
-      question,
-      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-    ),
-    children: [
-      Align(
-        alignment: Alignment.centerLeft,
-        child: Text(
-          answer,
-          style: const TextStyle(fontSize: 13, color: kTextMuted, height: 1.4),
+  Widget _faq(BuildContext context, String question, String answer) =>
+      ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: const EdgeInsets.only(bottom: 12),
+        title: Text(
+          question,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         ),
-      ),
-    ],
-  );
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              answer,
+              style: TextStyle(
+                fontSize: 13,
+                color: context.palette.muted,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      );
 }
 
 class _Label extends StatelessWidget {
@@ -216,11 +240,11 @@ class _Label extends StatelessWidget {
     padding: const EdgeInsets.only(left: 4, bottom: 8),
     child: Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 11,
         fontWeight: FontWeight.bold,
         letterSpacing: .8,
-        color: kTextMuted,
+        color: context.palette.muted,
       ),
     ),
   );

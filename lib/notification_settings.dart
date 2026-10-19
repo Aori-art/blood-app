@@ -9,7 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'config.dart';
 import 'profile_page_widgets.dart';
-import 'shared_design.dart';
+import 'app_palette.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
@@ -170,16 +170,19 @@ class _NotificationSettingsScreenState
     title: 'Notification Settings',
     subtitle: 'Control how eDonate notifies you',
     child: loading
-        ? const Center(
+        ? Center(
             child: Padding(
               padding: EdgeInsets.all(24),
-              child: CircularProgressIndicator(color: kCrimson),
+              child: CircularProgressIndicator(
+                color: context.palette.primaryText,
+              ),
             ),
           )
         : Column(
             children: [
               if (!online) ...[
                 profileInfoCard(
+                  context,
                   'Showing your saved notification preference. Changing this setting requires internet.',
                   icon: Icons.cloud_off_outlined,
                 ),
@@ -189,12 +192,12 @@ class _NotificationSettingsScreenState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Account Push Notifications',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: kTextPrimary,
+                        color: context.palette.foreground,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -205,21 +208,26 @@ class _NotificationSettingsScreenState
                           'Receive appointment, eligibility and donation updates.',
                       trailing: Switch(
                         value: enabled,
-                        activeColor: kCrimson,
+                        activeColor: context.palette.primaryText,
                         onChanged: updating ? null : _toggle,
                       ),
                     ),
                     if (updating)
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.only(top: 4),
-                        child: LinearProgressIndicator(color: kCrimson),
+                        child: LinearProgressIndicator(
+                          color: context.palette.primaryText,
+                        ),
                       ),
                     const Divider(),
                     Text(
                       deviceRegistered
                           ? 'This device is registered for push notifications.'
                           : 'This device is not currently registered for push notifications.',
-                      style: const TextStyle(fontSize: 12, color: kTextMuted),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.palette.muted,
+                      ),
                     ),
                   ],
                 ),
@@ -229,20 +237,20 @@ class _NotificationSettingsScreenState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Phone Notification Permission',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: kTextPrimary,
+                        color: context.palette.foreground,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
+                    Text(
                       'Android and iOS control notification permission at the device level. If permission is denied, enable it in your phone settings.',
                       style: TextStyle(
                         fontSize: 13,
-                        color: kTextMuted,
+                        color: context.palette.muted,
                         height: 1.4,
                       ),
                     ),
@@ -254,8 +262,8 @@ class _NotificationSettingsScreenState
                         icon: const Icon(Icons.settings_outlined),
                         label: const Text('Open Device Notification Settings'),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: kCrimson,
-                          side: const BorderSide(color: kCrimson),
+                          foregroundColor: context.palette.primaryText,
+                          side: BorderSide(color: context.palette.primaryText),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),

@@ -12,6 +12,7 @@ import 'config.dart';
 import 'shared_design.dart';
 import 'streak/streak_controller.dart';
 import 'streak/streak_screen.dart';
+import 'app_palette.dart';
 
 enum _IdSide { front, back }
 
@@ -305,7 +306,7 @@ class _VerifyScreenState extends State<VerifyScreen>
       StreakScreen(id: 'verify', child: _buildScreen(context));
 
   Widget _buildScreen(BuildContext context) => Scaffold(
-    backgroundColor: AppColors.mutedBg,
+    backgroundColor: context.palette.background,
     body: SafeArea(
       child: Column(
         children: [
@@ -367,13 +368,13 @@ class _VerifyScreenState extends State<VerifyScreen>
     ),
   );
 
-  Widget _loadingBody() => const Center(
-    child: CircularProgressIndicator(color: kCrimson),
+  Widget _loadingBody() => Center(
+    child: CircularProgressIndicator(color: context.palette.primaryText),
   );
 
   Widget _statusBody() => RefreshIndicator(
     onRefresh: _fetchStatus,
-    color: kCrimson,
+    color: context.palette.primaryText,
     child: SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
@@ -439,17 +440,17 @@ class _VerifyScreenState extends State<VerifyScreen>
           Text(
             title,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 18,
-              color: kTextPrimary,
+              color: context.palette.foreground,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             subtitle,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 13, color: kTextMuted, height: 1.5),
+            style: TextStyle(fontSize: 13, color: context.palette.muted, height: 1.5),
           ),
         ],
       ),
@@ -460,14 +461,14 @@ class _VerifyScreenState extends State<VerifyScreen>
   Color _stepColor(String status, int step) {
     switch (status) {
       case 'verified':
-        return AppColors.success;
+        return context.palette.success;
       case 'rejected':
-        return step < 2 ? AppColors.success : kCrimson;
+        return step < 2 ? context.palette.success : context.palette.primaryText;
       case 'pending':
       default:
-        if (step == 0) return AppColors.success;
-        if (step == 1) return AppColors.warning;
-        return kBorder;
+        if (step == 0) return context.palette.success;
+        if (step == 1) return context.palette.warning;
+        return context.palette.border;
     }
   }
 
@@ -490,7 +491,7 @@ class _VerifyScreenState extends State<VerifyScreen>
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w600,
-              color: color == kBorder ? kTextMuted : kTextPrimary,
+              color: color == context.palette.border ? context.palette.muted : context.palette.foreground,
             ),
           ),
         ],
@@ -498,12 +499,12 @@ class _VerifyScreenState extends State<VerifyScreen>
     }
 
     Widget line(int afterStep) {
-      final active = _stepColor(status, afterStep + 1) != kBorder;
+      final active = _stepColor(status, afterStep + 1) != context.palette.border;
       return Expanded(
         child: Container(
           height: 2,
           margin: const EdgeInsets.only(bottom: 16),
-          color: active ? AppColors.success : kBorder,
+          color: active ? AppColors.success : context.palette.border,
         ),
       );
     }
@@ -521,9 +522,9 @@ class _VerifyScreenState extends State<VerifyScreen>
     width: double.infinity,
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: context.palette.surface,
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: AppColors.border, width: 1.5),
+      border: Border.all(color: context.palette.border, width: 1.5),
     ),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: rows),
   );
@@ -533,13 +534,13 @@ class _VerifyScreenState extends State<VerifyScreen>
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: kTextMuted)),
+        Text(label, style: TextStyle(fontSize: 12, color: context.palette.muted)),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: kTextPrimary,
+            color: context.palette.foreground,
           ),
         ),
       ],
@@ -550,23 +551,23 @@ class _VerifyScreenState extends State<VerifyScreen>
     width: double.infinity,
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: AppColors.infoBg,
-      border: Border.all(color: AppColors.infoBorder),
+      color: context.palette.infoBg,
+      border: Border.all(color: context.palette.infoBorder),
       borderRadius: BorderRadius.circular(16),
     ),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(Icons.lightbulb_outline_rounded, color: AppColors.info),
+        Icon(Icons.lightbulb_outline_rounded, color: context.palette.info),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Did you know?',
                 style: TextStyle(
-                  color: AppColors.infoDark,
+                  color: context.palette.infoText,
                   fontWeight: FontWeight.bold,
                   fontSize: 12,
                 ),
@@ -574,8 +575,8 @@ class _VerifyScreenState extends State<VerifyScreen>
               const SizedBox(height: 4),
               Text(
                 fact,
-                style: const TextStyle(
-                  color: AppColors.infoDark,
+                style: TextStyle(
+                  color: context.palette.infoText,
                   fontSize: 13,
                   height: 1.45,
                 ),
@@ -596,7 +597,7 @@ class _VerifyScreenState extends State<VerifyScreen>
       children: [
         _statusStepper('verified'),
         _animatedHero(
-          color: AppColors.success,
+          color: context.palette.success,
           icon: Icons.verified_rounded,
           title: "You're Verified!",
           subtitle: 'Your identity has been confirmed. You now have full '
@@ -628,7 +629,7 @@ class _VerifyScreenState extends State<VerifyScreen>
       children: [
         _statusStepper('pending'),
         _animatedHero(
-          color: AppColors.warning,
+          color: context.palette.warning,
           icon: Icons.hourglass_top_rounded,
           title: 'Under Review',
           subtitle: "Your ID is being reviewed by our team. We'll notify "
@@ -653,7 +654,7 @@ class _VerifyScreenState extends State<VerifyScreen>
     children: [
       _statusStepper('rejected'),
       _animatedHero(
-        color: kCrimson,
+        color: context.palette.primaryText,
         icon: Icons.cancel_rounded,
         title: 'Verification Rejected',
         subtitle: 'Your last submission did not meet our requirements.',
@@ -661,11 +662,11 @@ class _VerifyScreenState extends State<VerifyScreen>
       const SizedBox(height: 20),
       _rejectionBanner(),
       const SizedBox(height: 12),
-      const Text(
+      Text(
         'Please review the reason above, then upload a new photo of a '
         'valid ID to try again.',
         textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 12, color: kTextMuted, height: 1.5),
+        style: TextStyle(fontSize: 12, color: context.palette.muted, height: 1.5),
       ),
       const SizedBox(height: 20),
       _uploadFormBody(),
@@ -678,23 +679,23 @@ class _VerifyScreenState extends State<VerifyScreen>
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.accentBg,
-        border: Border.all(color: AppColors.primaryBorder),
+        color: context.palette.accentBg,
+        border: Border.all(color: context.palette.primaryBorder),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.error_outline_rounded, color: kCrimson),
+          Icon(Icons.error_outline_rounded, color: context.palette.primaryText),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Your last submission was rejected',
                   style: TextStyle(
-                    color: kCrimson,
+                    color: context.palette.primaryText,
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
                   ),
@@ -704,8 +705,8 @@ class _VerifyScreenState extends State<VerifyScreen>
                   (reason == null || reason.isEmpty)
                       ? 'Please review your ID photo and try again.'
                       : reason,
-                  style: const TextStyle(
-                    color: kCrimson,
+                  style: TextStyle(
+                    color: context.palette.primaryText,
                     fontSize: 13,
                     height: 1.45,
                   ),
@@ -735,11 +736,11 @@ class _VerifyScreenState extends State<VerifyScreen>
         onTap: _canSubmit ? _submit : null,
       ),
       const SizedBox(height: 12),
-      const Text(
+      Text(
         'Your ID is used only to confirm your identity as a '
         'blood donor and is never shared publicly.',
         textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 11, color: kTextMuted),
+        style: TextStyle(fontSize: 11, color: context.palette.muted),
       ),
     ],
   );
@@ -748,14 +749,14 @@ class _VerifyScreenState extends State<VerifyScreen>
     width: double.infinity,
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: AppColors.infoBg,
-      border: Border.all(color: AppColors.infoBorder),
+      color: context.palette.infoBg,
+      border: Border.all(color: context.palette.infoBorder),
       borderRadius: BorderRadius.circular(16),
     ),
-    child: const Row(
+    child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(Icons.info_outline_rounded, color: AppColors.info),
+        Icon(Icons.info_outline_rounded, color: context.palette.info),
         SizedBox(width: 12),
         Expanded(
           child: Text(
@@ -763,7 +764,7 @@ class _VerifyScreenState extends State<VerifyScreen>
             "upload a clear photo of a valid government-issued ID (e.g. "
             "National ID, Driver's License, SSS ID, or Passport).",
             style: TextStyle(
-              color: AppColors.infoDark,
+              color: context.palette.infoText,
               fontSize: 13,
               height: 1.45,
             ),
@@ -777,24 +778,24 @@ class _VerifyScreenState extends State<VerifyScreen>
     width: double.infinity,
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: context.palette.surface,
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: AppColors.border, width: 1.5),
-      boxShadow: AppColors.cardShadow,
+      border: Border.all(color: context.palette.border, width: 1.5),
+      boxShadow: context.palette.shadow,
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Row(
+        Row(
           children: [
-            Icon(Icons.badge_outlined, color: kCrimson, size: 20),
+            Icon(Icons.badge_outlined, color: context.palette.primaryText, size: 20),
             SizedBox(width: 8),
             Text(
               'ID Type',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
-                color: kTextPrimary,
+                color: context.palette.foreground,
               ),
             ),
           ],
@@ -823,24 +824,24 @@ class _VerifyScreenState extends State<VerifyScreen>
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.palette.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border, width: 2),
-        boxShadow: AppColors.cardShadow,
+        border: Border.all(color: context.palette.border, width: 2),
+        boxShadow: context.palette.shadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.badge_outlined, color: kCrimson, size: 20),
+              Icon(Icons.badge_outlined, color: context.palette.primaryText, size: 20),
               const SizedBox(width: 8),
-              const Text(
+              Text(
                 'Valid ID Photos',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
-                  color: kTextPrimary,
+                  color: context.palette.foreground,
                 ),
               ),
             ],
@@ -851,7 +852,7 @@ class _VerifyScreenState extends State<VerifyScreen>
                 ? 'Take a clear photo of the front of your document. The '
                       'back is optional.'
                 : 'Take clear photos of the front and back of your ID.',
-            style: const TextStyle(fontSize: 11, color: kTextMuted),
+            style: TextStyle(fontSize: 11, color: context.palette.muted),
           ),
           const SizedBox(height: 12),
           Row(
@@ -880,20 +881,20 @@ class _VerifyScreenState extends State<VerifyScreen>
           children: [
             Text(
               isFront ? 'Front' : 'Back',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: kTextPrimary,
+                color: context.palette.foreground,
               ),
             ),
             if (optional)
-              const Text(
+              Text(
                 ' (optional)',
-                style: TextStyle(fontSize: 12, color: kTextMuted),
+                style: TextStyle(fontSize: 12, color: context.palette.muted),
               ),
             if (hasImage) ...[
               const SizedBox(width: 6),
-              const Icon(Icons.check_circle_rounded, size: 14, color: AppColors.success),
+              Icon(Icons.check_circle_rounded, size: 14, color: context.palette.success),
             ],
           ],
         ),
@@ -914,9 +915,9 @@ class _VerifyScreenState extends State<VerifyScreen>
       height: 140,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: kInputFill,
+        color: context.palette.surfaceAlt,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kBorder, width: 1.5),
+        border: Border.all(color: context.palette.border, width: 1.5),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -925,13 +926,13 @@ class _VerifyScreenState extends State<VerifyScreen>
             width: 40,
             height: 40,
             alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              color: AppColors.accentBg,
+            decoration: BoxDecoration(
+              color: context.palette.accentBg,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.photo_camera_rounded,
-              color: kCrimson,
+              color: context.palette.primaryText,
               size: 20,
             ),
           ),
@@ -939,16 +940,16 @@ class _VerifyScreenState extends State<VerifyScreen>
           Text(
             isFront ? 'Tap to take front photo' : 'Tap to take back photo',
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w600,
               fontSize: 12,
-              color: kTextPrimary,
+              color: context.palette.foreground,
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
+          Text(
             'Opens your camera',
-            style: TextStyle(fontSize: 10, color: kTextMuted),
+            style: TextStyle(fontSize: 10, color: context.palette.muted),
           ),
         ],
       ),
@@ -1019,20 +1020,20 @@ class _VerifyScreenState extends State<VerifyScreen>
     width: double.infinity,
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: context.palette.surface,
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: AppColors.border, width: 1.5),
-      boxShadow: AppColors.cardShadow,
+      border: Border.all(color: context.palette.border, width: 1.5),
+      boxShadow: context.palette.shadow,
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Before you take the photos',
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 14,
-            color: kTextPrimary,
+            color: context.palette.foreground,
           ),
         ),
         const SizedBox(height: 12),
@@ -1051,12 +1052,12 @@ class _VerifyScreenState extends State<VerifyScreen>
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(Icons.check_circle_rounded, size: 16, color: AppColors.success),
+        Icon(Icons.check_circle_rounded, size: 16, color: context.palette.success),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(fontSize: 13, color: kTextPrimary, height: 1.4),
+            style: TextStyle(fontSize: 13, color: context.palette.foreground, height: 1.4),
           ),
         ),
       ],
