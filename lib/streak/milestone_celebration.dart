@@ -14,6 +14,7 @@ import 'streak_controller.dart';
 import 'streak_particles.dart';
 import 'streak_ladder_screen.dart' show badgeVisualFor;
 import 'streak_share.dart';
+import '../app_palette.dart';
 
 const Color _kGold = Color(0xFFFFD54F);
 
@@ -890,8 +891,8 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
               width: double.infinity,
               constraints: const BoxConstraints(maxWidth: 520),
               padding: EdgeInsets.fromLTRB(20, 18, 20, 16 + bottom),
-              decoration: const BoxDecoration(
-                color: Colors.white,
+              decoration: BoxDecoration(
+                color: context.palette.surface,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
               ),
               child: Column(
@@ -906,10 +907,10 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
                         Text(
                           _title,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.w800,
-                            color: kTextPrimary,
+                            color: context.palette.foreground,
                           ),
                         ),
                         if (_event.description.isNotEmpty) ...[
@@ -917,9 +918,9 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
                           Text(
                             _event.description,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 13,
-                              color: kTextMuted,
+                              color: context.palette.muted,
                               height: 1.4,
                             ),
                           ),
@@ -932,7 +933,10 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
                     Text(
                       _error!,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 12, color: kCrimson),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.palette.primaryText,
+                      ),
                     ),
                   ],
                   const SizedBox(height: 14),
@@ -1012,7 +1016,11 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
           ),
         );
       case CelebrationKind.badge:
-        final (icon, color) = badgeVisualFor(_event.key, _event.streak);
+        final (icon, color) = badgeVisualFor(
+          context,
+          _event.key,
+          _event.streak,
+        );
         final pop = _reduce
             ? 1.0
             : Curves.elasticOut.transform(_seg(r, 300, 1100));
@@ -1052,10 +1060,10 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
             : Curves.elasticOut.transform(_seg(r, 300, 1100));
         return Transform.scale(
           scale: pop,
-          child: const Icon(
+          child: Icon(
             Icons.auto_awesome_rounded,
             size: 56,
-            color: kCrimson,
+            color: context.palette.primaryText,
           ),
         );
     }
@@ -1069,8 +1077,8 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
       builder: (btnContext) => OutlinedButton(
         onPressed: _shareBusy ? null : () => _share(btnContext),
         style: OutlinedButton.styleFrom(
-          foregroundColor: kCrimson,
-          side: const BorderSide(color: kCrimson, width: 1.3),
+          foregroundColor: context.palette.primaryText,
+          side: BorderSide(color: context.palette.primaryText, width: 1.3),
           padding: EdgeInsets.zero,
           minimumSize: const Size(0, 48),
           shape: RoundedRectangleBorder(
@@ -1078,12 +1086,12 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
           ),
         ),
         child: _shareBusy
-            ? const SizedBox(
+            ? SizedBox(
                 width: 18,
                 height: 18,
                 child: CircularProgressIndicator(
                   strokeWidth: 2.2,
-                  color: kCrimson,
+                  color: context.palette.primaryText,
                 ),
               )
             : const Row(
@@ -1143,7 +1151,7 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
             child: TextButton(
               onPressed: _equipBusy ? null : _close,
               style: TextButton.styleFrom(
-                foregroundColor: kTextMuted,
+                foregroundColor: context.palette.muted,
                 minimumSize: const Size(0, 48),
               ),
               child: Text(

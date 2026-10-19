@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../app_colors.dart';
 import '../shared_design.dart';
 import 'avatar_frame.dart';
 import 'dugtong.dart';
@@ -9,6 +8,7 @@ import 'interactive_dugtong.dart';
 import 'streak_controller.dart';
 import 'streak_screen.dart';
 import 'streak_share.dart';
+import '../app_palette.dart';
 
 
 /// Size of the big Dugtong in the summary card.
@@ -23,17 +23,18 @@ const String _kAboutDugtong =
     "connects to the day before it. In Filipino, 'dugtong-buhay' even "
     "describes something that extends a life. Dugtong is the link, and you "
     'keep the connection going.';
-const List<BoxShadow> _kSoftShadow = AppColors.cardShadow;
+// (the card shadow comes from the palette: context.palette.shadow)
 
 /// Icon + colour for a badge reward. The server decides which badges exist;
 /// this only picks a look for them.
-(IconData, Color) badgeVisualFor(String key, int index) {
-  const looks = [
-    (Icons.local_fire_department_rounded, AppColors.orange),
-    (Icons.bolt_rounded, AppColors.warning),
-    (Icons.favorite_rounded, Color(0xFFEC4899)),
-    (Icons.military_tech_rounded, AppColors.info),
-    (Icons.emoji_events_rounded, AppColors.warning),
+(IconData, Color) badgeVisualFor(BuildContext context, String key, int index) {
+  final p = context.palette;
+  final looks = [
+    (Icons.local_fire_department_rounded, p.orange),
+    (Icons.bolt_rounded, p.warning),
+    (Icons.favorite_rounded, p.pink),
+    (Icons.military_tech_rounded, p.info),
+    (Icons.emoji_events_rounded, p.warning),
   ];
   return looks[(index.abs()) % looks.length];
 }
@@ -148,7 +149,7 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
     // The ladder has its own interactive Dugtong.
     hideBubble: true,
     child: Scaffold(
-      backgroundColor: AppColors.mutedBg,
+      backgroundColor: context.palette.background,
       body: Column(
         children: [
           EdonateHeader(
@@ -162,7 +163,7 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
           ),
           Expanded(
             child: RefreshIndicator(
-              color: kCrimson,
+              color: context.palette.primaryText,
               onRefresh: _refresh,
               child: ListenableBuilder(
                 listenable: _c,
@@ -189,24 +190,24 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
     children: [
       const SizedBox(height: 60),
       if (_refreshing)
-        const Center(child: CircularProgressIndicator(color: kCrimson))
+        Center(child: CircularProgressIndicator(color: context.palette.primaryText))
       else ...[
-        const Icon(Icons.cloud_off_rounded, size: 52, color: AppColors.muted),
+        Icon(Icons.cloud_off_rounded, size: 52, color: context.palette.muted),
         const SizedBox(height: 14),
-        const Text(
+        Text(
           "Couldn't load your streak",
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: kTextPrimary,
+            color: context.palette.foreground,
           ),
         ),
         const SizedBox(height: 6),
-        const Text(
+        Text(
           'Check your connection and pull down to try again.',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 13, color: kTextMuted, height: 1.4),
+          style: TextStyle(fontSize: 13, color: context.palette.muted, height: 1.4),
         ),
         const SizedBox(height: 20),
         Center(
@@ -239,18 +240,18 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
               TextButton.icon(
                 onPressed: _busyFrame != null ? null : () => _setFrame(null),
                 icon: _busyFrame == ''
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 14,
                         height: 14,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: kCrimson,
+                          color: context.palette.primaryText,
                         ),
                       )
                     : const Icon(Icons.layers_clear_rounded, size: 16),
                 label: const Text('Remove frame'),
                 style: TextButton.styleFrom(
-                  foregroundColor: kCrimson,
+                  foregroundColor: context.palette.primaryText,
                   textStyle: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
@@ -261,12 +262,12 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
         ),
         const SizedBox(height: 8),
         if (rungs.isEmpty)
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(vertical: 16),
             child: Text(
               'No rewards to show yet.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: kTextMuted),
+              style: TextStyle(fontSize: 13, color: context.palette.muted),
             ),
           )
         else
@@ -280,11 +281,11 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
         const SizedBox(height: 18),
         _settingsCard(),
         const SizedBox(height: 16),
-        const Text(
+        Text(
           'Rewards are cosmetic. Your best streak keeps your unlocked rewards '
           'even if your current streak resets.',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 11.5, color: kTextMuted, height: 1.5),
+          style: TextStyle(fontSize: 11.5, color: context.palette.muted, height: 1.5),
         ),
       ],
     );
@@ -318,10 +319,10 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
     width: double.infinity,
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: context.palette.surface,
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: border ?? AppColors.border),
-      boxShadow: _kSoftShadow,
+      border: Border.all(color: border ?? context.palette.border),
+      boxShadow: context.palette.shadow,
     ),
     child: child,
   );
@@ -330,24 +331,24 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Row(
+        Row(
           children: [
-            Icon(Icons.favorite_rounded, size: 18, color: kCrimson),
+            Icon(Icons.favorite_rounded, size: 18, color: context.palette.primaryText),
             SizedBox(width: 8),
             Text(
               'About Dugtong',
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w800,
-                color: kTextPrimary,
+                color: context.palette.foreground,
               ),
             ),
           ],
         ),
         const SizedBox(height: 8),
-        const Text(
+        Text(
           _kAboutDugtong,
-          style: TextStyle(fontSize: 13, color: kTextMuted, height: 1.5),
+          style: TextStyle(fontSize: 13, color: context.palette.muted, height: 1.5),
         ),
       ],
     ),
@@ -379,21 +380,21 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
                       alignment: Alignment.centerLeft,
                       child: Text(
                         '${d.current}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 48,
                           fontWeight: FontWeight.w900,
-                          color: kCrimson,
+                          color: context.palette.primaryText,
                           height: 1.0,
                         ),
                       ),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
+                    Text(
                       'day streak',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: kTextMuted,
+                        color: context.palette.muted,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -403,15 +404,15 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.accentBg,
+                        color: context.palette.accentBg,
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
                         dugtongStageFor(d.current).stageName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w800,
-                          color: kCrimson,
+                          color: context.palette.primaryText,
                         ),
                       ),
                     ),
@@ -436,23 +437,23 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
                 'Streak Freeze',
                 d.freezeAvailable ? 'Ready' : 'Recharging',
                 valueColor: d.freezeAvailable
-                    ? AppColors.success
-                    : AppColors.warning,
+                    ? context.palette.success
+                    : context.palette.warning,
               ),
             ],
           ),
           const SizedBox(height: 10),
-          const Row(
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.info_outline_rounded, size: 14, color: kTextMuted),
+              Icon(Icons.info_outline_rounded, size: 14, color: context.palette.muted),
               SizedBox(width: 6),
               Expanded(
                 child: Text(
                   'Protects 1 missed day, once every 30 days',
                   style: TextStyle(
                     fontSize: 11.5,
-                    color: kTextMuted,
+                    color: context.palette.muted,
                     height: 1.4,
                   ),
                 ),
@@ -467,19 +468,19 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
               child: OutlinedButton(
                 onPressed: _sharing ? null : () => _share(buttonContext, d),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: kCrimson,
-                  side: const BorderSide(color: kCrimson, width: 1.3),
+                  foregroundColor: context.palette.primaryText,
+                  side: BorderSide(color: context.palette.primaryText, width: 1.3),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
                 child: _sharing
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2.2,
-                          color: kCrimson,
+                          color: context.palette.primaryText,
                         ),
                       )
                     : const Row(
@@ -502,15 +503,15 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
               width: double.infinity,
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: AppColors.infoBg,
-                border: Border.all(color: AppColors.infoBorder),
+                color: context.palette.infoBg,
+                border: Border.all(color: context.palette.infoBorder),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
                 notice,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
-                  color: AppColors.infoDark,
+                  color: context.palette.infoText,
                   height: 1.4,
                 ),
               ),
@@ -525,18 +526,18 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
     IconData icon,
     String label,
     String value, {
-    Color valueColor = kTextPrimary,
+    Color? valueColor,
   }) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
     decoration: BoxDecoration(
-      color: kInputFill,
-      border: Border.all(color: AppColors.border),
+      color: context.palette.surfaceAlt,
+      border: Border.all(color: context.palette.border),
       borderRadius: BorderRadius.circular(12),
     ),
     child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 16, color: kCrimson),
+        Icon(icon, size: 16, color: context.palette.primaryText),
         const SizedBox(width: 6),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -544,14 +545,14 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
           children: [
             Text(
               label,
-              style: const TextStyle(fontSize: 10, color: kTextMuted),
+              style: TextStyle(fontSize: 10, color: context.palette.muted),
             ),
             Text(
               value,
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
-                color: valueColor,
+                color: valueColor ?? context.palette.foreground,
               ),
             ),
           ],
@@ -564,11 +565,11 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
     final next = d.nextMilestone;
     if (next == null) {
       return _card(
-        child: const Row(
+        child: Row(
           children: [
             Icon(
               Icons.emoji_events_rounded,
-              color: AppColors.warning,
+              color: context.palette.warning,
               size: 28,
             ),
             SizedBox(width: 12),
@@ -578,7 +579,7 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: kTextPrimary,
+                  color: context.palette.foreground,
                 ),
               ),
             ),
@@ -594,22 +595,22 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'NEXT REWARD',
             style: TextStyle(
               fontSize: 10.5,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.8,
-              color: kTextMuted,
+              color: context.palette.muted,
             ),
           ),
           const SizedBox(height: 6),
           Text(
             '$remaining more ${remaining == 1 ? 'day' : 'days'} to ${next.label}',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.bold,
-              color: kTextPrimary,
+              color: context.palette.foreground,
             ),
           ),
           const SizedBox(height: 12),
@@ -625,8 +626,8 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
               builder: (context, value, _) => LinearProgressIndicator(
                 value: value,
                 minHeight: 10,
-                color: kCrimson,
-                backgroundColor: AppColors.mutedBg,
+                color: context.palette.primaryText,
+                backgroundColor: context.palette.surfaceAlt,
               ),
             ),
           ),
@@ -635,10 +636,10 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
             alignment: Alignment.centerRight,
             child: Text(
               '${d.current} / ${next.days}',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11.5,
                 fontWeight: FontWeight.w600,
-                color: kTextMuted,
+                color: context.palette.muted,
               ),
             ),
           ),
@@ -718,7 +719,7 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
           children: [
             DecoratedBox(
               decoration: BoxDecoration(
-                color: AppColors.border,
+                color: context.palette.border,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -746,9 +747,9 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: unlocked ? kCrimson : Colors.white,
+        color: unlocked ? kCrimson : context.palette.surface,
         border: Border.all(
-          color: unlocked ? kCrimson : AppColors.border,
+          color: unlocked ? context.palette.primaryText : context.palette.border,
           width: 2,
         ),
         boxShadow: unlocked
@@ -764,7 +765,7 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
       child: Icon(
         unlocked ? Icons.check_rounded : Icons.lock_rounded,
         size: 18,
-        color: unlocked ? Colors.white : AppColors.hint,
+        color: unlocked ? Colors.white : context.palette.hint,
       ),
     );
     if (!isNext) return circle;
@@ -813,7 +814,7 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
-                color: unlocked ? kCrimson : kTextMuted,
+                color: unlocked ? context.palette.primaryText : context.palette.muted,
               ),
             ),
             if (isHere) ...[
@@ -841,15 +842,15 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
           width: double.infinity,
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: context.palette.surface,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isNext
                   ? kCrimson.withValues(alpha: .45)
-                  : AppColors.border,
+                  : context.palette.border,
               width: isNext ? 1.5 : 1,
             ),
-            boxShadow: _kSoftShadow,
+            boxShadow: context.palette.shadow,
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -862,19 +863,19 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
                   children: [
                     Text(
                       m.label,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: kTextPrimary,
+                        color: context.palette.foreground,
                       ),
                     ),
                     if (m.description.isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Text(
                         m.description,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: kTextMuted,
+                          color: context.palette.muted,
                           height: 1.35,
                         ),
                       ),
@@ -915,8 +916,8 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
         ),
       );
     }
-    final (icon, color) = badgeVisualFor(m.key, index);
-    final tint = unlocked ? color : AppColors.hint;
+    final (icon, color) = badgeVisualFor(context, m.key, index);
+    final tint = unlocked ? color : context.palette.hint;
     return Container(
       width: 50,
       height: 50,
@@ -933,10 +934,10 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
     final equipped = d.equippedFrame == m.key;
     final busy = _busyFrame == m.key;
     if (equipped) {
-      return const _SmallPill(
+      return _SmallPill(
         icon: Icons.check_circle_rounded,
         label: 'Equipped',
-        color: AppColors.success,
+        color: context.palette.success,
       );
     }
     return SizedBox(
@@ -944,8 +945,8 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
       child: OutlinedButton(
         onPressed: _busyFrame != null ? null : () => _setFrame(m.key),
         style: OutlinedButton.styleFrom(
-          foregroundColor: kCrimson,
-          side: const BorderSide(color: kCrimson, width: 1.3),
+          foregroundColor: context.palette.primaryText,
+          side: BorderSide(color: context.palette.primaryText, width: 1.3),
           padding: const EdgeInsets.symmetric(horizontal: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
@@ -953,12 +954,12 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
           textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
         ),
         child: busy
-            ? const SizedBox(
+            ? SizedBox(
                 width: 14,
                 height: 14,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: kCrimson,
+                  color: context.palette.primaryText,
                 ),
               )
             : const Text('Equip'),
@@ -972,49 +973,49 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Settings',
           style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.bold,
-            color: kTextPrimary,
+            color: context.palette.foreground,
           ),
         ),
         const SizedBox(height: 8),
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
                 'Show floating streak',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: kTextPrimary,
+                  color: context.palette.foreground,
                 ),
               ),
             ),
             Switch(
               value: _c.showBubblePref,
-              activeThumbColor: kCrimson,
+              activeThumbColor: context.palette.primaryText,
               onChanged: (v) => _c.setShowBubble(v),
             ),
           ],
         ),
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
                 'Dugtong chat',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: kTextPrimary,
+                  color: context.palette.foreground,
                 ),
               ),
             ),
             Switch(
               value: _c.chatEnabled,
-              activeThumbColor: kCrimson,
+              activeThumbColor: context.palette.primaryText,
               onChanged: (v) => _c.setChatEnabled(v),
             ),
           ],
@@ -1031,8 +1032,8 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
             icon: const Icon(Icons.open_with_rounded, size: 18),
             label: const Text('Reset bubble position'),
             style: OutlinedButton.styleFrom(
-              foregroundColor: kCrimson,
-              side: const BorderSide(color: AppColors.primaryBorder),
+              foregroundColor: context.palette.primaryText,
+              side: BorderSide(color: context.palette.primaryBorder),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
