@@ -7,15 +7,10 @@ import 'app_colors.dart';
 import 'app_palette.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
-// Aliases of the app palette in app_colors.dart (the newsfeed's), kept under
-// their old names so every screen that uses them follows the palette at once.
+// The brand colors, which are the same in both modes. Everything that depends
+// on the mode (text, surfaces, borders, fills) comes from `context.palette`.
 const Color kCrimson = AppColors.primary;
 const Color kCrimsonDark = AppColors.primaryDark;
-const Color kSurface = Colors.white;
-const Color kInputFill = AppColors.mutedBg;
-const Color kBorder = AppColors.border;
-const Color kTextPrimary = AppColors.foreground;
-const Color kTextMuted = AppColors.muted;
 
 const List<Color> kHeaderGradient = AppColors.primaryGradient;
 

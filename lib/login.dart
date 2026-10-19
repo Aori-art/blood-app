@@ -16,7 +16,7 @@ import 'unread_notifications.dart';
 import 'streak/streak_screen.dart';
 import 'app_palette.dart';
 
-// Design tokens now come from shared_design.dart (kCrimson, kSurface, etc.)
+// Design tokens now come from shared_design.dart (kCrimson) and context.palette
 // so this screen matches the rest of the app instead of its own palette.
 
 class LoginScreen extends StatefulWidget {

@@ -306,9 +306,9 @@ class MatchBadge extends StatelessWidget {
         icon = Icons.check_circle_outline_rounded;
         break;
       case 'replacement_any':
-        fg = const Color(0xFF9333EA);
-        bg = const Color(0xFFFAF5FF);
-        border = const Color(0xFFE9D5FF);
+        fg = context.palette.purple;
+        bg = context.palette.purpleBg;
+        border = context.palette.purpleBorder;
         label = 'Any type accepted';
         icon = Icons.all_inclusive_rounded;
         break;

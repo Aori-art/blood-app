@@ -384,16 +384,19 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
       initialDate: _neededBy ?? today,
       firstDate: today,
       lastDate: today.add(Duration(days: maxDays)),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: ColorScheme.light(
-            primary: context.palette.primaryText,
-            onPrimary: Colors.white,
-            onSurface: context.palette.foreground,
-          ),
-        ),
-        child: child!,
-      ),
+      // Light keeps its look; dark inherits the app's dark theme.
+      builder: (context, child) => context.palette.isDark
+          ? child!
+          : Theme(
+              data: Theme.of(context).copyWith(
+                colorScheme: const ColorScheme.light(
+                  primary: kCrimson,
+                  onPrimary: Colors.white,
+                  onSurface: AppColors.foreground,
+                ),
+              ),
+              child: child!,
+            ),
     );
     if (picked != null) {
       setState(() {
