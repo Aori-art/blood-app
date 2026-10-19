@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'app_colors.dart';
 import 'package:flutter/services.dart';
 
 import 'donor_avatar.dart';
-import 'newsfeed.dart' show AppColors;
 import 'post_comments_api.dart';
 import 'shared_design.dart' show kCrimson;
 import 'skeleton.dart';
@@ -196,8 +196,8 @@ class _CommenterProfileSheetState extends State<CommenterProfileSheet> {
               _chip(
                 icon: Icons.verified_user_rounded,
                 text: 'Verified Donor',
-                color: const Color(0xFF16A34A),
-                bg: const Color(0xFFF0FDF4),
+                color: AppColors.success,
+                bg: AppColors.successBg,
               ),
             if (since != null)
               _chip(

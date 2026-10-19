@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:blood/app_colors.dart';
 import 'package:flutter/services.dart';
 
 import '../home.dart' show kBottomNavBarHeight;
@@ -48,7 +49,7 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
   late final List<Particle> _burstParticles = generateParticles(
     seed: 11,
     count: 14,
-    palette: const [kCrimson, Color(0xFFFF8FA3), Color(0xFFEF4444)],
+    palette: const [kCrimson, Color(0xFFFF8FA3), AppColors.primary],
     shapes: const [ParticleShape.drop, ParticleShape.heart, ParticleShape.drop],
     speedMin: 70,
     speedMax: 170,
@@ -448,7 +449,7 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE5E7EB),
+                    color: AppColors.border,
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
@@ -470,7 +471,7 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: kInputFill,
-                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                    border: Border.all(color: AppColors.border),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: const Row(

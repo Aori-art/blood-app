@@ -1,6 +1,7 @@
 // Hub screen for the Blood Requests feature: "Help Others" (open requests a
 // donor can volunteer for) and "My Requests" (requests the donor created).
 import 'package:flutter/material.dart';
+import 'package:blood/app_colors.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -172,7 +173,7 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFFF9FAFB),
+    backgroundColor: AppColors.mutedBg,
     body: SafeArea(
       child: Stack(
         children: [
@@ -231,7 +232,7 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
               SizedBox(height: 2),
               Text(
                 'Give blood. Get help. Save lives.',
-                style: TextStyle(color: Colors.white70, fontSize: 12),
+                style: TextStyle(color: AppColors.onPrimary, fontSize: 12),
               ),
             ],
           ),
@@ -312,7 +313,7 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
                   decoration: BoxDecoration(
                     color: selected
                         ? Colors.white.withValues(alpha: .25)
-                        : const Color(0xFFF3F4F6),
+                        : AppColors.mutedBg,
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
@@ -430,9 +431,7 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
       border: Border.all(color: kBorder),
-      boxShadow: const [
-        BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 2)),
-      ],
+      boxShadow: AppColors.cardShadow,
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -466,8 +465,8 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
                           vertical: 3,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFFFBEB),
-                          border: Border.all(color: const Color(0xFFFDE68A)),
+                          color: AppColors.warningBg,
+                          border: Border.all(color: AppColors.warningBorder),
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: const Text(
@@ -475,7 +474,7 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFFD97706),
+                            color: AppColors.warning,
                           ),
                         ),
                       ),
@@ -504,7 +503,7 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
                                 vertical: 3,
                               ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFFFF1F1),
+                                color: AppColors.accentBg,
                                 borderRadius: BorderRadius.circular(999),
                               ),
                               child: Text(
@@ -540,9 +539,9 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
   Widget _volunteerBlockBanner(VolunteerBlock block) {
     const amberReasons = {'NOT_CHECKED', 'DEFERRED', 'ELIGIBILITY_REVIEW'};
     final amber = amberReasons.contains(block.reason);
-    final fg = amber ? const Color(0xFFD97706) : kCrimson;
-    final bg = amber ? const Color(0xFFFFFBEB) : const Color(0xFFFFF1F1);
-    final border = amber ? const Color(0xFFFDE68A) : const Color(0xFFFECACA);
+    final fg = amber ? AppColors.warning : kCrimson;
+    final bg = amber ? AppColors.warningBg : AppColors.accentBg;
+    final border = amber ? AppColors.warningBorder : AppColors.primaryBorder;
     String? buttonLabel;
     if (block.action == 'verify') {
       buttonLabel = 'Verify Now';
@@ -588,13 +587,13 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
     width: double.infinity,
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
-      color: const Color(0xFFF0FDF4),
-      border: Border.all(color: const Color(0xFFBBF7D0)),
+      color: AppColors.successBg,
+      border: Border.all(color: AppColors.successBorder),
       borderRadius: BorderRadius.circular(12),
     ),
     child: Row(
       children: [
-        const Icon(Icons.favorite_rounded, size: 16, color: Color(0xFF16A34A)),
+        const Icon(Icons.favorite_rounded, size: 16, color: AppColors.success),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
@@ -602,7 +601,7 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF166534),
+              color: AppColors.successDark,
             ),
           ),
         ),
@@ -613,7 +612,7 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF16A34A),
+              color: AppColors.success,
             ),
           ),
         ),
@@ -707,21 +706,21 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFFEFF6FF),
-                border: Border.all(color: const Color(0xFFBFDBFE)),
+                color: AppColors.infoBg,
+                border: Border.all(color: AppColors.infoBorder),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: const Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.info_outline_rounded, color: Color(0xFF2563EB), size: 18),
+                  Icon(Icons.info_outline_rounded, color: AppColors.info, size: 18),
                   SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       'Requests are reviewed by the eDonate team before donors can see them.',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Color(0xFF1D4ED8),
+                        color: AppColors.infoDark,
                         height: 1.4,
                       ),
                     ),
@@ -782,7 +781,9 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFFDC2626), Color(0xFF991B1B)],
+                    colors: AppColors.primaryGradient,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(999),
                   boxShadow: [

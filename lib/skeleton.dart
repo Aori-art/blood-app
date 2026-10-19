@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'app_colors.dart';
 
-const Color _kSkeleton = Color(0xFFE5E7EB);
+const Color _kSkeleton = AppColors.border;
 
 /// Makes the skeleton shapes inside it breathe slowly. With reduced motion
 /// they just stay still.

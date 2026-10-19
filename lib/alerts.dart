@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'app_colors.dart';
 import 'streak/streak_screen.dart';
 import 'package:http/http.dart' as http;
 import 'anim.dart';
 import 'config.dart';
+import 'home.dart' show FloatingNavMetrics;
 import 'notification_service.dart';
 import 'shared_design.dart';
 import 'unread_notifications.dart';
@@ -263,20 +265,22 @@ class _AlertsScreenState extends State<AlertsScreen> {
         ),
         content: const Text(
           'Are you sure you want to delete all notifications? This cannot be undone.',
-          style: TextStyle(fontSize: 13, color: Color(0xFF6B7280), height: 1.5),
+          style: TextStyle(fontSize: 13, color: AppColors.muted, height: 1.5),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text(
               'Cancel',
-              style: TextStyle(color: Color(0xFF6B7280)),
+              style: TextStyle(color: AppColors.muted),
             ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFDC2626),
+              backgroundColor: AppColors.primary,
+              disabledBackgroundColor: AppColors.border,
+              disabledForegroundColor: AppColors.muted,
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(
@@ -348,8 +352,8 @@ class _AlertsScreenState extends State<AlertsScreen> {
           ],
         ),
         backgroundColor: isSuccess
-            ? const Color(0xFF16A34A)
-            : const Color(0xFFDC2626),
+            ? AppColors.success
+            : AppColors.primary,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         margin: const EdgeInsets.all(12),
@@ -365,22 +369,22 @@ class _AlertsScreenState extends State<AlertsScreen> {
       case 'appointment_rescheduled':
       case 'appointment_cancelled':
       case 'appointment_completed':
-        return const Color(0xFF2563EB);
+        return AppColors.info;
       case 'reminder':
-        return const Color(0xFFF59E0B);
+        return AppColors.warning;
       case 'thank_you':
-        return const Color(0xFF16A34A);
+        return AppColors.success;
       case 'eligibility':
       case 'eligibility_reviewed':
         return const Color(0xFF9333EA);
       case 'screening_passed':
-        return const Color(0xFF16A34A);
+        return AppColors.success;
       case 'screening_failed':
-        return const Color(0xFFDC2626);
+        return AppColors.primary;
       case 'screening_deferred':
-        return const Color(0xFFF59E0B);
+        return AppColors.warning;
       default:
-        return const Color(0xFF6B7280);
+        return AppColors.muted;
     }
   }
 
@@ -391,22 +395,22 @@ class _AlertsScreenState extends State<AlertsScreen> {
       case 'appointment_rescheduled':
       case 'appointment_cancelled':
       case 'appointment_completed':
-        return const Color(0xFFEFF6FF);
+        return AppColors.infoBg;
       case 'reminder':
-        return const Color(0xFFFFFBEB);
+        return AppColors.warningBg;
       case 'thank_you':
-        return const Color(0xFFF0FDF4);
+        return AppColors.successBg;
       case 'eligibility':
       case 'eligibility_reviewed':
         return const Color(0xFFFAF5FF);
       case 'screening_passed':
-        return const Color(0xFFF0FDF4);
+        return AppColors.successBg;
       case 'screening_failed':
-        return const Color(0xFFFEF2F2);
+        return AppColors.accentBg;
       case 'screening_deferred':
-        return const Color(0xFFFFFBEB);
+        return AppColors.warningBg;
       default:
-        return const Color(0xFFF3F4F6);
+        return AppColors.mutedBg;
     }
   }
 
@@ -475,7 +479,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
         !_isLoading && _errorMessage == null && _notifications.isNotEmpty;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
+      backgroundColor: AppColors.mutedBg,
       body: Column(
         children: [
           // ── HEADER ────────────────────────────────────────────
@@ -485,7 +489,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(
-                    child: CircularProgressIndicator(color: Color(0xFFDC2626)),
+                    child: CircularProgressIndicator(color: AppColors.primary),
                   )
                 : _errorMessage != null
                 ? _buildError()
@@ -503,18 +507,22 @@ class _AlertsScreenState extends State<AlertsScreen> {
   // ── FLOATING DELETE-ALL BUTTON ───────────────────────────────
   Widget _buildDeleteAllButton() {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8, right: 4),
+      padding: const EdgeInsets.only(
+        bottom:
+            8 + FloatingNavMetrics.barHeight + FloatingNavMetrics.bottomMargin,
+        right: 4,
+      ),
       child: GestureDetector(
         onTap: _confirmAndDeleteAll,
         child: Container(
           width: 56,
           height: 56,
           decoration: BoxDecoration(
-            color: const Color(0xFFDC2626),
+            color: AppColors.primary,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFFDC2626).withOpacity(0.35),
+                color: AppColors.primary.withOpacity(0.35),
                 blurRadius: 14,
                 offset: const Offset(0, 6),
               ),
@@ -580,13 +588,13 @@ class _AlertsScreenState extends State<AlertsScreen> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF1F1),
+                color: AppColors.accentBg,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.wifi_off_rounded,
                 size: 40,
-                color: Color(0xFFDC2626),
+                color: AppColors.primary,
               ),
             ),
             const SizedBox(height: 20),
@@ -595,7 +603,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 17,
-                color: Color(0xFF111827),
+                color: AppColors.foreground,
               ),
             ),
             const SizedBox(height: 8),
@@ -603,7 +611,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
               _errorMessage!,
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: Color(0xFF6B7280),
+                color: AppColors.muted,
                 fontSize: 13,
                 height: 1.5,
               ),
@@ -614,7 +622,9 @@ class _AlertsScreenState extends State<AlertsScreen> {
               icon: const Icon(Icons.refresh_rounded, size: 18),
               label: const Text('Try Again'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFDC2626),
+                backgroundColor: AppColors.primary,
+                disabledBackgroundColor: AppColors.border,
+                disabledForegroundColor: AppColors.muted,
                 foregroundColor: Colors.white,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(
@@ -652,7 +662,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
             child: Icon(
               Icons.notifications_off_rounded,
               size: 48,
-              color: Colors.grey.shade300,
+              color: AppColors.border,
             ),
           ),
           const SizedBox(height: 20),
@@ -661,7 +671,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 17,
-              color: Color(0xFF111827),
+              color: AppColors.foreground,
             ),
           ),
           const SizedBox(height: 6),
@@ -669,7 +679,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
             "You're all caught up. We'll\nnotify you when something new arrives.",
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Color(0xFF9CA3AF),
+              color: AppColors.muted,
               fontSize: 13,
               height: 1.5,
             ),
@@ -682,12 +692,14 @@ class _AlertsScreenState extends State<AlertsScreen> {
   Widget _buildList(Size size) {
     return RefreshIndicator(
       onRefresh: _fetchNotifications,
-      color: const Color(0xFFDC2626),
+      color: AppColors.primary,
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.symmetric(
-          horizontal: size.width * 0.04,
-          vertical: 16,
+        padding: EdgeInsets.fromLTRB(
+          size.width * 0.04,
+          16,
+          size.width * 0.04,
+          FloatingNavMetrics.bottomPadding(context),
         ),
         itemCount: _notifications.length,
         itemBuilder: (context, index) {
@@ -759,7 +771,7 @@ class _NotificationCard extends StatelessWidget {
           alignment: Alignment.centerRight,
           padding: const EdgeInsets.only(right: 20),
           decoration: BoxDecoration(
-            color: const Color(0xFFDC2626),
+            color: AppColors.primary,
             borderRadius: BorderRadius.circular(14),
           ),
           child: const Column(
@@ -785,22 +797,23 @@ class _NotificationCard extends StatelessWidget {
             curve: Curves.easeInOut,
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: !notification.isRead
-                    ? const Color(0xFFDC2626).withOpacity(0.4)
-                    : Colors.transparent,
-                width: 1.5,
+                    ? AppColors.primary.withOpacity(0.4)
+                    : AppColors.border,
+                width: !notification.isRead ? 1.5 : 1,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: isExpanded
-                      ? typeColor.withOpacity(0.12)
-                      : Colors.black.withOpacity(0.06),
-                  blurRadius: isExpanded ? 16 : 6,
-                  offset: const Offset(0, 3),
-                ),
-              ],
+              // An open card lifts with a soft glow in its type color.
+              boxShadow: isExpanded
+                  ? [
+                      BoxShadow(
+                        color: typeColor.withOpacity(0.12),
+                        blurRadius: 16,
+                        offset: const Offset(0, 3),
+                      ),
+                    ]
+                  : AppColors.cardShadow,
             ),
             child: Column(
               children: [
@@ -854,7 +867,7 @@ class _NotificationCard extends StatelessWidget {
                                     width: 7,
                                     height: 7,
                                     decoration: const BoxDecoration(
-                                      color: Color(0xFFDC2626),
+                                      color: AppColors.primary,
                                       shape: BoxShape.circle,
                                     ),
                                   ),
@@ -869,7 +882,7 @@ class _NotificationCard extends StatelessWidget {
                                 fontWeight: notification.isRead
                                     ? FontWeight.w500
                                     : FontWeight.w700,
-                                color: const Color(0xFF111827),
+                                color: AppColors.foreground,
                               ),
                               maxLines: isExpanded ? null : 1,
                               overflow: isExpanded
@@ -881,7 +894,7 @@ class _NotificationCard extends StatelessWidget {
                               notification.date,
                               style: const TextStyle(
                                 fontSize: 11,
-                                color: Color(0xFF9CA3AF),
+                                color: AppColors.muted,
                               ),
                             ),
                           ],
@@ -897,7 +910,7 @@ class _NotificationCard extends StatelessWidget {
                           Icons.keyboard_arrow_down_rounded,
                           color: isExpanded
                               ? typeColor
-                              : const Color(0xFFD1D5DB),
+                              : AppColors.border,
                           size: 22,
                         ),
                       ),
@@ -917,7 +930,7 @@ class _NotificationCard extends StatelessWidget {
                     children: [
                       Divider(
                         height: 1,
-                        color: Colors.grey.shade100,
+                        color: AppColors.mutedBg,
                         indent: 14,
                         endIndent: 14,
                       ),
@@ -952,7 +965,7 @@ class _NotificationCard extends StatelessWidget {
                                 Icon(
                                   Icons.access_time_rounded,
                                   size: 13,
-                                  color: Colors.grey.shade400,
+                                  color: AppColors.muted,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
@@ -961,7 +974,7 @@ class _NotificationCard extends StatelessWidget {
                                       : notification.date,
                                   style: TextStyle(
                                     fontSize: 11,
-                                    color: Colors.grey.shade400,
+                                    color: AppColors.muted,
                                   ),
                                 ),
                                 const Spacer(),
@@ -979,7 +992,7 @@ class _NotificationCard extends StatelessWidget {
                                       vertical: 6,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFFFF1F1),
+                                      color: AppColors.accentBg,
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: const Row(
@@ -987,7 +1000,7 @@ class _NotificationCard extends StatelessWidget {
                                         Icon(
                                           Icons.delete_outline_rounded,
                                           size: 14,
-                                          color: Color(0xFFDC2626),
+                                          color: AppColors.primary,
                                         ),
                                         SizedBox(width: 4),
                                         Text(
@@ -995,7 +1008,7 @@ class _NotificationCard extends StatelessWidget {
                                           style: TextStyle(
                                             fontSize: 12,
                                             fontWeight: FontWeight.w600,
-                                            color: Color(0xFFDC2626),
+                                            color: AppColors.primary,
                                           ),
                                         ),
                                       ],
@@ -1029,20 +1042,22 @@ class _NotificationCard extends StatelessWidget {
         ),
         content: const Text(
           'Are you sure you want to delete this notification? This cannot be undone.',
-          style: TextStyle(fontSize: 13, color: Color(0xFF6B7280), height: 1.5),
+          style: TextStyle(fontSize: 13, color: AppColors.muted, height: 1.5),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text(
               'Cancel',
-              style: TextStyle(color: Color(0xFF6B7280)),
+              style: TextStyle(color: AppColors.muted),
             ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFDC2626),
+              backgroundColor: AppColors.primary,
+              disabledBackgroundColor: AppColors.border,
+              disabledForegroundColor: AppColors.muted,
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(

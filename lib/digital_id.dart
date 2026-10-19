@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'app_colors.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
@@ -440,7 +441,7 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
             Text('ID number copied'),
           ],
         ),
-        backgroundColor: const Color(0xFF16A34A),
+        backgroundColor: AppColors.success,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
@@ -452,7 +453,7 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
       StreakScreen(id: 'digital_id', child: _buildScreen(context));
 
   Widget _buildScreen(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFFF9FAFB),
+    backgroundColor: AppColors.mutedBg,
     body: SafeArea(
       child: Column(
         children: [
@@ -502,7 +503,7 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
               SizedBox(height: 2),
               Text(
                 'Your official eDonate donor card',
-                style: TextStyle(color: Colors.white70, fontSize: 12),
+                style: TextStyle(color: AppColors.onPrimary, fontSize: 12),
               ),
             ],
           ),
@@ -531,7 +532,7 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
     padding: const EdgeInsets.all(24),
     children: [
       const SizedBox(height: 60),
-      const Icon(Icons.wifi_off_rounded, size: 56, color: Color(0xFF9CA3AF)),
+      const Icon(Icons.wifi_off_rounded, size: 56, color: AppColors.muted),
       const SizedBox(height: 16),
       const Text(
         "Couldn't load your Digital Donor ID",
@@ -646,8 +647,8 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
           _banner(
             icon: Icons.error_outline_rounded,
             color: kCrimson,
-            bg: const Color(0xFFFFF1F1),
-            border: const Color(0xFFFECACA),
+            bg: AppColors.accentBg,
+            border: AppColors.primaryBorder,
             text:
                 'This Digital Donor ID is no longer valid. Please contact eDonate support.',
           ),
@@ -657,8 +658,8 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
           _banner(
             icon: Icons.info_outline_rounded,
             color: kTextMuted,
-            bg: const Color(0xFFF3F4F6),
-            border: const Color(0xFFE5E7EB),
+            bg: AppColors.mutedBg,
+            border: AppColors.border,
             text: 'Your account is inactive.',
           ),
         ],
@@ -789,7 +790,7 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: const Color(0xFFE5E7EB),
+              color: AppColors.border,
               borderRadius: BorderRadius.circular(99),
             ),
           ),
@@ -812,7 +813,7 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
-              border: Border.all(color: const Color(0xFFE5E7EB)),
+              border: Border.all(color: AppColors.border),
               borderRadius: BorderRadius.circular(20),
             ),
             child: TweenAnimationBuilder<double>(
@@ -849,8 +850,8 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
-              border: Border.all(color: const Color(0xFFBFDBFE)),
+              color: AppColors.infoBg,
+              border: Border.all(color: AppColors.infoBorder),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -860,7 +861,7 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
                       ? Icons.brightness_high_rounded
                       : Icons.light_mode_rounded,
                   size: 16,
-                  color: const Color(0xFF1D4ED8),
+                  color: AppColors.infoDark,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -870,7 +871,7 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
                         : 'Turn your screen brightness up for faster scanning.',
                     style: const TextStyle(
                       fontSize: 12,
-                      color: Color(0xFF1D4ED8),
+                      color: AppColors.infoDark,
                     ),
                   ),
                 ),
@@ -912,6 +913,8 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
             label: const Text('Show QR Code'),
             style: ElevatedButton.styleFrom(
               backgroundColor: kCrimson,
+              disabledBackgroundColor: AppColors.border,
+              disabledForegroundColor: AppColors.muted,
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(
@@ -959,9 +962,7 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
       border: Border.all(color: kBorder),
-      boxShadow: const [
-        BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 2)),
-      ],
+      boxShadow: AppColors.cardShadow,
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -990,7 +991,7 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
           height: 32,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: const Color(0xFFFFF1F1),
+            color: AppColors.accentBg,
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(icon, size: 16, color: kCrimson),
@@ -1072,7 +1073,7 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF16A34A),
+                  color: AppColors.success,
                 ),
               )
             : const Text(
@@ -1080,7 +1081,7 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFFD97706),
+                  color: AppColors.warning,
                 ),
               ),
       ),
@@ -1113,7 +1114,7 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
           Expanded(
             child: _statTile(
               Icons.favorite_rounded,
-              const Color(0xFF16A34A),
+              AppColors.success,
               '${d.livesHelped}',
               'Lives Helped',
             ),
@@ -1133,7 +1134,7 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFF1F1),
+              color: AppColors.accentBg,
               borderRadius: BorderRadius.circular(999),
             ),
             child: const Text(
@@ -1213,12 +1214,12 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
     Color color;
     switch (elig?.status) {
       case 'eligible':
-        color = const Color(0xFF16A34A);
+        color = AppColors.success;
         break;
       case 'temporary_deferred':
       case 'pending':
       case 'for_review':
-        color = const Color(0xFFD97706);
+        color = AppColors.warning;
         break;
       case 'not_eligible':
         color = kCrimson;
@@ -1338,12 +1339,12 @@ String _memberSinceLabel(String? value) {
     final dateOnly = DateTime(date.year, date.month, date.day);
     final todayOnly = DateTime(today.year, today.month, today.day);
     if (!dateOnly.isAfter(todayOnly)) {
-      return ('Eligible now', const Color(0xFFBBF7D0));
+      return ('Eligible now', AppColors.successBorder);
     }
     return (_shortDate(raw), Colors.white);
   }
   if (elig?.status == 'eligible') {
-    return ('Eligible now', const Color(0xFFBBF7D0));
+    return ('Eligible now', AppColors.successBorder);
   }
   return ('—', Colors.white);
 }
@@ -1385,7 +1386,7 @@ Widget _qrBox(String payload, {double size = 116}) => Container(
   decoration: BoxDecoration(
     color: Colors.white,
     borderRadius: BorderRadius.circular(12),
-    border: Border.all(color: const Color(0xFFE5E7EB)),
+    border: Border.all(color: AppColors.border),
   ),
   child: QrImageView(
     data: payload,
@@ -1397,11 +1398,11 @@ Widget _qrBox(String payload, {double size = 116}) => Container(
     padding: EdgeInsets.zero,
     eyeStyle: const QrEyeStyle(
       eyeShape: QrEyeShape.square,
-      color: Color(0xFF111827),
+      color: AppColors.foreground,
     ),
     dataModuleStyle: const QrDataModuleStyle(
       dataModuleShape: QrDataModuleShape.square,
-      color: Color(0xFF111827),
+      color: AppColors.foreground,
     ),
     errorStateBuilder: (context, error) => _qrErrorContent(),
   ),
@@ -1506,11 +1507,7 @@ class _IdCardFront extends StatelessWidget {
               child: Container(
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF7F1D1D),
-                      Color(0xFFDC2626),
-                      Color(0xFFEF4444),
-                    ],
+                    colors: AppColors.primaryGradient,
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -1573,18 +1570,12 @@ class _IdCardFront extends StatelessWidget {
                                   width: 60,
                                   height: 60,
                                   decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(14),
+                                    borderRadius: BorderRadius.circular(16),
                                     border: Border.all(
                                       color: Colors.white,
                                       width: 3,
                                     ),
-                                    boxShadow: const [
-                                      BoxShadow(
-                                        color: Colors.black26,
-                                        blurRadius: 8,
-                                        offset: Offset(0, 3),
-                                      ),
-                                    ],
+                                    boxShadow: AppColors.cardShadow,
                                   ),
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(11),
@@ -1640,7 +1631,7 @@ class _IdCardFront extends StatelessWidget {
                                             const Icon(
                                               Icons.verified_rounded,
                                               size: 14,
-                                              color: Color(0xFF16A34A),
+                                              color: AppColors.success,
                                             )
                                           else
                                             const Text(
@@ -1648,7 +1639,7 @@ class _IdCardFront extends StatelessWidget {
                                               style: TextStyle(
                                                 fontSize: 9,
                                                 fontWeight: FontWeight.w700,
-                                                color: Color(0xFFFDE68A),
+                                                color: AppColors.warningBorder,
                                               ),
                                             ),
                                         ],
@@ -1722,7 +1713,7 @@ class _IdCardBack extends StatelessWidget {
               child: Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                  border: Border.all(color: AppColors.border),
                 ),
                 child: Column(
                   children: [
@@ -2088,7 +2079,7 @@ class _DigitalIdSkeletonState extends State<_DigitalIdSkeleton>
     width: double.infinity,
     height: height,
     decoration: BoxDecoration(
-      color: const Color(0xFFF3F4F6),
+      color: AppColors.mutedBg,
       borderRadius: BorderRadius.circular(radius),
     ),
   );

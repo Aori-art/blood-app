@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'app_colors.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'privacy_statement.dart';
@@ -71,8 +72,8 @@ class _DataPrivacyScreenState extends State<DataPrivacyScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFFF0FDF4),
-              border: Border.all(color: const Color(0xFFBBF7D0)),
+              color: AppColors.successBg,
+              border: Border.all(color: AppColors.successBorder),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Row(
@@ -80,7 +81,7 @@ class _DataPrivacyScreenState extends State<DataPrivacyScreen> {
                 const Icon(
                   Icons.check_circle_outline_rounded,
                   size: 18,
-                  color: Color(0xFF16A34A),
+                  color: AppColors.success,
                 ),
                 const SizedBox(width: 10),
                 Expanded(

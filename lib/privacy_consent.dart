@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'app_colors.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -125,6 +126,8 @@ class _PrivacyConsentScreenState extends State<PrivacyConsentScreen> {
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: kCrimson,
+              disabledBackgroundColor: AppColors.border,
+              disabledForegroundColor: AppColors.muted,
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(
@@ -200,6 +203,8 @@ class _PrivacyConsentScreenState extends State<PrivacyConsentScreen> {
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: kCrimson,
+              disabledBackgroundColor: AppColors.border,
+              disabledForegroundColor: AppColors.muted,
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(
@@ -226,7 +231,7 @@ class _PrivacyConsentScreenState extends State<PrivacyConsentScreen> {
   Widget _buildScreen(BuildContext context) => PopScope(
     canPop: false,
     child: Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
+      backgroundColor: AppColors.mutedBg,
       body: Column(
         children: [
           // Fixed chrome: cap its text scaling so a large system font can't
@@ -263,13 +268,8 @@ class _PrivacyConsentScreenState extends State<PrivacyConsentScreen> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: .05),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
+                  border: Border.all(color: AppColors.border),
+                  boxShadow: AppColors.cardShadow,
                 ),
                 child: const PrivacyStatementView(),
               ),
@@ -285,7 +285,7 @@ class _PrivacyConsentScreenState extends State<PrivacyConsentScreen> {
     width: double.infinity,
     decoration: BoxDecoration(
       color: Colors.white,
-      border: const Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+      border: const Border(top: BorderSide(color: AppColors.border)),
       boxShadow: [
         BoxShadow(
           color: Colors.black.withValues(alpha: .06),

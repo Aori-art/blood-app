@@ -12,7 +12,7 @@ import 'commenter_profile_sheet.dart';
 import 'config.dart';
 import 'donor_avatar.dart';
 import 'login.dart';
-import 'newsfeed.dart' show AppColors;
+import 'app_colors.dart';
 import 'post_comments_api.dart';
 import 'shared_design.dart' show kCrimson;
 import 'skeleton.dart';
@@ -295,6 +295,8 @@ class _CommentsSheetState extends State<_CommentsSheet> {
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: kCrimson,
+              disabledBackgroundColor: AppColors.border,
+              disabledForegroundColor: AppColors.muted,
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(
@@ -920,6 +922,8 @@ class _CommentsSheetState extends State<_CommentsSheet> {
             onPressed: onTap,
             style: ElevatedButton.styleFrom(
               backgroundColor: kCrimson,
+              disabledBackgroundColor: AppColors.border,
+              disabledForegroundColor: AppColors.muted,
               foregroundColor: Colors.white,
               elevation: 0,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'app_colors.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'shared_design.dart';
@@ -131,7 +132,7 @@ class PrivacyStatementView extends StatelessWidget {
     children: [
       const Text(
         _kIntro,
-        style: TextStyle(fontSize: 13, color: Color(0xFF4B5563), height: 1.5),
+        style: TextStyle(fontSize: 13, color: AppColors.muted, height: 1.5),
       ),
       const SizedBox(height: 14),
       for (final section in _kSections) ...[
@@ -153,7 +154,7 @@ class PrivacyStatementView extends StatelessWidget {
     decoration: BoxDecoration(
       color: sectionFill,
       borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: const Color(0xFFE5E7EB)),
+      border: Border.all(color: AppColors.border),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -165,7 +166,7 @@ class PrivacyStatementView extends StatelessWidget {
               height: 32,
               alignment: Alignment.center,
               decoration: const BoxDecoration(
-                color: Color(0xFFFFF1F1),
+                color: AppColors.accentBg,
                 shape: BoxShape.circle,
               ),
               child: Icon(section.icon, size: 17, color: kCrimson),
@@ -199,7 +200,7 @@ class PrivacyStatementView extends StatelessWidget {
                     bullet,
                     style: const TextStyle(
                       fontSize: 13,
-                      color: Color(0xFF4B5563),
+                      color: AppColors.muted,
                       height: 1.5,
                     ),
                   ),

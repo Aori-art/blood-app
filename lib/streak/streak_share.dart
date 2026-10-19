@@ -6,6 +6,7 @@ import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../app_colors.dart';
 import '../main.dart' show appNavigatorKey;
 import '../shared_design.dart';
 import 'dugtong.dart';
@@ -126,7 +127,7 @@ class StreakShareCard extends StatelessWidget {
               style: _white.copyWith(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w500,
-                color: Colors.white70,
+                color: AppColors.onPrimary,
               ),
             ),
           ],

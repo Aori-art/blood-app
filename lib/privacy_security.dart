@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'app_colors.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -42,7 +43,7 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
-          backgroundColor: const Color(0xFF16A34A),
+          backgroundColor: AppColors.success,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
@@ -290,7 +291,7 @@ class _DeleteAccountRow extends StatelessWidget {
                 height: 32,
                 alignment: Alignment.center,
                 decoration: const BoxDecoration(
-                  color: Color(0xFFFFF1F1),
+                  color: AppColors.accentBg,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -326,7 +327,7 @@ class _DeleteAccountRow extends StatelessWidget {
               ],
             ),
           ),
-          const Icon(Icons.chevron_right_rounded, color: Color(0xFF9CA3AF)),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
         ],
       ),
     ),
@@ -454,7 +455,7 @@ class _PasswordDialogState extends State<_PasswordDialog> {
             decoration: InputDecoration(
               hintText: 'Password',
               hintStyle: TextStyle(
-                color: kTextMuted.withValues(alpha: .6),
+                color: kTextMuted,
                 fontSize: 14,
               ),
               filled: true,
@@ -575,7 +576,7 @@ class _FinalConfirmDialogState extends State<_FinalConfirmDialog> {
         height: 56,
         alignment: Alignment.center,
         decoration: const BoxDecoration(
-          color: Color(0xFFFFF1F1),
+          color: AppColors.accentBg,
           shape: BoxShape.circle,
         ),
         child: const Icon(

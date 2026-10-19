@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'app_colors.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -275,7 +276,7 @@ class _VerifyScreenState extends State<VerifyScreen>
             Expanded(child: Text(message)),
           ],
         ),
-        backgroundColor: isError ? kCrimson : const Color(0xFF16A34A),
+        backgroundColor: isError ? kCrimson : AppColors.success,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
@@ -304,7 +305,7 @@ class _VerifyScreenState extends State<VerifyScreen>
       StreakScreen(id: 'verify', child: _buildScreen(context));
 
   Widget _buildScreen(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFFF9FAFB),
+    backgroundColor: AppColors.mutedBg,
     body: SafeArea(
       child: Column(
         children: [
@@ -348,7 +349,7 @@ class _VerifyScreenState extends State<VerifyScreen>
               SizedBox(height: 2),
               Text(
                 'Upload a valid ID to unlock full access',
-                style: TextStyle(color: Colors.white70, fontSize: 12),
+                style: TextStyle(color: AppColors.onPrimary, fontSize: 12),
               ),
             ],
           ),
@@ -459,13 +460,13 @@ class _VerifyScreenState extends State<VerifyScreen>
   Color _stepColor(String status, int step) {
     switch (status) {
       case 'verified':
-        return const Color(0xFF16A34A);
+        return AppColors.success;
       case 'rejected':
-        return step < 2 ? const Color(0xFF16A34A) : kCrimson;
+        return step < 2 ? AppColors.success : kCrimson;
       case 'pending':
       default:
-        if (step == 0) return const Color(0xFF16A34A);
-        if (step == 1) return const Color(0xFFD97706);
+        if (step == 0) return AppColors.success;
+        if (step == 1) return AppColors.warning;
         return kBorder;
     }
   }
@@ -502,7 +503,7 @@ class _VerifyScreenState extends State<VerifyScreen>
         child: Container(
           height: 2,
           margin: const EdgeInsets.only(bottom: 16),
-          color: active ? const Color(0xFF16A34A) : kBorder,
+          color: active ? AppColors.success : kBorder,
         ),
       );
     }
@@ -522,7 +523,7 @@ class _VerifyScreenState extends State<VerifyScreen>
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
+      border: Border.all(color: AppColors.border, width: 1.5),
     ),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: rows),
   );
@@ -549,14 +550,14 @@ class _VerifyScreenState extends State<VerifyScreen>
     width: double.infinity,
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: const Color(0xFFEFF6FF),
-      border: Border.all(color: const Color(0xFFBFDBFE)),
+      color: AppColors.infoBg,
+      border: Border.all(color: AppColors.infoBorder),
       borderRadius: BorderRadius.circular(16),
     ),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(Icons.lightbulb_outline_rounded, color: Color(0xFF2563EB)),
+        const Icon(Icons.lightbulb_outline_rounded, color: AppColors.info),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -565,7 +566,7 @@ class _VerifyScreenState extends State<VerifyScreen>
               const Text(
                 'Did you know?',
                 style: TextStyle(
-                  color: Color(0xFF1D4ED8),
+                  color: AppColors.infoDark,
                   fontWeight: FontWeight.bold,
                   fontSize: 12,
                 ),
@@ -574,7 +575,7 @@ class _VerifyScreenState extends State<VerifyScreen>
               Text(
                 fact,
                 style: const TextStyle(
-                  color: Color(0xFF1D4ED8),
+                  color: AppColors.infoDark,
                   fontSize: 13,
                   height: 1.45,
                 ),
@@ -595,7 +596,7 @@ class _VerifyScreenState extends State<VerifyScreen>
       children: [
         _statusStepper('verified'),
         _animatedHero(
-          color: const Color(0xFF16A34A),
+          color: AppColors.success,
           icon: Icons.verified_rounded,
           title: "You're Verified!",
           subtitle: 'Your identity has been confirmed. You now have full '
@@ -627,7 +628,7 @@ class _VerifyScreenState extends State<VerifyScreen>
       children: [
         _statusStepper('pending'),
         _animatedHero(
-          color: const Color(0xFFD97706),
+          color: AppColors.warning,
           icon: Icons.hourglass_top_rounded,
           title: 'Under Review',
           subtitle: "Your ID is being reviewed by our team. We'll notify "
@@ -677,8 +678,8 @@ class _VerifyScreenState extends State<VerifyScreen>
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFFEF2F2),
-        border: Border.all(color: const Color(0xFFFECACA)),
+        color: AppColors.accentBg,
+        border: Border.all(color: AppColors.primaryBorder),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -747,14 +748,14 @@ class _VerifyScreenState extends State<VerifyScreen>
     width: double.infinity,
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: const Color(0xFFEFF6FF),
-      border: Border.all(color: const Color(0xFFBFDBFE)),
+      color: AppColors.infoBg,
+      border: Border.all(color: AppColors.infoBorder),
       borderRadius: BorderRadius.circular(16),
     ),
     child: const Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(Icons.info_outline_rounded, color: Color(0xFF2563EB)),
+        Icon(Icons.info_outline_rounded, color: AppColors.info),
         SizedBox(width: 12),
         Expanded(
           child: Text(
@@ -762,7 +763,7 @@ class _VerifyScreenState extends State<VerifyScreen>
             "upload a clear photo of a valid government-issued ID (e.g. "
             "National ID, Driver's License, SSS ID, or Passport).",
             style: TextStyle(
-              color: Color(0xFF1D4ED8),
+              color: AppColors.infoDark,
               fontSize: 13,
               height: 1.45,
             ),
@@ -778,10 +779,8 @@ class _VerifyScreenState extends State<VerifyScreen>
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
-      boxShadow: const [
-        BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
-      ],
+      border: Border.all(color: AppColors.border, width: 1.5),
+      boxShadow: AppColors.cardShadow,
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -825,11 +824,9 @@ class _VerifyScreenState extends State<VerifyScreen>
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE5E7EB), width: 2),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 3)),
-        ],
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border, width: 2),
+        boxShadow: AppColors.cardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -896,7 +893,7 @@ class _VerifyScreenState extends State<VerifyScreen>
               ),
             if (hasImage) ...[
               const SizedBox(width: 6),
-              const Icon(Icons.check_circle_rounded, size: 14, color: Color(0xFF16A34A)),
+              const Icon(Icons.check_circle_rounded, size: 14, color: AppColors.success),
             ],
           ],
         ),
@@ -929,7 +926,7 @@ class _VerifyScreenState extends State<VerifyScreen>
             height: 40,
             alignment: Alignment.center,
             decoration: const BoxDecoration(
-              color: Color(0xFFFFF1F1),
+              color: AppColors.accentBg,
               shape: BoxShape.circle,
             ),
             child: const Icon(
@@ -1024,10 +1021,8 @@ class _VerifyScreenState extends State<VerifyScreen>
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
-      boxShadow: const [
-        BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
-      ],
+      border: Border.all(color: AppColors.border, width: 1.5),
+      boxShadow: AppColors.cardShadow,
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1056,7 +1051,7 @@ class _VerifyScreenState extends State<VerifyScreen>
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(Icons.check_circle_rounded, size: 16, color: Color(0xFF16A34A)),
+        const Icon(Icons.check_circle_rounded, size: 16, color: AppColors.success),
         const SizedBox(width: 8),
         Expanded(
           child: Text(

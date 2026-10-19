@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
+import 'app_colors.dart';
 import 'anim.dart';
 import 'book.dart';
 import 'history.dart';
@@ -16,17 +17,9 @@ import 'pin_screen.dart'; // PIN: "Go to Home" now goes through the PIN screen
 import 'config.dart';
 import 'donor_avatar.dart';
 import 'verify.dart';
-// ── Theme Colors ─────────────────────────────────────────────────────────────
-
-class AppColors {
-  static const primary = Color(0xFFC41E3A);
-  static const primaryDark = Color(0xFF8B0000);
-  static const foreground = Color(0xFF1A1A1A);
-  static const muted = Color(0xFF6B6B6B);
-  static const mutedBg = Color(0xFFF2F2F2);
-  static const border = Color(0xFFE5E5E5);
-  static const accentBg = Color(0xFFFDF0F1);
-}
+// The palette lives in app_colors.dart; it is re-exported so files that took
+// AppColors from here keep working.
+export 'app_colors.dart';
 
 // ── Models ───────────────────────────────────────────────────────────────────
 
@@ -191,9 +184,7 @@ class UrgencyBadge extends StatelessWidget {
     if (urgency == Urgency.normal) return const SizedBox.shrink();
 
     final isCritical = urgency == Urgency.critical;
-    final color = isCritical
-        ? const Color(0xFFDC2626)
-        : const Color(0xFFF97316);
+    final color = isCritical ? AppColors.critical : AppColors.orange;
     final label = isCritical ? "CRITICAL" : "URGENT";
 
     return Container(
@@ -436,14 +427,14 @@ class _ImageViewerPageState extends State<_ImageViewerPage> {
                                       children: [
                                         Icon(
                                           Icons.broken_image_outlined,
-                                          color: Colors.grey[400],
+                                          color: AppColors.muted,
                                           size: 40,
                                         ),
                                         const SizedBox(height: 8),
                                         Text(
                                           "Couldn't load image",
                                           style: TextStyle(
-                                            color: Colors.grey[400],
+                                            color: AppColors.muted,
                                             fontSize: 13,
                                           ),
                                         ),
@@ -678,21 +669,21 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
       final facilityType = _profile?['facility_type']?.toString();
       return (
         _facilityTypeIcon(facilityType),
-        const Color(0xFF2563EB),
-        const Color(0xFFEFF6FF),
+        AppColors.info,
+        AppColors.infoBg,
       );
     }
     if (authorType == 'admin') {
       return (
         Icons.verified_rounded,
-        const Color(0xFFDC2626),
-        const Color(0xFFFFF1F1),
+        AppColors.primary,
+        AppColors.accentBg,
       );
     }
     return (
       Icons.groups_rounded,
-      const Color(0xFF6B7280),
-      const Color(0xFFF3F4F6),
+      AppColors.muted,
+      AppColors.mutedBg,
     );
   }
 
@@ -770,9 +761,9 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
       return _pill(
         icon: _facilityTypeIcon(facilityType),
         label: label,
-        fg: const Color(0xFF2563EB),
-        bg: const Color(0xFFEFF6FF),
-        border: const Color(0xFFBFDBFE),
+        fg: AppColors.info,
+        bg: AppColors.infoBg,
+        border: AppColors.infoBorder,
       );
     }
     if (profile != null && authorType == 'admin') {
@@ -781,9 +772,9 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
       return _pill(
         icon: Icons.verified_rounded,
         label: label,
-        fg: const Color(0xFFDC2626),
-        bg: const Color(0xFFFFF1F1),
-        border: const Color(0xFFFECACA),
+        fg: AppColors.primary,
+        bg: AppColors.accentBg,
+        border: AppColors.primaryBorder,
       );
     }
     // Loading / unlinked / error — fall back to whatever badge the post
@@ -792,9 +783,9 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
       return _pill(
         icon: Icons.emoji_events,
         label: widget.post.authorBadge!,
-        fg: const Color(0xFFDC2626),
-        bg: const Color(0xFFFFF1F1),
-        border: const Color(0xFFFECACA),
+        fg: AppColors.primary,
+        bg: AppColors.accentBg,
+        border: AppColors.primaryBorder,
       );
     }
     return null;
@@ -804,11 +795,11 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
     width: 32,
     height: 32,
     decoration: BoxDecoration(
-      color: const Color(0xFFFFF1F1),
+      color: AppColors.accentBg,
       borderRadius: BorderRadius.circular(10),
     ),
     alignment: Alignment.center,
-    child: Icon(icon, size: 16, color: const Color(0xFFDC2626)),
+    child: Icon(icon, size: 16, color: AppColors.primary),
   );
 
   Widget _addressBlock(Map<String, dynamic> profile) {
@@ -834,7 +825,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
             children: [
               const Text(
                 "Address",
-                style: TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+                style: TextStyle(fontSize: 11, color: AppColors.muted),
               ),
               const SizedBox(height: 2),
               Text(
@@ -842,7 +833,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
                 style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF111827),
+                  color: AppColors.foreground,
                 ),
               ),
               if (subParts.isNotEmpty) ...[
@@ -851,7 +842,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
                   subParts.join(', '),
                   style: const TextStyle(
                     fontSize: 11,
-                    color: Color(0xFF6B7280),
+                    color: AppColors.muted,
                   ),
                 ),
               ],
@@ -883,7 +874,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
             children: [
               const Text(
                 "Contact",
-                style: TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+                style: TextStyle(fontSize: 11, color: AppColors.muted),
               ),
               const SizedBox(height: 2),
               Text(
@@ -891,13 +882,13 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
                 style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF111827),
+                  color: AppColors.foreground,
                 ),
               ),
             ],
           ),
         ),
-        const Icon(Icons.copy_rounded, size: 14, color: Color(0xFF9CA3AF)),
+        const Icon(Icons.copy_rounded, size: 14, color: AppColors.muted),
       ],
     ),
   );
@@ -909,7 +900,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
     if (address != null && address.isNotEmpty) rows.add(_addressBlock(profile));
     if (contact != null && contact.isNotEmpty) {
       if (rows.isNotEmpty)
-        rows.add(const Divider(height: 20, color: Color(0xFFF3F4F6)));
+        rows.add(const Divider(height: 20, color: AppColors.mutedBg));
       rows.add(_contactRow(contact));
     }
     if (rows.isEmpty) return const SizedBox.shrink();
@@ -918,8 +909,8 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF9FAFB),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        color: AppColors.mutedBg,
+        border: Border.all(color: AppColors.border),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(children: rows),
@@ -963,7 +954,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: const Color(0xFFFFF1F1),
+            color: AppColors.accentBg,
             borderRadius: BorderRadius.circular(10),
           ),
           alignment: Alignment.center,
@@ -974,7 +965,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
                 monthLabel,
                 style: const TextStyle(
                   fontSize: 10,
-                  color: Color(0xFFDC2626),
+                  color: AppColors.primary,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -983,7 +974,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF111827),
+                  color: AppColors.foreground,
                 ),
               ),
             ],
@@ -999,7 +990,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
                 style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF111827),
+                  color: AppColors.foreground,
                 ),
               ),
               if (subtitle.isNotEmpty) ...[
@@ -1008,7 +999,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
                   subtitle,
                   style: const TextStyle(
                     fontSize: 11,
-                    color: Color(0xFF6B7280),
+                    color: AppColors.muted,
                   ),
                 ),
               ],
@@ -1031,14 +1022,14 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w700,
-            color: Color(0xFF6B7280),
+            color: AppColors.muted,
           ),
         ),
         const SizedBox(height: 8),
         if (list.isEmpty)
           const Text(
             "No upcoming events right now.",
-            style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+            style: TextStyle(fontSize: 12, color: AppColors.muted),
           )
         else
           for (final e in list) ...[
@@ -1060,8 +1051,8 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
             width: double.infinity,
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFFBEB),
-              border: Border.all(color: const Color(0xFFFDE68A)),
+              color: AppColors.warningBg,
+              border: Border.all(color: AppColors.warningBorder),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Row(
@@ -1069,13 +1060,13 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
                 Icon(
                   Icons.info_outline_rounded,
                   size: 14,
-                  color: Color(0xFFB45309),
+                  color: AppColors.warningDark,
                 ),
                 SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     "This facility isn't accepting donations right now.",
-                    style: TextStyle(fontSize: 11, color: Color(0xFFB45309)),
+                    style: TextStyle(fontSize: 11, color: AppColors.warningDark),
                   ),
                 ),
               ],
@@ -1094,21 +1085,21 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
     width: double.infinity,
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
-      color: const Color(0xFFEFF6FF),
-      border: Border.all(color: const Color(0xFFBFDBFE)),
+      color: AppColors.infoBg,
+      border: Border.all(color: AppColors.infoBorder),
       borderRadius: BorderRadius.circular(14),
     ),
     child: const Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(Icons.shield_rounded, size: 16, color: Color(0xFF2563EB)),
+        Icon(Icons.shield_rounded, size: 16, color: AppColors.info),
         SizedBox(width: 8),
         Expanded(
           child: Text(
             "Posts from this account are official announcements from the eDonate team.",
             style: TextStyle(
               fontSize: 12,
-              color: Color(0xFF1D4ED8),
+              color: AppColors.infoDark,
               height: 1.4,
             ),
           ),
@@ -1122,7 +1113,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
     child: Text(
       "More details about this organization aren't available yet.",
       textAlign: TextAlign.center,
-      style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+      style: TextStyle(fontSize: 12, color: AppColors.muted),
     ),
   );
 
@@ -1132,7 +1123,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
         width: double.infinity,
         height: 56,
         decoration: BoxDecoration(
-          color: const Color(0xFFF3F4F6),
+          color: AppColors.mutedBg,
           borderRadius: BorderRadius.circular(8),
         ),
       ),
@@ -1141,7 +1132,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
         width: double.infinity,
         height: 56,
         decoration: BoxDecoration(
-          color: const Color(0xFFF3F4F6),
+          color: AppColors.mutedBg,
           borderRadius: BorderRadius.circular(8),
         ),
       ),
@@ -1150,7 +1141,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
         width: double.infinity,
         height: 72,
         decoration: BoxDecoration(
-          color: const Color(0xFFF3F4F6),
+          color: AppColors.mutedBg,
           borderRadius: BorderRadius.circular(8),
         ),
       ),
@@ -1159,11 +1150,11 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
 
   Widget _errorSection() => Column(
     children: [
-      const Icon(Icons.wifi_off_rounded, color: Color(0xFF9CA3AF), size: 28),
+      const Icon(Icons.wifi_off_rounded, color: AppColors.muted, size: 28),
       const SizedBox(height: 8),
       const Text(
         "Couldn't load this profile",
-        style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+        style: TextStyle(fontSize: 13, color: AppColors.muted),
       ),
       const SizedBox(height: 10),
       TextButton.icon(
@@ -1171,12 +1162,12 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
         icon: const Icon(
           Icons.refresh_rounded,
           size: 16,
-          color: Color(0xFFDC2626),
+          color: AppColors.primary,
         ),
         label: const Text(
           "Retry",
           style: TextStyle(
-            color: Color(0xFFDC2626),
+            color: AppColors.primary,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -1224,7 +1215,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE5E7EB),
+                  color: AppColors.border,
                   borderRadius: BorderRadius.circular(99),
                 ),
               ),
@@ -1239,7 +1230,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF111827),
+                  color: AppColors.foreground,
                 ),
               ),
               if (pill != null) ...[const SizedBox(height: 8), pill],
@@ -1249,7 +1240,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
                   "On eDonate since $memberSince",
                   style: const TextStyle(
                     fontSize: 12,
-                    color: Color(0xFF9CA3AF),
+                    color: AppColors.muted,
                   ),
                 ),
               ],
@@ -1262,8 +1253,8 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
                 child: OutlinedButton(
                   onPressed: () => Navigator.of(context).pop(),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFDC2626),
-                    side: const BorderSide(color: Color(0xFFDC2626)),
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -1568,7 +1559,7 @@ class _PostCardState extends State<PostCard> {
                             width: 16,
                             height: 16,
                             decoration: BoxDecoration(
-                              color: const Color(0xFFDC2626),
+                              color: AppColors.primary,
                               shape: BoxShape.circle,
                               border: Border.all(color: Colors.white, width: 2),
                             ),
@@ -1841,7 +1832,7 @@ class _DonateBlockState extends State<_DonateBlock> {
                   gradient: const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [AppColors.primary, AppColors.primaryDark],
+                    colors: AppColors.primaryGradient,
                   ),
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
@@ -2150,9 +2141,9 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
 
   Widget _buildVerificationBanner(BuildContext context) {
     final isPending = _verificationStatus == 'pending';
-    final bg = isPending ? const Color(0xFFFFFBEB) : const Color(0xFFF3F4F6);
-    final border = isPending ? const Color(0xFFFDE68A) : AppColors.border;
-    final fg = isPending ? const Color(0xFFB45309) : AppColors.muted;
+    final bg = isPending ? AppColors.warningBg : AppColors.mutedBg;
+    final border = isPending ? AppColors.warningBorder : AppColors.border;
+    final fg = isPending ? AppColors.warningDark : AppColors.muted;
     final icon = isPending
         ? Icons.hourglass_top_rounded
         : Icons.info_outline_rounded;
@@ -2232,7 +2223,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
                 gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [AppColors.primary, AppColors.primaryDark],
+                  colors: AppColors.primaryGradient,
                 ),
                 boxShadow: [
                   BoxShadow(
@@ -2359,7 +2350,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [AppColors.primary, AppColors.primaryDark],
+                colors: AppColors.primaryGradient,
               ),
             ),
             alignment: Alignment.center,
@@ -2492,7 +2483,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [AppColors.primary, AppColors.primaryDark],
+          colors: AppColors.primaryGradient,
         ),
       ),
       child: Column(
@@ -2533,7 +2524,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
                           ? "View your donation history, track your impact, and manage your profile."
                           : "Sign in to schedule your donation, track your impact, and earn badges.",
                       style: const TextStyle(
-                        color: Color(0xFFFECACA),
+                        color: AppColors.onPrimarySoft,
                         fontSize: 11,
                         height: 1.3,
                       ),
@@ -2639,21 +2630,21 @@ class _VerificationCard extends StatelessWidget {
       case 'pending':
         return _card(
           icon: Icons.hourglass_top_rounded,
-          iconBg: const Color(0xFFFFFBEB),
-          accent: const Color(0xFFD97706),
+          iconBg: AppColors.warningBg,
+          accent: AppColors.warning,
           title: "Verification in Progress",
           subtitle: "We're reviewing your ID — hang tight",
-          trailing: _outlinedButton("View", const Color(0xFFD97706)),
+          trailing: _outlinedButton("View", AppColors.warning),
         );
       case 'rejected':
         return _card(
           icon: Icons.gpp_bad_outlined,
-          iconBg: const Color(0xFFFFF1F1),
-          accent: const Color(0xFFDC2626),
+          iconBg: AppColors.accentBg,
+          accent: AppColors.critical,
           title: "Verification Unsuccessful",
           subtitle: "Please upload a clearer photo of your ID",
           trailing: _filledButton("Retry"),
-          borderColor: const Color(0xFFFECACA),
+          borderColor: AppColors.primaryBorder,
         );
       case 'verified':
         return _verifiedCard();
@@ -2661,11 +2652,11 @@ class _VerificationCard extends StatelessWidget {
       default:
         return _card(
           icon: Icons.shield_outlined,
-          iconBg: const Color(0xFFFFF1F1),
-          accent: const Color(0xFFDC2626),
+          iconBg: AppColors.accentBg,
+          accent: AppColors.primary,
           title: "Verify Your Identity",
           subtitle: "Upload a valid ID to unlock full access",
-          trailing: _outlinedButton("Verify", const Color(0xFFDC2626)),
+          trailing: _outlinedButton("Verify", AppColors.primary),
         );
     }
   }
@@ -2689,7 +2680,9 @@ class _VerificationCard extends StatelessWidget {
   Widget _filledButton(String label) => ElevatedButton(
     onPressed: onTap,
     style: ElevatedButton.styleFrom(
-      backgroundColor: const Color(0xFFDC2626),
+      backgroundColor: AppColors.primary,
+      disabledBackgroundColor: AppColors.border,
+      disabledForegroundColor: AppColors.muted,
       foregroundColor: Colors.white,
       elevation: 0,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -2781,12 +2774,12 @@ class _VerificationCard extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFFF0FDF4), Color(0xFFDCFCE7)],
+            colors: [AppColors.successBg, AppColors.successSoft],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFBBF7D0), width: 1.5),
+          border: Border.all(color: AppColors.successBorder, width: 1.5),
         ),
         child: Stack(
           children: [
@@ -2813,7 +2806,7 @@ class _VerificationCard extends StatelessWidget {
                     child: const Icon(
                       Icons.close_rounded,
                       size: 15,
-                      color: Color(0xFF15803D),
+                      color: AppColors.successDark,
                     ),
                   ),
                 ),
@@ -2838,14 +2831,14 @@ class _VerificationCard extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: const BoxDecoration(
-              color: Color(0xFFDCFCE7),
+              color: AppColors.successSoft,
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
             child: const Icon(
               Icons.verified_user_rounded,
               size: 20,
-              color: Color(0xFF16A34A),
+              color: AppColors.success,
             ),
           ),
         ),
@@ -2875,7 +2868,7 @@ class _VerificationCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: const Color(0xFF16A34A),
+            color: AppColors.success,
             borderRadius: BorderRadius.circular(999),
           ),
           child: const Row(

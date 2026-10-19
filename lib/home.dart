@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'streak/streak_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -130,243 +133,1019 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
-      // IndexedStack keeps every tab mounted (instead of swapping the body
-      // widget), so switching tabs — e.g. tapping Home mid eligibility-check —
-      // no longer disposes/rebuilds the other tabs and loses their state.
-      body: IndexedStack(
-        index: _selectedIndex,
-        // The tabs are not routes: tell each one whether it is showing, so
-        // Dugtong knows which tab the donor is on.
-        children: [
-          for (var i = 0; i < _screens.length; i++)
-            StreakTabScope(active: i == _selectedIndex, child: _screens[i]),
-        ],
-      ),
-      bottomNavigationBar: Material(
-        type: MaterialType.transparency,
-        child: _CustomNavBar(
-          selectedIndex: _selectedIndex,
-          onTap: _selectTab,
-          onCheckTap: () => _selectTab(2),
-        ),
-      ),
-    );
-  }
-}
-
-// ── CUSTOM BOTTOM NAV ─────────────────────────────────────────────────────────
-
-// Total footprint of _CustomNavBar's floating pill, including the portion
-// of the center FAB that pokes above it — excludes the device safe-area
-// inset, which the bar's own SafeArea adds separately. Tabs hosted inside
-// HomeScreen that scroll under this bar should add at least this much
-// bottom padding so their last item isn't tucked behind it.
-const double kBottomNavBarHeight =
-    _CustomNavBar._barHeight + (_CustomNavBar._checkSize / 2) + 8;
-
-class _CustomNavBar extends StatelessWidget {
-  final int selectedIndex;
-  final ValueChanged<int> onTap;
-  final VoidCallback onCheckTap;
-
-  const _CustomNavBar({
-    required this.selectedIndex,
-    required this.onTap,
-    required this.onCheckTap,
-  });
-
-  // Fixed, device-independent sizing — no hardcoded `bottom:` offsets or
-  // Transform.translate; SafeArea handles the system nav-bar/gesture inset.
-  // 72px comfortably fits _NavItem's icon+label+indicator column without
-  // overflowing (icon 22 + label ~13 + indicator 3 + spacing + padding ≈ 68).
-  static const double _barHeight = 72;
-  static const double _checkSize = 62;
-  static const double _stackHeight = kBottomNavBarHeight;
-
-  @override
-  Widget build(BuildContext context) {
-    final isCheckActive = selectedIndex == 2;
-
-    return SafeArea(
-      top: false,
-      minimum: const EdgeInsets.only(bottom: 10),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-        child: SizedBox(
-          height: _stackHeight,
-          child: Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.bottomCenter,
-            children: [
-              // Rounded floating pill
-              Container(
-                height: _barHeight,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(_barHeight / 2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.10),
-                      blurRadius: 16,
-                      spreadRadius: -2,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(_barHeight / 2),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _NavItem(
-                        icon: Icons.home_rounded,
-                        label: 'Home',
-                        index: 0,
-                        selectedIndex: selectedIndex,
-                        onTap: onTap,
-                      ),
-                      _NavItem(
-                        icon: Icons.calendar_month_rounded,
-                        label: 'Book',
-                        index: 1,
-                        selectedIndex: selectedIndex,
-                        onTap: onTap,
-                      ),
-                      _NavItem(
-                        icon: Icons.history_rounded,
-                        label: 'History',
-                        index: 3,
-                        selectedIndex: selectedIndex,
-                        onTap: onTap,
-                      ),
-                      _NavItem(
-                        icon: Icons.notifications_rounded,
-                        label: 'Alerts',
-                        index: 4,
-                        selectedIndex: selectedIndex,
-                        onTap: onTap,
-                        badge: UnreadNotifications.instance.count,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // Floating Check button — overlaps the top edge of the pill
-              // (its own vertical center sits on the pill's top edge, same
-              // ratio the old FloatingActionButtonLocation.centerDocked used).
-              Positioned(
-                bottom: _barHeight - (_checkSize / 2),
-                child: _CenterFAB(isActive: isCheckActive, onTap: onCheckTap),
-              ),
-            ],
+    final theme = Theme.of(context);
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
+    return Theme(
+      // Floating snack bars are laid out against the bottom of the screen;
+      // lift them over the floating nav.
+      data: theme.copyWith(
+        snackBarTheme: theme.snackBarTheme.copyWith(
+          insetPadding: const EdgeInsets.fromLTRB(
+            16,
+            5,
+            16,
+            kBottomNavBarHeight + 8,
           ),
         ),
       ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final int index;
-  final int selectedIndex;
-  final ValueChanged<int> onTap;
-
-  /// Optional unread count shown as a badge on the icon (hidden at 0).
-  final ValueNotifier<int>? badge;
-
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.index,
-    required this.selectedIndex,
-    required this.onTap,
-    this.badge,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isSelected = selectedIndex == index;
-    return Tooltip(
-      message: label,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            HapticFeedback.selectionClick();
-            onTap(index);
-          },
-          borderRadius: BorderRadius.circular(14),
-          splashColor: const Color(0xFFDC2626).withOpacity(0.12),
-          highlightColor: const Color(0xFFDC2626).withOpacity(0.06),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 260),
-              curve: Curves.easeOutBack,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-              decoration: BoxDecoration(
-                gradient: isSelected
-                    ? const LinearGradient(
-                        colors: [Color(0xFFFFE4E4), Color(0xFFFFF1F1)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : null,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+      child: Scaffold(
+        backgroundColor: AppColors.mutedBg,
+        // The nav floats over the tabs and nothing is painted behind it. The
+        // tabs resize for the keyboard themselves; the keyboard just covers
+        // the nav, as it did before.
+        resizeToAvoidBottomInset: false,
+        body: Stack(
+          children: [
+            // Every tab stays mounted (like an IndexedStack), so switching
+            // tabs — e.g. tapping Home mid eligibility-check — doesn't
+            // dispose the other tabs and lose their state.
+            Positioned.fill(
+              child: _TabSwitcher(
+                index: _selectedIndex,
+                // The tabs are not routes: tell each one whether it is
+                // showing, so Dugtong knows which tab the donor is on.
                 children: [
-                  // The badge hangs off the icon's top-right corner without
-                  // taking any room (the Stack is only as big as the icon).
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 1.0, end: isSelected ? 1.18 : 1.0),
-                        duration: const Duration(milliseconds: 380),
-                        curve: Curves.elasticOut,
-                        builder: (context, scale, child) =>
-                            Transform.scale(scale: scale, child: child),
-                        child: Icon(
-                          icon,
-                          size: 22,
-                          color: isSelected
-                              ? const Color(0xFFDC2626)
-                              : const Color(0xFF9CA3AF),
-                        ),
-                      ),
-                      if (badge != null)
-                        Positioned(
-                          top: -7,
-                          right: -9,
-                          child: _UnreadBadge(count: badge!),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 5),
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    curve: Curves.easeOut,
-                    height: 3,
-                    width: isSelected ? 14 : 0,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDC2626),
-                      borderRadius: BorderRadius.circular(999),
+                  for (var i = 0; i < _screens.length; i++)
+                    StreakTabScope(
+                      active: i == _selectedIndex,
+                      child: _screens[i],
                     ),
-                  ),
                 ],
               ),
             ),
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: safeBottom + FloatingNavMetrics.bottomMargin,
+              child: RepaintBoundary(
+                child: _FloatingNav(
+                  selectedIndex: _selectedIndex,
+                  onSelect: _selectTab,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── FLOATING BOTTOM NAV ───────────────────────────────────────────────────────
+
+/// Sizes of the floating bottom bar, shared with every screen that scrolls
+/// under it.
+class FloatingNavMetrics {
+  FloatingNavMetrics._();
+
+  /// Height of the glass bar.
+  static const double barHeight = 64;
+
+  /// Gap between the bar and the system inset at the bottom of the screen.
+  static const double bottomMargin = 10;
+
+  /// How far the raised Check button sticks out above the bar.
+  static const double overhang = 38;
+
+  /// The Check button: raised out of the bar, and sunk into it.
+  static const double checkSize = 62;
+  static const double checkBlendedSize = 48;
+
+  /// Raised, the button's centre sits this far above the bar's top edge.
+  static const double checkRise = 6;
+
+  /// The scoop in the bar's top edge is concentric with the raised button:
+  /// button radius + 8.
+  static const double scoopRadius = checkSize / 2 + 8;
+  static const double scoopDepth = scoopRadius - checkRise;
+
+  /// What every scrollable inside [HomeScreen] ends with, so its last item
+  /// is never hidden behind the bar.
+  static double bottomPadding(BuildContext context) =>
+      barHeight + bottomMargin + MediaQuery.paddingOf(context).bottom + 24;
+
+  /// True while the bar blurs what is behind it. The bar switches this off by
+  /// itself (solid white at 94 %) if frames keep taking too long.
+  static bool frosted = true;
+}
+
+/// Height the nav takes at the bottom of the screen, the raised Check button
+/// included but the system inset excluded (add `MediaQuery.padding.bottom`).
+/// Anything floating over the shell, like the Dugtong bubble, stays above it.
+const double kBottomNavBarHeight =
+    FloatingNavMetrics.barHeight +
+    FloatingNavMetrics.bottomMargin +
+    FloatingNavMetrics.overhang;
+
+/// The bar's outline: a pill whose top edge has a circular scoop around the
+/// Check button, [depth] pixels deep, with eased corners where the scoop meets
+/// the edge. Fill, border, shadow and the backdrop clip all use this one path.
+Path _floatingNavPath(Size size, double depth) {
+  final w = size.width;
+  final h = size.height;
+  final r = h / 2;
+  if (depth < 1) {
+    return Path()..addRRect(
+      RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(r)),
+    );
+  }
+
+  const radius = FloatingNavMetrics.scoopRadius;
+  const fillet = 14.0;
+  final d = math.min(depth, radius - 2);
+  final cx = w / 2;
+  final yc = d - radius; // the scoop circle's centre, relative to the top edge
+  // The fillet circles touch the top edge and the scoop from the bar's side.
+  final xf = math.sqrt(d * (2 * radius + 2 * fillet - d));
+  final left = Offset(cx - xf, fillet);
+  final right = Offset(cx + xf, fillet);
+  final phiLeft = math.atan2(yc - fillet, xf);
+  final phiRight = math.atan2(yc - fillet, -xf);
+  final psiLeft = math.atan2(fillet - yc, -xf);
+  final psiRight = math.atan2(fillet - yc, xf);
+
+  return Path()
+    ..moveTo(r, 0)
+    ..lineTo(left.dx, 0)
+    ..arcTo(
+      Rect.fromCircle(center: left, radius: fillet),
+      -math.pi / 2,
+      phiLeft + math.pi / 2,
+      false,
+    )
+    ..arcTo(
+      Rect.fromCircle(center: Offset(cx, yc), radius: radius),
+      psiLeft,
+      psiRight - psiLeft,
+      false,
+    )
+    ..arcTo(
+      Rect.fromCircle(center: right, radius: fillet),
+      phiRight,
+      -math.pi / 2 - phiRight,
+      false,
+    )
+    ..lineTo(w - r, 0)
+    ..arcTo(Rect.fromLTWH(w - h, 0, h, h), -math.pi / 2, math.pi, false)
+    ..lineTo(r, h)
+    ..arcTo(Rect.fromLTWH(0, 0, h, h), math.pi / 2, math.pi, false)
+    ..close();
+}
+
+class _NavClipper extends CustomClipper<Path> {
+  final ValueGetter<double> depth;
+
+  _NavClipper(this.depth, Listenable reclip) : super(reclip: reclip);
+
+  @override
+  Path getClip(Size size) => _floatingNavPath(size, depth());
+
+  @override
+  bool shouldReclip(covariant _NavClipper oldClipper) => true;
+}
+
+/// A soft, neutral drop shadow: black at 10 %, blur 24, offset (0, 8).
+class _NavShadowPainter extends CustomPainter {
+  final ValueGetter<double> depth;
+
+  _NavShadowPainter(this.depth, Listenable repaint) : super(repaint: repaint);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.translate(0, 8);
+    canvas.drawPath(
+      _floatingNavPath(size, depth()),
+      Paint()
+        ..color = Colors.black.withValues(alpha: 0.10)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
+    );
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _NavShadowPainter old) => false;
+}
+
+/// The glass: white at 86 % over the blur (94 % when the blur is off) and a
+/// 1 px white border at 60 %.
+class _NavGlassPainter extends CustomPainter {
+  final ValueGetter<double> depth;
+  final bool frosted;
+
+  _NavGlassPainter(this.depth, this.frosted, Listenable repaint)
+    : super(repaint: repaint);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = _floatingNavPath(size, depth());
+    canvas.drawPath(
+      path,
+      Paint()..color = Colors.white.withValues(alpha: frosted ? 0.86 : 0.94),
+    );
+    // The clip keeps the inner half of this 2 px stroke: a 1 px border.
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = Colors.white.withValues(alpha: 0.60),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _NavGlassPainter old) => old.frosted != frosted;
+}
+
+class _RingPainter extends CustomPainter {
+  final Offset center;
+  final double radius;
+  final double width;
+  final Color color;
+
+  const _RingPainter(this.center, this.radius, this.width, this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = width
+        ..color = color,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _RingPainter old) =>
+      old.center != center ||
+      old.radius != radius ||
+      old.width != width ||
+      old.color != color;
+}
+
+class _NavDef {
+  final int index;
+  final IconData icon;
+  final String label;
+
+  const _NavDef(this.index, this.icon, this.label);
+}
+
+const _kNavDefs = <_NavDef>[
+  _NavDef(0, Icons.home_rounded, 'Home'),
+  _NavDef(1, Icons.calendar_month_rounded, 'Book an appointment'),
+  _NavDef(3, Icons.history_rounded, 'Donation history'),
+  _NavDef(4, Icons.notifications_rounded, 'Notifications'),
+];
+
+/// The floating bar: Home, Book, [Check], History, Alerts.
+///
+/// Every animation is driven by the selected index changing, so a tap and a
+/// tab switch made from code (a "Check Eligibility" button on Home) look the
+/// same.
+///
+/// * `_move` runs the Check button between BLENDED (t = 0: a 48 px circle
+///   inside the bar, the bar's top edge flat) and RAISED (t = 1: a 62 px
+///   circle 6 px above the top edge, with a scoop in the bar around it).
+/// * `_pillC` glides the selected-tab pill.
+class _FloatingNav extends StatefulWidget {
+  final int selectedIndex;
+  final ValueChanged<int> onSelect;
+
+  const _FloatingNav({required this.selectedIndex, required this.onSelect});
+
+  @override
+  State<_FloatingNav> createState() => _FloatingNavState();
+}
+
+class _FloatingNavState extends State<_FloatingNav>
+    with TickerProviderStateMixin {
+  static const int _check = 2;
+  static const int _slotCount = 5;
+
+  /// Room above the bar for the raised button, its bob and the overshoot.
+  static const double _top = FloatingNavMetrics.overhang + 8;
+
+  // t: 0 = blended, 1 = raised. One linear controller; the curve depends on
+  // the direction so an interrupted move continues from where it was.
+  late final AnimationController _move;
+  double _tFrom = 1;
+  double _tTo = 1;
+  bool _raising = true;
+  double _glowFrom = 1;
+
+  // The selected-tab pill: position (in slots) and visibility, in ms.
+  late final AnimationController _pillC;
+  double _pFromS = 0;
+  double _pToS = 0;
+  double _pDelay = 0;
+  double _pGlide = 300;
+  double _vFrom = 1;
+  double _vTo = 1;
+  double _vDelay = 0;
+  double _vMs = 240;
+  double _pillDur = 1;
+
+  late final AnimationController _pop; // the selected icon's small pop
+  late final AnimationController _squash; // the Check press
+  late final AnimationController _settle; // the ring after sinking
+  late final AnimationController _idle; // bob (3 s) and ring (4 s): 12 s loop
+
+  int _popIndex = 0;
+  int _gen = 0;
+  bool _reduced = false;
+  bool _depsReady = false;
+
+  int _frames = 0;
+  int _slowFrames = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    final onCheck = widget.selectedIndex == _check;
+    _tFrom = _tTo = onCheck ? 0 : 1;
+    _raising = !onCheck;
+    _glowFrom = onCheck ? 0 : 1;
+    _pFromS = _pToS = widget.selectedIndex.toDouble();
+    _vFrom = _vTo = onCheck ? 0 : 1;
+    _popIndex = widget.selectedIndex;
+
+    _move = AnimationController(vsync: this, value: 1)
+      ..addStatusListener(_moveStatus);
+    _pillC = AnimationController(vsync: this, value: 1);
+    _pop = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 180),
+    );
+    _squash = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 90),
+    );
+    _settle = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    );
+    _idle = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 12),
+    );
+    // Debug builds are slow by nature: only judge release/profile frames.
+    if (!kDebugMode) {
+      SchedulerBinding.instance.addTimingsCallback(_onTimings);
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final reduced = MediaQuery.disableAnimationsOf(context);
+    if (!_depsReady || reduced != _reduced) {
+      _depsReady = true;
+      _reduced = reduced;
+      _syncIdle();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _FloatingNav old) {
+    super.didUpdateWidget(old);
+    if (old.selectedIndex != widget.selectedIndex) {
+      _changed(old.selectedIndex, widget.selectedIndex);
+    }
+  }
+
+  @override
+  void dispose() {
+    if (!kDebugMode) {
+      SchedulerBinding.instance.removeTimingsCallback(_onTimings);
+    }
+    _move.dispose();
+    _pillC.dispose();
+    _pop.dispose();
+    _squash.dispose();
+    _settle.dispose();
+    _idle.dispose();
+    super.dispose();
+  }
+
+  // ── Transitions ───────────────────────────────────────────────────────────
+
+  void _changed(int from, int to) {
+    final gen = ++_gen;
+    final toCheck = to == _check;
+    final fromCheck = from == _check;
+
+    if (!toCheck && _squash.value > 0) _squash.reverse();
+    if (toCheck) HapticFeedback.mediumImpact();
+    if (!toCheck) {
+      _popIndex = to;
+      if (!_reduced) _pop.forward(from: 0);
+    }
+
+    if (toCheck) {
+      // The pill fades out where it is while the circle sinks into the bar.
+      _startPill(toS: _pillS, toVis: 0, visMs: 240);
+      if (_reduced) {
+        _beginMove(0);
+      } else {
+        _squash.forward(from: 0).then((_) {
+          if (!mounted || gen != _gen) return;
+          _squash.reverse();
+          _beginMove(0);
+        });
+      }
+    } else if (fromCheck) {
+      // The circle rises out of the bar; the pill starts 60 ms later and
+      // glides from the centre slot to its tab.
+      _beginMove(1);
+      _startPill(
+        fromS: _check.toDouble(),
+        toS: to.toDouble(),
+        toVis: 1,
+        delay: 60,
+        visDelay: 60,
+        visMs: 300,
+      );
+    } else {
+      _startPill(toS: to.toDouble(), toVis: 1);
+    }
+  }
+
+  void _beginMove(double target) {
+    final p = _move.value;
+    final t0 = _tAt(p);
+    final g0 = _glowAt(p);
+    if ((t0 - target).abs() < 0.001 && !_move.isAnimating) {
+      _tFrom = _tTo = target;
+      return;
+    }
+    _glowFrom = g0;
+    _tFrom = t0;
+    _tTo = target;
+    _raising = target > t0;
+    _move.duration = Duration(
+      milliseconds: _reduced ? 120 : (_raising ? 520 : 420),
+    );
+    _move.forward(from: 0);
+    _syncIdle();
+  }
+
+  void _moveStatus(AnimationStatus status) {
+    // The settle ring after the circle has sunk into the bar.
+    if (status == AnimationStatus.completed &&
+        !_raising &&
+        _tTo == 0 &&
+        !_reduced) {
+      _settle.forward(from: 0);
+    }
+  }
+
+  void _startPill({
+    double? fromS,
+    required double toS,
+    required double toVis,
+    double delay = 0,
+    double glide = 300,
+    double visDelay = 0,
+    double visMs = 240,
+  }) {
+    final s0 = fromS ?? _pillS;
+    final v0 = _pillVis;
+    if (_reduced) {
+      // No movement: the pill is already at its tab and just fades.
+      _pFromS = toS;
+      _pDelay = 0;
+      _pGlide = 1;
+      _vDelay = 0;
+      _vMs = 120;
+    } else {
+      _pFromS = s0;
+      _pDelay = delay;
+      _pGlide = glide;
+      _vDelay = visDelay;
+      _vMs = visMs;
+    }
+    _pToS = toS;
+    _vFrom = v0;
+    _vTo = toVis;
+    _pillDur = math.max(_pDelay + _pGlide, _vDelay + _vMs);
+    _pillC.duration = Duration(milliseconds: _pillDur.round());
+    _pillC.forward(from: 0);
+  }
+
+  void _syncIdle() {
+    final want = _tTo > 0.5 && !_reduced;
+    if (want && !_idle.isAnimating) {
+      _idle.repeat();
+    } else if (!want && _idle.isAnimating) {
+      _idle.stop();
+    }
+  }
+
+  void _onTimings(List<ui.FrameTiming> timings) {
+    if (!mounted || !FloatingNavMetrics.frosted) return;
+    if (!_move.isAnimating && !_pillC.isAnimating) return;
+    for (final t in timings) {
+      _frames++;
+      if (t.totalSpan > const Duration(milliseconds: 24)) _slowFrames++;
+    }
+    if (_frames >= 45 && _slowFrames / _frames > 0.3) {
+      setState(() => FloatingNavMetrics.frosted = false);
+    }
+  }
+
+  // ── Values read while painting ────────────────────────────────────────────
+
+  double _tAt(double p) {
+    if (_reduced) return _tTo;
+    final curve = _raising ? Curves.easeOutBack : Curves.easeInOutCubic;
+    return _tFrom + (_tTo - _tFrom) * curve.transform(p);
+  }
+
+  /// Glow and "Check" label: gone within the first 40 % of the sink, back
+  /// during the last 60 % of the rise.
+  double _glowAt(double p) {
+    if (_reduced) return _tTo;
+    if (_raising) {
+      final k = Curves.easeOut.transform(((p - 0.4) / 0.6).clamp(0.0, 1.0));
+      return _glowFrom + (1 - _glowFrom) * k;
+    }
+    final k = Curves.easeOut.transform((p / 0.4).clamp(0.0, 1.0));
+    return _glowFrom * (1 - k);
+  }
+
+  double _depth() => (FloatingNavMetrics.scoopDepth * _tAt(_move.value)).clamp(
+    0.0,
+    FloatingNavMetrics.scoopRadius - 2,
+  );
+
+  double get _pillMs => _pillC.value * _pillDur;
+
+  double get _pillS {
+    final k = Curves.easeOutCubic.transform(
+      ((_pillMs - _pDelay) / _pGlide).clamp(0.0, 1.0),
+    );
+    return _pFromS + (_pToS - _pFromS) * k;
+  }
+
+  double get _pillVis {
+    final k = Curves.easeOutCubic.transform(
+      ((_pillMs - _vDelay) / _vMs).clamp(0.0, 1.0),
+    );
+    return _vFrom + (_vTo - _vFrom) * k;
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
+
+  void _tap(int i) {
+    HapticFeedback.selectionClick();
+    widget.onSelect(i);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const barH = FloatingNavMetrics.barHeight;
+    final frosted = FloatingNavMetrics.frosted;
+
+    return MediaQuery.withClampedTextScaling(
+      maxScaleFactor: 1.2,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final w = constraints.maxWidth;
+          final slotW = w / _slotCount;
+          return SizedBox(
+            height: _top + barH,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // Soft shadow, outside the glass.
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: barH,
+                  child: IgnorePointer(
+                    child: CustomPaint(
+                      painter: _NavShadowPainter(_depth, _move),
+                    ),
+                  ),
+                ),
+                // The glass: blur + white + border, all inside the one path.
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: barH,
+                  child: ClipPath(
+                    clipper: _NavClipper(_depth, _move),
+                    child: frosted
+                        ? BackdropFilter(
+                            filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                            child: CustomPaint(
+                              painter: _NavGlassPainter(_depth, true, _move),
+                            ),
+                          )
+                        : CustomPaint(
+                            painter: _NavGlassPainter(_depth, false, _move),
+                          ),
+                  ),
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: barH,
+                  child: _pill(slotW),
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: barH,
+                  child: Row(
+                    children: [
+                      for (var i = 0; i < _slotCount; i++)
+                        SizedBox(
+                          width: slotW,
+                          height: barH,
+                          child: i == _check ? null : _item(i),
+                        ),
+                    ],
+                  ),
+                ),
+                Positioned.fill(child: _checkLayer(w)),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _pill(double slotW) {
+    return IgnorePointer(
+      child: AnimatedBuilder(
+        animation: _pillC,
+        builder: (context, _) {
+          final vis = _pillVis.clamp(0.0, 1.0);
+          if (vis < 0.01) return const SizedBox.shrink();
+          final x = (_pillS + 0.5) * slotW;
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                left: x - 26,
+                top: (FloatingNavMetrics.barHeight - 40) / 2,
+                width: 52,
+                height: 40,
+                child: Transform.scale(
+                  scale: 0.6 + 0.4 * vis,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: AppColors.accentBg.withValues(alpha: vis),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _item(int i) {
+    final def = _kNavDefs.firstWhere((d) => d.index == i);
+    final selected = widget.selectedIndex == i;
+    final badge = i == 4 ? UnreadNotifications.instance.count : null;
+
+    Widget icon = TweenAnimationBuilder<Color?>(
+      tween: ColorTween(
+        end: selected ? AppColors.primary : AppColors.muted,
+      ),
+      duration: const Duration(milliseconds: 200),
+      builder: (context, color, _) => Icon(def.icon, size: 24, color: color),
+    );
+    // A small pop (1.0 -> 1.12 -> 1.0) when the tab becomes the selected one.
+    icon = AnimatedBuilder(
+      animation: _pop,
+      builder: (context, child) => Transform.scale(
+        scale: _popIndex == i
+            ? 1.0 + 0.12 * math.sin(math.pi * _pop.value)
+            : 1.0,
+        child: child,
+      ),
+      child: icon,
+    );
+    final face = SizedBox(
+      width: 24,
+      height: 24,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Center(child: icon),
+          if (badge != null)
+            Positioned(top: -7, right: -9, child: _UnreadBadge(count: badge)),
+        ],
+      ),
+    );
+
+    Widget button(String label) => Semantics(
+      container: true,
+      button: true,
+      selected: selected,
+      label: label,
+      onTap: () => _tap(i),
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _tap(i),
+        child: Center(child: face),
+      ),
+    );
+
+    if (badge == null) return button(def.label);
+    return ValueListenableBuilder<int>(
+      valueListenable: badge,
+      builder: (context, n, _) =>
+          button(n > 0 ? '${def.label}, $n unread' : def.label),
+    );
+  }
+
+  Widget _checkLayer(double w) {
+    return AnimatedBuilder(
+      animation: Listenable.merge([_move, _idle, _squash, _settle]),
+      builder: (context, _) {
+        final p = _move.value;
+        final t = _tAt(p);
+        final tc = t.clamp(0.0, 1.0);
+        final size = ui.lerpDouble(
+          FloatingNavMetrics.checkBlendedSize,
+          FloatingNavMetrics.checkSize,
+          t,
+        )!;
+        final cx = w / 2;
+        final cy =
+            _top +
+            ui.lerpDouble(
+              FloatingNavMetrics.barHeight / 2,
+              -FloatingNavMetrics.checkRise,
+              t,
+            )!;
+
+        final cycle = _idle.value * 12.0; // seconds in the 12 s loop
+        final bob = _reduced ? 0.0 : tc * 2 * math.sin(2 * math.pi * cycle / 3);
+        final center = Offset(cx, cy + bob);
+        final glow = _glowAt(p);
+
+        final rings = <Widget>[];
+        // A soft ring every 4 s while raised.
+        if (!_reduced && _idle.isAnimating && tc > 0.98) {
+          final phase = (cycle % 4) / 4;
+          if (phase < 0.4) {
+            final k = Curves.easeOut.transform(phase / 0.4);
+            rings.add(
+              _ring(center, size / 2 + 2 + 16 * k, 2, 0.28 * (1 - k)),
+            );
+          }
+        }
+        // The settle ring once the circle has sunk into the bar.
+        if (_settle.isAnimating) {
+          final k = Curves.easeOut.transform(_settle.value);
+          rings.add(
+            _ring(center, size / 2 * (1 + 0.6 * k), 1.5, 0.35 * (1 - k)),
+          );
+        }
+
+        final hit = math.max(size, 48.0);
+        Widget face = Transform.scale(
+          scale: 1 - 0.1 * Curves.easeOut.transform(_squash.value),
+          child: _face(size, tc, glow),
+        );
+        if (_reduced && p < 1) {
+          face = Opacity(opacity: Curves.easeOut.transform(p), child: face);
+        }
+
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            ...rings,
+            Positioned(
+              left: center.dx - hit / 2,
+              top: center.dy - hit / 2,
+              width: hit,
+              height: hit,
+              child: Semantics(
+                container: true,
+                button: true,
+                selected: widget.selectedIndex == _check,
+                label: 'Check eligibility',
+                onTap: () => widget.onSelect(_check),
+                excludeSemantics: true,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => widget.onSelect(_check),
+                  child: Center(child: face),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _ring(Offset center, double radius, double width, double alpha) {
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: CustomPaint(
+          painter: _RingPainter(
+            center,
+            radius,
+            width,
+            AppColors.primary.withValues(alpha: alpha.clamp(0.0, 1.0)),
           ),
         ),
       ),
+    );
+  }
+
+  /// The circle: gradient, 3 px white ring, drop icon, and (raised only) the
+  /// "Check" label and the glow.
+  Widget _face(double size, double t, double glow) {
+    final g = glow.clamp(0.0, 1.0);
+    return Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(
+          colors: AppColors.primaryGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(color: Colors.white, width: 3),
+        boxShadow: g < 0.01
+            ? const []
+            : [
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.28 * g),
+                  blurRadius: 18,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.water_drop_rounded,
+            size: ui.lerpDouble(22, 26, t)!,
+            color: AppColors.onPrimary,
+          ),
+          if (g > 0.01)
+            Align(
+              heightFactor: g,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 1),
+                child: Text(
+                  'Check',
+                  maxLines: 1,
+                  style: TextStyle(
+                    color: AppColors.onPrimary.withValues(alpha: g),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    height: 1.1,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shows one tab at a time and keeps the others alive (like an
+/// [IndexedStack], so a half-finished eligibility check survives a trip to
+/// another tab). The arriving tab fades in and settles from 0.98 to 1.0, 80 ms
+/// after the tap.
+class _TabSwitcher extends StatefulWidget {
+  final int index;
+  final List<Widget> children;
+
+  const _TabSwitcher({required this.index, required this.children});
+
+  @override
+  State<_TabSwitcher> createState() => _TabSwitcherState();
+}
+
+class _TabSwitcherState extends State<_TabSwitcher>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+  late final Animation<double> _fade;
+  late final Animation<double> _scale;
+  late int _shown = widget.index;
+  int? _leaving;
+  Timer? _timer;
+  bool _reduced = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 240),
+      value: 1,
+    )..addStatusListener(_status);
+    _fade = CurvedAnimation(parent: _c, curve: Curves.easeOut);
+    _scale = Tween<double>(
+      begin: 0.98,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _c, curve: Curves.easeOutCubic));
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _reduced = MediaQuery.disableAnimationsOf(context);
+  }
+
+  @override
+  void didUpdateWidget(covariant _TabSwitcher old) {
+    super.didUpdateWidget(old);
+    if (old.index == widget.index) return;
+    _timer?.cancel();
+    final to = widget.index;
+    if (_reduced) {
+      _show(to);
+    } else {
+      _timer = Timer(const Duration(milliseconds: 80), () => _show(to));
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _c.dispose();
+    super.dispose();
+  }
+
+  void _status(AnimationStatus status) {
+    if (status == AnimationStatus.completed && _leaving != null && mounted) {
+      setState(() => _leaving = null);
+    }
+  }
+
+  void _show(int to) {
+    if (!mounted || to == _shown) return;
+    setState(() {
+      _leaving = _shown;
+      _shown = to;
+    });
+    _c.duration = Duration(milliseconds: _reduced ? 120 : 240);
+    _c.forward(from: 0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final n = widget.children.length;
+    // Paint order: parked tabs, the one leaving, the one arriving on top.
+    final order = <int>[
+      for (var i = 0; i < n; i++)
+        if (i != _shown && i != _leaving) i,
+      if (_leaving != null) _leaving!,
+      _shown,
+    ];
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        for (final i in order)
+          KeyedSubtree(
+            key: ValueKey(i),
+            child: Offstage(
+              offstage: i != _shown && i != _leaving,
+              child: TickerMode(
+                enabled: i == _shown || i == _leaving,
+                child: FadeTransition(
+                  opacity: (i == _shown && _leaving != null)
+                      ? _fade
+                      : kAlwaysCompleteAnimation,
+                  child: ScaleTransition(
+                    scale: (i == _shown && _leaving != null)
+                        ? _scale
+                        : kAlwaysCompleteAnimation,
+                    child: widget.children[i],
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -441,7 +1220,7 @@ class _UnreadBadgeState extends State<_UnreadBadge>
                 padding: const EdgeInsets.symmetric(horizontal: 3),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFDC2626),
+                  color: AppColors.primary,
                   borderRadius: BorderRadius.circular(999),
                   border: Border.all(color: Colors.white, width: 2),
                 ),
@@ -461,170 +1240,6 @@ class _UnreadBadgeState extends State<_UnreadBadge>
       },
     );
   }
-}
-
-class _CenterFAB extends StatefulWidget {
-  final bool isActive;
-  final VoidCallback onTap;
-
-  const _CenterFAB({required this.isActive, required this.onTap});
-
-  @override
-  State<_CenterFAB> createState() => _CenterFABState();
-}
-
-class _CenterFABState extends State<_CenterFAB>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _pulseController;
-
-  @override
-  void initState() {
-    super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1000),
-    );
-    if (widget.isActive) _pulseController.repeat(reverse: true);
-  }
-
-  @override
-  void didUpdateWidget(covariant _CenterFAB oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.isActive && !oldWidget.isActive) {
-      _pulseController.repeat(reverse: true);
-    } else if (!widget.isActive && oldWidget.isActive) {
-      _pulseController.stop();
-      _pulseController.animateTo(
-        0,
-        duration: const Duration(milliseconds: 200),
-      );
-    }
-  }
-
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isActive = widget.isActive;
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.mediumImpact();
-        widget.onTap();
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeInOut,
-        width: 62,
-        height: 62,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(31),
-          gradient: LinearGradient(
-            colors: isActive
-                ? [const Color(0xFF750000), const Color(0xFFFF4E4E)]
-                : [const Color(0xFFDC2626), const Color(0xFFEF4444)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          boxShadow: isActive
-              ? []
-              : [
-                  BoxShadow(
-                    color: const Color(0xFFDC2626).withOpacity(0.45),
-                    blurRadius: 14,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            AnimatedBuilder(
-              animation: _pulseController,
-              builder: (context, child) {
-                // While active, the drop bobs up/down and squashes &
-                // stretches like it's beating/dripping in place.
-                final t = isActive ? _pulseController.value : 0.0;
-                final bob = -4.0 * t;
-                final stretch = 1.0 + 0.14 * t;
-                final squash = 1.0 - 0.10 * t;
-                return Transform.translate(
-                  offset: Offset(0, bob),
-                  child: Transform(
-                    alignment: Alignment.bottomCenter,
-                    transform: Matrix4.diagonal3Values(squash, stretch, 1),
-                    child: child,
-                  ),
-                );
-              },
-              child: const _BloodDropIcon(),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              'Check',
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                color: Colors.white.withOpacity(0.9),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _BloodDropIcon extends StatelessWidget {
-  const _BloodDropIcon();
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(size: const Size(20, 26), painter: _BloodDropPainter());
-  }
-}
-
-class _BloodDropPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-
-    final w = size.width;
-    final h = size.height;
-
-    // Classic droplet: sharp point at the top, flaring out into a
-    // fully rounded bulb at the bottom (not a symmetric oval).
-    final path = Path()
-      ..moveTo(w * 0.5, 0)
-      ..cubicTo(w * 0.5, 0, w * 0.12, h * 0.42, w * 0.12, h * 0.66)
-      ..cubicTo(w * 0.12, h * 0.87, w * 0.28, h, w * 0.5, h)
-      ..cubicTo(w * 0.72, h, w * 0.88, h * 0.87, w * 0.88, h * 0.66)
-      ..cubicTo(w * 0.88, h * 0.42, w * 0.5, 0, w * 0.5, 0)
-      ..close();
-
-    canvas.drawPath(path, paint);
-
-    final shinePaint = Paint()
-      ..color = Colors.white.withOpacity(0.35)
-      ..style = PaintingStyle.fill;
-
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(w * 0.38, h * 0.62),
-        width: w * 0.2,
-        height: h * 0.16,
-      ),
-      shinePaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_) => false;
 }
 
 // ── HOME CONTENT ──────────────────────────────────────────────────────────────
@@ -802,7 +1417,7 @@ class _HomeContentState extends State<HomeContent> {
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFD1D5DB),
+                  color: AppColors.border,
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -812,7 +1427,7 @@ class _HomeContentState extends State<HomeContent> {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF111827),
+                color: AppColors.foreground,
               ),
             ),
             const SizedBox(height: 10),
@@ -820,7 +1435,7 @@ class _HomeContentState extends State<HomeContent> {
               block?.message ?? 'You cannot create a request right now.',
               style: const TextStyle(
                 fontSize: 13,
-                color: Color(0xFF6B7280),
+                color: AppColors.muted,
                 height: 1.5,
               ),
             ),
@@ -838,7 +1453,9 @@ class _HomeContentState extends State<HomeContent> {
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFDC2626),
+                    backgroundColor: AppColors.primary,
+                    disabledBackgroundColor: kBorder,
+                    disabledForegroundColor: kTextMuted,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -857,8 +1474,8 @@ class _HomeContentState extends State<HomeContent> {
                 child: OutlinedButton(
                   onPressed: () => Navigator.pop(sheetContext),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF6B7280),
-                    side: const BorderSide(color: Color(0xFFE5E7EB)),
+                    foregroundColor: AppColors.muted,
+                    side: const BorderSide(color: AppColors.border),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
@@ -1065,43 +1682,43 @@ class _HomeContentState extends State<HomeContent> {
   Color getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'cancelled':
-        return const Color(0xFFDC2626);
+        return AppColors.primary;
       case 'pending':
-        return const Color(0xFFF59E0B);
+        return AppColors.warning;
       case 'approved':
       case 'completed':
-        return const Color(0xFF16A34A);
+        return AppColors.success;
       default:
-        return Colors.grey;
+        return AppColors.hint;
     }
   }
 
   Color getStatusBg(String status) {
     switch (status.toLowerCase()) {
       case 'cancelled':
-        return const Color(0xFFFFF1F1);
+        return AppColors.accentBg;
       case 'pending':
-        return const Color(0xFFFFFBEB);
+        return AppColors.warningBg;
       case 'approved':
       case 'completed':
-        return const Color(0xFFF0FDF4);
+        return AppColors.successBg;
       default:
-        return const Color(0xFFF3F4F6);
+        return AppColors.mutedBg;
     }
   }
 
   Color getEligibilityStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'eligible':
-        return const Color(0xFF16A34A);
+        return AppColors.success;
       case 'pending':
       case 'for_review':
       case 'temporary_deferred':
       case 'not_checked':
-        return const Color(0xFFF59E0B);
+        return AppColors.warning;
       case 'not_eligible':
       default:
-        return const Color(0xFFDC2626);
+        return AppColors.primary;
     }
   }
 
@@ -1163,14 +1780,14 @@ class _HomeContentState extends State<HomeContent> {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFF7F1D1D), Color(0xFFDC2626), Color(0xFFEF4444)],
+            colors: AppColors.primaryGradient,
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFDC2626).withValues(alpha: .3),
+              color: AppColors.primary.withValues(alpha: .3),
               blurRadius: 14,
               offset: const Offset(0, 5),
             ),
@@ -1260,7 +1877,7 @@ class _HomeContentState extends State<HomeContent> {
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w900,
-                      color: Color(0xFFDC2626),
+                      color: AppColors.primary,
                     ),
                   ),
                 ),
@@ -1280,7 +1897,7 @@ class _HomeContentState extends State<HomeContent> {
     child: Text(
       _initialsFor(name),
       style: const TextStyle(
-        color: Color(0xFFDC2626),
+        color: AppColors.primary,
         fontWeight: FontWeight.w800,
         fontSize: 16,
       ),
@@ -1306,9 +1923,8 @@ class _HomeContentState extends State<HomeContent> {
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
-      boxShadow: const [
-        BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 3)),
-      ],
+      border: Border.all(color: AppColors.border),
+      boxShadow: AppColors.cardShadow,
     ),
     child: child,
   );
@@ -1320,12 +1936,12 @@ class _HomeContentState extends State<HomeContent> {
         height: 36,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: const Color(0xFFFFF1F1),
+          color: AppColors.accentBg,
           borderRadius: BorderRadius.circular(10),
         ),
         child: const Icon(
           Icons.bloodtype_rounded,
-          color: Color(0xFFDC2626),
+          color: AppColors.primary,
           size: 20,
         ),
       ),
@@ -1339,12 +1955,12 @@ class _HomeContentState extends State<HomeContent> {
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF111827),
+                color: AppColors.foreground,
               ),
             ),
             Text(
               'Request blood or help a patient in need',
-              style: TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+              style: TextStyle(fontSize: 11, color: AppColors.muted),
             ),
           ],
         ),
@@ -1352,7 +1968,7 @@ class _HomeContentState extends State<HomeContent> {
       TextButton(
         onPressed: () => _openBloodRequestsHub(),
         style: TextButton.styleFrom(
-          foregroundColor: const Color(0xFFDC2626),
+          foregroundColor: AppColors.primary,
           padding: EdgeInsets.zero,
         ),
         child: const Row(
@@ -1381,7 +1997,7 @@ class _HomeContentState extends State<HomeContent> {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFF750000), Color(0xFFFF4E4E)],
+            colors: AppColors.primaryGradient,
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -1413,7 +2029,7 @@ class _HomeContentState extends State<HomeContent> {
                       ].where((e) => e != null && e.isNotEmpty).join(' · '),
                       style: const TextStyle(
                         fontSize: 11,
-                        color: Colors.white70,
+                        color: AppColors.onPrimary,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1435,14 +2051,14 @@ class _HomeContentState extends State<HomeContent> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFFDC2626), Color(0xFF991B1B)],
+          colors: AppColors.primaryGradient,
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFDC2626).withValues(alpha: .3),
+            color: AppColors.primary.withValues(alpha: .3),
             blurRadius: 12,
             offset: const Offset(0, 5),
           ),
@@ -1476,7 +2092,7 @@ class _HomeContentState extends State<HomeContent> {
               SizedBox(height: 2),
               Text(
                 'For you or a loved one',
-                style: TextStyle(fontSize: 11, color: Colors.white70),
+                style: TextStyle(fontSize: 11, color: AppColors.onPrimary),
               ),
             ],
           ),
@@ -1494,8 +2110,8 @@ class _HomeContentState extends State<HomeContent> {
           height: 118,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color(0xFFFFF7F7),
-            border: Border.all(color: const Color(0xFFFECACA), width: 1.5),
+            color: AppColors.accentBg,
+            border: Border.all(color: AppColors.primaryBorder, width: 1.5),
             borderRadius: BorderRadius.circular(14),
           ),
           child: Column(
@@ -1507,12 +2123,12 @@ class _HomeContentState extends State<HomeContent> {
                 height: 36,
                 alignment: Alignment.center,
                 decoration: const BoxDecoration(
-                  color: Color(0xFFFFE4E4),
+                  color: AppColors.accentBg,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
                   Icons.volunteer_activism_rounded,
-                  color: Color(0xFFDC2626),
+                  color: AppColors.primary,
                   size: 20,
                 ),
               ),
@@ -1524,7 +2140,7 @@ class _HomeContentState extends State<HomeContent> {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF111827),
+                      color: AppColors.foreground,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -1536,7 +2152,7 @@ class _HomeContentState extends State<HomeContent> {
                         : 'No requests right now',
                     style: const TextStyle(
                       fontSize: 11,
-                      color: Color(0xFF6B7280),
+                      color: AppColors.muted,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -1553,7 +2169,7 @@ class _HomeContentState extends State<HomeContent> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
               decoration: BoxDecoration(
-                color: const Color(0xFFDC2626),
+                color: AppColors.primary,
                 borderRadius: BorderRadius.circular(999),
                 border: Border.all(color: Colors.white, width: 1.5),
               ),
@@ -1585,7 +2201,7 @@ class _HomeContentState extends State<HomeContent> {
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF9CA3AF),
+                  color: AppColors.muted,
                   letterSpacing: 0.8,
                 ),
               ),
@@ -1595,7 +2211,7 @@ class _HomeContentState extends State<HomeContent> {
                   '+${summary.myActiveCount - 1} more',
                   style: const TextStyle(
                     fontSize: 10,
-                    color: Color(0xFF9CA3AF),
+                    color: AppColors.muted,
                   ),
                 ),
               ],
@@ -1616,7 +2232,7 @@ class _HomeContentState extends State<HomeContent> {
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF111827),
+                        color: AppColors.foreground,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -1634,7 +2250,7 @@ class _HomeContentState extends State<HomeContent> {
                       style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF111827),
+                        color: AppColors.foreground,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -1661,8 +2277,8 @@ class _HomeContentState extends State<HomeContent> {
         width: double.infinity,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: const Color(0xFFF0FDF4),
-          border: Border.all(color: const Color(0xFFBBF7D0)),
+          color: AppColors.successBg,
+          border: Border.all(color: AppColors.successBorder),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -1670,7 +2286,7 @@ class _HomeContentState extends State<HomeContent> {
             const Icon(
               Icons.favorite_rounded,
               size: 18,
-              color: Color(0xFF16A34A),
+              color: AppColors.success,
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -1682,7 +2298,7 @@ class _HomeContentState extends State<HomeContent> {
                     style: const TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF166534),
+                      color: AppColors.successDark,
                     ),
                   ),
                   Text(
@@ -1694,7 +2310,7 @@ class _HomeContentState extends State<HomeContent> {
                     ].where((e) => e != null && e.isNotEmpty).join(' · '),
                     style: const TextStyle(
                       fontSize: 11,
-                      color: Color(0xFF15803D),
+                      color: AppColors.successDark,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -1702,7 +2318,7 @@ class _HomeContentState extends State<HomeContent> {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: Color(0xFF16A34A)),
+            const Icon(Icons.chevron_right_rounded, color: AppColors.success),
           ],
         ),
       ),
@@ -1715,7 +2331,7 @@ class _HomeContentState extends State<HomeContent> {
         width: 36,
         height: 36,
         decoration: BoxDecoration(
-          color: const Color(0xFFF3F4F6),
+          color: AppColors.mutedBg,
           borderRadius: BorderRadius.circular(10),
         ),
       ),
@@ -1726,7 +2342,7 @@ class _HomeContentState extends State<HomeContent> {
           style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF111827),
+            color: AppColors.foreground,
           ),
         ),
       ),
@@ -1736,7 +2352,7 @@ class _HomeContentState extends State<HomeContent> {
   Widget _brSkeletonTile() => Container(
     height: 118,
     decoration: BoxDecoration(
-      color: const Color(0xFFF3F4F6),
+      color: AppColors.mutedBg,
       borderRadius: BorderRadius.circular(14),
     ),
   );
@@ -1766,18 +2382,18 @@ class _HomeContentState extends State<HomeContent> {
           const Icon(
             Icons.wifi_off_rounded,
             size: 16,
-            color: Color(0xFF9CA3AF),
+            color: AppColors.muted,
           ),
           const SizedBox(width: 8),
           const Text(
             "Couldn't load blood requests",
-            style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+            style: TextStyle(fontSize: 12, color: AppColors.muted),
           ),
           const Spacer(),
           TextButton(
             onPressed: loadBloodRequestSummary,
             style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFFDC2626),
+              foregroundColor: AppColors.primary,
               padding: EdgeInsets.zero,
             ),
             child: const Text(
@@ -1814,7 +2430,7 @@ class _HomeContentState extends State<HomeContent> {
             ],
           ),
           if (summary.myActiveRequest != null) ...[
-            const Divider(height: 28, color: Color(0xFFF3F4F6)),
+            const Divider(height: 28, color: AppColors.mutedBg),
             _brYourRequestSection(summary),
           ],
           if (summary.myCommitment != null) ...[
@@ -1835,7 +2451,7 @@ class _HomeContentState extends State<HomeContent> {
     final firstName = userName.split(' ').first;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
+      backgroundColor: AppColors.mutedBg,
       body: Column(
         children: [
           EdonateHeader(
@@ -1898,7 +2514,7 @@ class _HomeContentState extends State<HomeContent> {
           ),
           Expanded(
             child: RefreshIndicator(
-              color: const Color(0xFFDC2626),
+              color: AppColors.primary,
               onRefresh: _refreshHomeData,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
@@ -1906,7 +2522,7 @@ class _HomeContentState extends State<HomeContent> {
                   screenWidth * 0.05,
                   20,
                   screenWidth * 0.05,
-                  20,
+                  FloatingNavMetrics.bottomPadding(context),
                 ),
                 child: Column(
                   children: [
@@ -1919,8 +2535,8 @@ class _HomeContentState extends State<HomeContent> {
                               label: 'Blood Type',
                               value: isProfileLoading ? '...' : bloodType,
                               icon: Icons.water_drop_rounded,
-                              iconColor: const Color(0xFFDC2626),
-                              iconBg: const Color(0xFFFFF1F1),
+                              iconColor: AppColors.primary,
+                              iconBg: AppColors.accentBg,
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -1943,8 +2559,8 @@ class _HomeContentState extends State<HomeContent> {
                                   ? '...'
                                   : '${totalDonations * 3}',
                               icon: Icons.people_rounded,
-                              iconColor: const Color(0xFF16A34A),
-                              iconBg: const Color(0xFFF0FDF4),
+                              iconColor: AppColors.success,
+                              iconBg: AppColors.successBg,
                             ),
                           ),
                         ],
@@ -1963,13 +2579,8 @@ class _HomeContentState extends State<HomeContent> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Colors.black12,
-                              blurRadius: 6,
-                              offset: Offset(0, 3),
-                            ),
-                          ],
+                          border: Border.all(color: AppColors.border),
+                          boxShadow: AppColors.cardShadow,
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1979,12 +2590,12 @@ class _HomeContentState extends State<HomeContent> {
                                 Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFFFF1F1),
+                                    color: AppColors.accentBg,
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: const Icon(
                                     Icons.verified_user_rounded,
-                                    color: Color(0xFFDC2626),
+                                    color: AppColors.primary,
                                     size: 20,
                                   ),
                                 ),
@@ -1994,7 +2605,7 @@ class _HomeContentState extends State<HomeContent> {
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 15,
-                                    color: Color(0xFF111827),
+                                    color: AppColors.foreground,
                                   ),
                                 ),
                               ],
@@ -2006,7 +2617,7 @@ class _HomeContentState extends State<HomeContent> {
                                   ? 'Loading...'
                                   : nextEligibleDate,
                               Icons.calendar_today_rounded,
-                              const Color(0xFF2563EB),
+                              AppColors.info,
                             ),
                             const SizedBox(height: 8),
                             _eligibilityRow(
@@ -2029,7 +2640,9 @@ class _HomeContentState extends State<HomeContent> {
                                 ),
                                 label: const Text('Check Eligibility'),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFDC2626),
+                                  backgroundColor: AppColors.primary,
+                                  disabledBackgroundColor: kBorder,
+                                  disabledForegroundColor: kTextMuted,
                                   foregroundColor: Colors.white,
                                   elevation: 0,
                                   shape: RoundedRectangleBorder(
@@ -2055,8 +2668,8 @@ class _HomeContentState extends State<HomeContent> {
                           Expanded(
                             child: _actionCard(
                               icon: Icons.calendar_month_rounded,
-                              iconColor: const Color(0xFF2563EB),
-                              iconBg: const Color(0xFFEFF6FF),
+                              iconColor: AppColors.info,
+                              iconBg: AppColors.infoBg,
                               title: 'Book Appointment',
                               subtitle: 'Schedule your donation',
                               onTap: () => widget.onNavigateToTab(1),
@@ -2087,7 +2700,7 @@ class _HomeContentState extends State<HomeContent> {
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 15,
-                              color: Color(0xFF111827),
+                              color: AppColors.foreground,
                             ),
                           ),
                           if (!isAppointmentsLoading && appointments.isNotEmpty)
@@ -2097,7 +2710,7 @@ class _HomeContentState extends State<HomeContent> {
                                 'See all',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Color(0xFFDC2626),
+                                  color: AppColors.primary,
                                 ),
                               ),
                             ),
@@ -2108,7 +2721,7 @@ class _HomeContentState extends State<HomeContent> {
                     if (isAppointmentsLoading)
                       const Center(
                         child: CircularProgressIndicator(
-                          color: Color(0xFFDC2626),
+                          color: AppColors.primary,
                         ),
                       )
                     else if (appointments.isEmpty)
@@ -2119,27 +2732,22 @@ class _HomeContentState extends State<HomeContent> {
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
                             color: Colors.white,
-                            borderRadius: BorderRadius.circular(14),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Colors.black12,
-                                blurRadius: 4,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppColors.border),
+                            boxShadow: AppColors.cardShadow,
                           ),
                           child: Column(
                             children: [
                               Icon(
                                 Icons.calendar_today_outlined,
-                                color: Colors.grey.shade300,
+                                color: AppColors.border,
                                 size: 36,
                               ),
                               const SizedBox(height: 8),
                               const Text(
                                 'No upcoming appointments.',
                                 style: TextStyle(
-                                  color: Color(0xFF9CA3AF),
+                                  color: AppColors.muted,
                                   fontSize: 13,
                                 ),
                               ),
@@ -2147,7 +2755,7 @@ class _HomeContentState extends State<HomeContent> {
                               const Text(
                                 'Book one to get started!',
                                 style: TextStyle(
-                                  color: Color(0xFFD1D5DB),
+                                  color: AppColors.border,
                                   fontSize: 11,
                                 ),
                               ),
@@ -2170,7 +2778,7 @@ class _HomeContentState extends State<HomeContent> {
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFF750000), Color(0xFFFF4E4E)],
+                            colors: AppColors.primaryGradient,
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
@@ -2194,7 +2802,7 @@ class _HomeContentState extends State<HomeContent> {
                                   Text(
                                     '$totalDonations donations · ${totalDonations * 3} lives potentially saved',
                                     style: const TextStyle(
-                                      color: Colors.white70,
+                                      color: AppColors.onPrimary,
                                       fontSize: 12,
                                     ),
                                   ),
@@ -2226,15 +2834,15 @@ class _HomeContentState extends State<HomeContent> {
                           vertical: 12,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF0FDF4),
+                          color: AppColors.successBg,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFBBF7D0)),
+                          border: Border.all(color: AppColors.successBorder),
                         ),
                         child: const Row(
                           children: [
                             Icon(
                               Icons.volunteer_activism_rounded,
-                              color: Color(0xFF16A34A),
+                              color: AppColors.success,
                               size: 18,
                             ),
                             SizedBox(width: 10),
@@ -2242,7 +2850,7 @@ class _HomeContentState extends State<HomeContent> {
                               child: Text(
                                 'Thank you for being a hero in your community. Every donation makes a difference.',
                                 style: TextStyle(
-                                  color: Color(0xFF166534),
+                                  color: AppColors.successDark,
                                   fontSize: 11,
                                   height: 1.4,
                                 ),
@@ -2280,10 +2888,9 @@ class _HomeContentState extends State<HomeContent> {
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 5, offset: Offset(0, 2)),
-        ],
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+        boxShadow: AppColors.cardShadow,
       ),
       child: Column(
         children: [
@@ -2298,14 +2905,14 @@ class _HomeContentState extends State<HomeContent> {
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF111827),
+              color: AppColors.foreground,
             ),
           ),
           const SizedBox(height: 2),
           Text(
             label,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 10, color: Color(0xFF9CA3AF)),
+            style: const TextStyle(fontSize: 10, color: AppColors.muted),
           ),
         ],
       ),
@@ -2324,7 +2931,7 @@ class _HomeContentState extends State<HomeContent> {
         const SizedBox(width: 6),
         Text(
           '$label: ',
-          style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+          style: const TextStyle(fontSize: 13, color: AppColors.muted),
         ),
         Expanded(
           child: Text(
@@ -2354,14 +2961,9 @@ class _HomeContentState extends State<HomeContent> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: const [
-            BoxShadow(
-              color: Colors.black12,
-              blurRadius: 5,
-              offset: Offset(0, 2),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+          boxShadow: AppColors.cardShadow,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2380,13 +2982,13 @@ class _HomeContentState extends State<HomeContent> {
               style: const TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
-                color: Color(0xFF111827),
+                color: AppColors.foreground,
               ),
             ),
             const SizedBox(height: 3),
             Text(
               subtitle,
-              style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+              style: const TextStyle(fontSize: 11, color: AppColors.muted),
             ),
           ],
         ),
@@ -2407,22 +3009,21 @@ class _HomeContentState extends State<HomeContent> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 5, offset: Offset(0, 2)),
-        ],
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+        boxShadow: AppColors.cardShadow,
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFF1F1),
+              color: AppColors.accentBg,
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(
               Icons.calendar_month_rounded,
-              color: Color(0xFFDC2626),
+              color: AppColors.primary,
               size: 24,
             ),
           ),
@@ -2436,7 +3037,7 @@ class _HomeContentState extends State<HomeContent> {
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
-                    color: Color(0xFF111827),
+                    color: AppColors.foreground,
                   ),
                 ),
                 const SizedBox(height: 3),
@@ -2444,7 +3045,7 @@ class _HomeContentState extends State<HomeContent> {
                   time,
                   style: const TextStyle(
                     fontSize: 12,
-                    color: Color(0xFF6B7280),
+                    color: AppColors.muted,
                   ),
                 ),
                 const SizedBox(height: 3),
@@ -2452,7 +3053,7 @@ class _HomeContentState extends State<HomeContent> {
                   center,
                   style: const TextStyle(
                     fontSize: 12,
-                    color: Color(0xFF6B7280),
+                    color: AppColors.muted,
                   ),
                 ),
               ],

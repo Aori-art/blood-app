@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The eDonate brand red (the same as AppColors.primary in lib/app_colors.dart). -->
+    <color name="edonate_primary">#C41E3A</color>
+    <color name="edonate_primary_dark">#8B0000</color>
+</resources>

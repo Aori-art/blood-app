@@ -1,6 +1,7 @@
 // The 3-step "Request Blood" wizard (Patient & Hospital → Blood Needed →
 // Contact & Review) plus the success screen shown right after submitting.
 import 'package:flutter/material.dart';
+import 'package:blood/app_colors.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -474,7 +475,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
             Expanded(child: Text(message)),
           ],
         ),
-        backgroundColor: isError ? kCrimson : const Color(0xFF16A34A),
+        backgroundColor: isError ? kCrimson : AppColors.success,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
@@ -485,7 +486,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
   Widget build(BuildContext context) {
     if (_loadingOptions) {
       return const Scaffold(
-        backgroundColor: Color(0xFFF9FAFB),
+        backgroundColor: AppColors.mutedBg,
         body: SafeArea(
           child: Center(child: CircularProgressIndicator(color: kCrimson)),
         ),
@@ -493,7 +494,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
     }
     if (_optionsError) {
       return Scaffold(
-        backgroundColor: const Color(0xFFF9FAFB),
+        backgroundColor: AppColors.mutedBg,
         body: SafeArea(
           child: BrEmptyState(
             icon: Icons.wifi_off_rounded,
@@ -509,7 +510,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
     final options = _options!;
     if (!options.canRequest) {
       return Scaffold(
-        backgroundColor: const Color(0xFFF9FAFB),
+        backgroundColor: AppColors.mutedBg,
         body: SafeArea(
           child: Column(
             children: [
@@ -555,7 +556,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
         if (!didPop) _confirmDiscard();
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFFF9FAFB),
+        backgroundColor: AppColors.mutedBg,
         body: SafeArea(
           child: Column(
             children: [
@@ -611,7 +612,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
               const SizedBox(height: 2),
               Text(
                 'Step ${_step + 1} of 3 · ${_stepNames[_step]}',
-                style: const TextStyle(color: Colors.white70, fontSize: 12),
+                style: const TextStyle(color: AppColors.onPrimary, fontSize: 12),
               ),
             ],
           ),
@@ -634,7 +635,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
                 margin: EdgeInsets.only(right: i < 2 ? 6 : 0),
                 height: 5,
                 decoration: BoxDecoration(
-                  color: active ? kCrimson : const Color(0xFFE5E7EB),
+                  color: active ? kCrimson : AppColors.border,
                   borderRadius: BorderRadius.circular(99),
                 ),
               ),
@@ -693,7 +694,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: valid
                           ? kCrimson
-                          : const Color(0xFFE5E7EB),
+                          : AppColors.border,
                       foregroundColor: valid ? Colors.white : kTextMuted,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
@@ -753,7 +754,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
       style: const TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w600,
-        color: Color(0xFF374151),
+        color: AppColors.foreground,
       ),
     ),
   );
@@ -767,21 +768,21 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
     width: double.infinity,
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
-      color: const Color(0xFFEFF6FF),
-      border: Border.all(color: const Color(0xFFBFDBFE)),
+      color: AppColors.infoBg,
+      border: Border.all(color: AppColors.infoBorder),
       borderRadius: BorderRadius.circular(14),
     ),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: const Color(0xFF2563EB), size: 18),
+        Icon(icon, color: AppColors.info, size: 18),
         const SizedBox(width: 10),
         Expanded(
           child: Text(
             text,
             style: const TextStyle(
               fontSize: 12,
-              color: Color(0xFF1D4ED8),
+              color: AppColors.infoDark,
               height: 1.4,
             ),
           ),
@@ -793,21 +794,21 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
   Widget _autoFilledPill() => Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
     decoration: BoxDecoration(
-      color: const Color(0xFFEFF6FF),
-      border: Border.all(color: const Color(0xFFBFDBFE)),
+      color: AppColors.infoBg,
+      border: Border.all(color: AppColors.infoBorder),
       borderRadius: BorderRadius.circular(999),
     ),
     child: const Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.person_rounded, size: 13, color: Color(0xFF2563EB)),
+        Icon(Icons.person_rounded, size: 13, color: AppColors.info),
         SizedBox(width: 5),
         Text(
           'Filled from your profile',
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF2563EB),
+            color: AppColors.info,
           ),
         ),
       ],
@@ -999,7 +1000,9 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
                 decoration: BoxDecoration(
                   gradient: selected
                       ? const LinearGradient(
-                          colors: [Color(0xFFEF4444), Color(0xFFB91C1C)],
+                          colors: AppColors.primaryGradient,
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         )
                       : null,
                   color: selected ? null : Colors.white,
@@ -1007,7 +1010,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
                   border: Border.all(
                     color: selected
                         ? Colors.transparent
-                        : const Color(0xFFE5E7EB),
+                        : AppColors.border,
                     width: 1.5,
                   ),
                   boxShadow: selected
@@ -1262,13 +1265,15 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
           decoration: BoxDecoration(
             gradient: selected
                 ? const LinearGradient(
-                    colors: [Color(0xFFEF4444), Color(0xFFB91C1C)],
+                    colors: AppColors.primaryGradient,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   )
                 : null,
             color: selected ? null : Colors.white,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: selected ? Colors.transparent : const Color(0xFFE5E7EB),
+              color: selected ? Colors.transparent : AppColors.border,
               width: 1.5,
             ),
             boxShadow: selected
@@ -1371,7 +1376,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: onTap == null ? const Color(0xFFE5E7EB) : Colors.white,
+        color: onTap == null ? AppColors.border : Colors.white,
         border: Border.all(color: kBorder),
         boxShadow: onTap == null
             ? null
@@ -1390,10 +1395,10 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
   Widget _urgencyCard(UrgencyOption u) {
     final selected = _urgency == u.value;
     final color = u.value == 'critical'
-        ? kCrimson
+        ? AppColors.critical
         : u.value == 'high'
-        ? const Color(0xFFEA580C)
-        : const Color(0xFF2563EB);
+        ? AppColors.orange
+        : AppColors.info;
     return GestureDetector(
       onTap: () {
         HapticFeedback.selectionClick();
@@ -1481,14 +1486,14 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
       Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: const [
-          Icon(Icons.visibility_rounded, size: 13, color: Color(0xFFD97706)),
+          Icon(Icons.visibility_rounded, size: 13, color: AppColors.warning),
           SizedBox(width: 6),
           Expanded(
             child: Text(
               "Visible to all donors. Don't include the patient's name or diagnosis.",
               style: TextStyle(
                 fontSize: 11,
-                color: Color(0xFFD97706),
+                color: AppColors.warning,
                 height: 1.4,
               ),
             ),
@@ -1531,9 +1536,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
       color: Colors.white,
       border: Border.all(color: kBorder),
       borderRadius: BorderRadius.circular(16),
-      boxShadow: const [
-        BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 3)),
-      ],
+      boxShadow: AppColors.cardShadow,
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1598,7 +1601,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
             _editLink(1),
           ],
         ),
-        const Divider(height: 28, color: Color(0xFFF3F4F6)),
+        const Divider(height: 28, color: AppColors.mutedBg),
         Row(
           children: [
             const Icon(Icons.lock_rounded, size: 14, color: kTextMuted),
@@ -1826,7 +1829,7 @@ class _FacilityPickerSheetState extends State<_FacilityPickerSheet> {
                                         width: 36,
                                         height: 36,
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFFFFF1F1),
+                                          color: AppColors.accentBg,
                                           borderRadius: BorderRadius.circular(
                                             10,
                                           ),
@@ -1902,7 +1905,7 @@ class BloodRequestSubmittedScreen extends StatelessWidget {
             Text('Reference copied'),
           ],
         ),
-        backgroundColor: const Color(0xFF16A34A),
+        backgroundColor: AppColors.success,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
@@ -1923,7 +1926,7 @@ class BloodRequestSubmittedScreen extends StatelessWidget {
           ];
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
+      backgroundColor: AppColors.mutedBg,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -1942,14 +1945,14 @@ class BloodRequestSubmittedScreen extends StatelessWidget {
                     height: 110,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0xFFF0FDF4),
+                      color: AppColors.successBg,
                       border: Border.all(
-                        color: const Color(0xFFBBF7D0),
+                        color: AppColors.successBorder,
                         width: 3,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF16A34A).withValues(alpha: .2),
+                          color: AppColors.success.withValues(alpha: .2),
                           blurRadius: 30,
                           offset: const Offset(0, 10),
                         ),
@@ -1958,7 +1961,7 @@ class BloodRequestSubmittedScreen extends StatelessWidget {
                     child: const Icon(
                       Icons.check_rounded,
                       size: 54,
-                      color: Color(0xFF16A34A),
+                      color: AppColors.success,
                     ),
                   ),
                 ),
@@ -1980,7 +1983,7 @@ class BloodRequestSubmittedScreen extends StatelessWidget {
                       vertical: 12,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF9FAFB),
+                      color: AppColors.mutedBg,
                       border: Border.all(color: kBorder),
                       borderRadius: BorderRadius.circular(14),
                     ),
@@ -2014,13 +2017,7 @@ class BloodRequestSubmittedScreen extends StatelessWidget {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: kBorder),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Colors.black12,
-                        blurRadius: 6,
-                        offset: Offset(0, 3),
-                      ),
-                    ],
+                    boxShadow: AppColors.cardShadow,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -2095,7 +2092,7 @@ class BloodRequestSubmittedScreen extends StatelessWidget {
               ),
               if (!isLast)
                 Expanded(
-                  child: Container(width: 2, color: const Color(0xFFE5E7EB)),
+                  child: Container(width: 2, color: AppColors.border),
                 ),
             ],
           ),

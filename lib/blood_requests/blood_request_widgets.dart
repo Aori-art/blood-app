@@ -4,6 +4,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:blood/app_colors.dart';
 
 import '../anim.dart';
 import '../shared_design.dart';
@@ -79,7 +80,7 @@ class _BloodDropPainter extends CustomPainter {
       paint.shader = const LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [Color(0xFFEF4444), Color(0xFFB91C1C)],
+        colors: AppColors.primaryGradient,
       ).createShader(Rect.fromLTWH(0, 0, w, h));
     }
     canvas.drawPath(path, paint);
@@ -135,21 +136,21 @@ class _UrgencyChipState extends State<UrgencyChip>
     bool showDot = true;
     switch (widget.urgency) {
       case 'critical':
-        fg = const Color(0xFFDC2626);
-        bg = const Color(0xFFFFF1F1);
-        border = const Color(0xFFFECACA);
+        fg = AppColors.critical;
+        bg = AppColors.accentBg;
+        border = AppColors.primaryBorder;
         label = 'CRITICAL';
         break;
       case 'high':
-        fg = const Color(0xFFEA580C);
-        bg = const Color(0xFFFFF7ED);
-        border = const Color(0xFFFED7AA);
+        fg = AppColors.orange;
+        bg = AppColors.orangeBg;
+        border = AppColors.orangeBorder;
         label = 'URGENT';
         break;
       default:
-        fg = const Color(0xFF2563EB);
-        bg = const Color(0xFFEFF6FF);
-        border = const Color(0xFFBFDBFE);
+        fg = AppColors.info;
+        bg = AppColors.infoBg;
+        border = AppColors.infoBorder;
         label = 'NORMAL';
         showDot = false;
     }
@@ -213,45 +214,45 @@ class RequestStatusChip extends StatelessWidget {
     late IconData icon;
     switch (status) {
       case 'pending_review':
-        fg = const Color(0xFFD97706);
-        bg = const Color(0xFFFFFBEB);
-        border = const Color(0xFFFDE68A);
+        fg = AppColors.warning;
+        bg = AppColors.warningBg;
+        border = AppColors.warningBorder;
         icon = Icons.hourglass_top_rounded;
         break;
       case 'open':
-        fg = const Color(0xFF16A34A);
-        bg = const Color(0xFFF0FDF4);
-        border = const Color(0xFFBBF7D0);
+        fg = AppColors.success;
+        bg = AppColors.successBg;
+        border = AppColors.successBorder;
         icon = Icons.radio_button_checked_rounded;
         break;
       case 'fulfilled':
-        fg = const Color(0xFF15803D);
-        bg = const Color(0xFFF0FDF4);
-        border = const Color(0xFFBBF7D0);
+        fg = AppColors.successDark;
+        bg = AppColors.successBg;
+        border = AppColors.successBorder;
         icon = Icons.check_circle_rounded;
         break;
       case 'cancelled':
-        fg = const Color(0xFF6B7280);
-        bg = const Color(0xFFF3F4F6);
-        border = const Color(0xFFE5E7EB);
+        fg = AppColors.muted;
+        bg = AppColors.mutedBg;
+        border = AppColors.border;
         icon = Icons.block_rounded;
         break;
       case 'expired':
-        fg = const Color(0xFF6B7280);
-        bg = const Color(0xFFF3F4F6);
-        border = const Color(0xFFE5E7EB);
+        fg = AppColors.muted;
+        bg = AppColors.mutedBg;
+        border = AppColors.border;
         icon = Icons.timer_off_rounded;
         break;
       case 'rejected':
-        fg = const Color(0xFFDC2626);
-        bg = const Color(0xFFFFF1F1);
-        border = const Color(0xFFFECACA);
+        fg = AppColors.critical;
+        bg = AppColors.accentBg;
+        border = AppColors.primaryBorder;
         icon = Icons.gpp_bad_rounded;
         break;
       default:
-        fg = const Color(0xFF6B7280);
-        bg = const Color(0xFFF3F4F6);
-        border = const Color(0xFFE5E7EB);
+        fg = AppColors.muted;
+        bg = AppColors.mutedBg;
+        border = AppColors.border;
         icon = Icons.info_outline_rounded;
     }
 
@@ -290,16 +291,16 @@ class MatchBadge extends StatelessWidget {
     late IconData icon;
     switch (matchType) {
       case 'exact':
-        fg = const Color(0xFF16A34A);
-        bg = const Color(0xFFF0FDF4);
-        border = const Color(0xFFBBF7D0);
+        fg = AppColors.success;
+        bg = AppColors.successBg;
+        border = AppColors.successBorder;
         label = 'Exact match';
         icon = Icons.verified_rounded;
         break;
       case 'compatible':
-        fg = const Color(0xFF2563EB);
-        bg = const Color(0xFFEFF6FF);
-        border = const Color(0xFFBFDBFE);
+        fg = AppColors.info;
+        bg = AppColors.infoBg;
+        border = AppColors.infoBorder;
         label = 'Compatible';
         icon = Icons.check_circle_outline_rounded;
         break;
@@ -352,7 +353,7 @@ class DonorProgressBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final full = required > 0 && volunteers >= required;
     final ratio = required <= 0 ? 0.0 : (volunteers / required).clamp(0.0, 1.0);
-    final color = full ? const Color(0xFF16A34A) : kCrimson;
+    final color = full ? AppColors.success : kCrimson;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -386,7 +387,7 @@ class DonorProgressBar extends StatelessWidget {
             builder: (_, value, _) => LinearProgressIndicator(
               value: value,
               minHeight: 6,
-              backgroundColor: const Color(0xFFE5E7EB),
+              backgroundColor: AppColors.border,
               valueColor: AlwaysStoppedAnimation(color),
             ),
           ),
@@ -420,21 +421,21 @@ class BloodRequestCard extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: const Color(0xFFF0FDF4),
-          border: Border.all(color: const Color(0xFFBBF7D0)),
+          color: AppColors.successBg,
+          border: Border.all(color: AppColors.successBorder),
           borderRadius: BorderRadius.circular(999),
         ),
         child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.favorite_rounded, size: 12, color: Color(0xFF16A34A)),
+            Icon(Icons.favorite_rounded, size: 12, color: AppColors.success),
             SizedBox(width: 4),
             Text(
               "You're donating",
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF16A34A),
+                color: AppColors.success,
               ),
             ),
           ],
@@ -445,8 +446,8 @@ class BloodRequestCard extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: const Color(0xFFF3F4F6),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
+          color: AppColors.mutedBg,
+          border: Border.all(color: AppColors.border),
           borderRadius: BorderRadius.circular(999),
         ),
         child: const Text(
@@ -454,7 +455,7 @@ class BloodRequestCard extends StatelessWidget {
           style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.w700,
-            color: Color(0xFF6B7280),
+            color: AppColors.muted,
           ),
         ),
       );
@@ -481,9 +482,9 @@ class BloodRequestCard extends StatelessWidget {
       child: Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          color: critical ? const Color(0xFFFFFBFB) : Colors.white,
+          color: critical ? AppColors.accentBg : Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
+          border: Border.all(color: AppColors.border),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: .04),
@@ -496,7 +497,7 @@ class BloodRequestCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (critical) Container(width: 4, color: kCrimson),
+              if (critical) Container(width: 4, color: AppColors.critical),
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.all(14),
@@ -525,7 +526,7 @@ class BloodRequestCard extends StatelessWidget {
                                         request.createdAgo!,
                                         style: const TextStyle(
                                           fontSize: 11,
-                                          color: Color(0xFF9CA3AF),
+                                          color: AppColors.muted,
                                         ),
                                       ),
                                   ],
@@ -560,7 +561,7 @@ class BloodRequestCard extends StatelessWidget {
                           const Icon(
                             Icons.groups_rounded,
                             size: 14,
-                            color: Color(0xFF374151),
+                            color: AppColors.foreground,
                           ),
                           const SizedBox(width: 6),
                           Expanded(
@@ -568,7 +569,7 @@ class BloodRequestCard extends StatelessWidget {
                               request.requirementText,
                               style: const TextStyle(
                                 fontSize: 12,
-                                color: Color(0xFF374151),
+                                color: AppColors.foreground,
                                 height: 1.4,
                               ),
                             ),
@@ -590,8 +591,8 @@ class BloodRequestCard extends StatelessWidget {
                                 vertical: 6,
                               ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFF9FAFB),
-                                border: Border.all(color: const Color(0xFFE5E7EB)),
+                                color: AppColors.mutedBg,
+                                border: Border.all(color: AppColors.border),
                                 borderRadius: BorderRadius.circular(999),
                               ),
                               child: Row(
@@ -749,7 +750,7 @@ class _BrSkeletonCardState extends State<BrSkeletonCard>
     width: width,
     height: height,
     decoration: BoxDecoration(
-      color: const Color(0xFFF3F4F6),
+      color: AppColors.mutedBg,
       borderRadius: BorderRadius.circular(6),
     ),
   );
@@ -762,7 +763,7 @@ class _BrSkeletonCardState extends State<BrSkeletonCard>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -773,7 +774,7 @@ class _BrSkeletonCardState extends State<BrSkeletonCard>
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF3F4F6),
+                  color: AppColors.mutedBg,
                   borderRadius: BorderRadius.circular(26),
                 ),
               ),

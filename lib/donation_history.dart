@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'app_colors.dart';
 import 'streak/streak_screen.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -9,7 +10,7 @@ import 'book.dart';
 import 'config.dart';
 import 'digital_id.dart';
 import 'digital_id_service.dart';
-import 'home.dart' show kBottomNavBarHeight;
+import 'home.dart' show FloatingNavMetrics;
 import 'shared_design.dart';
 
 class DonationHistoryScreen extends StatefulWidget {
@@ -245,11 +246,11 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
 
   Color get _statusTileColor {
     if (_checkingAppointment || _appointmentCheckFailed) {
-      return const Color(0xFF6B7280);
+      return AppColors.muted;
     }
     return _hasActiveAppointment
-        ? const Color(0xFF16A34A)
-        : const Color(0xFF6B7280);
+        ? AppColors.success
+        : AppColors.muted;
   }
 
   // Mirrors book.dart's _appointmentStatusColor conventions applied to the
@@ -257,26 +258,26 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
   Color _donationStatusColor(String? raw) {
     switch ((raw ?? '').toLowerCase()) {
       case 'completed':
-        return const Color(0xFF16A34A);
+        return AppColors.success;
       case 'deferred':
-        return const Color(0xFFF59E0B);
+        return AppColors.warning;
       case 'failed':
-        return const Color(0xFFDC2626);
+        return AppColors.primary;
       default:
-        return const Color(0xFF6B7280);
+        return AppColors.muted;
     }
   }
 
   Color _donationStatusBg(String? raw) {
     switch ((raw ?? '').toLowerCase()) {
       case 'completed':
-        return const Color(0xFFF0FDF4);
+        return AppColors.successBg;
       case 'deferred':
-        return const Color(0xFFFFFBEB);
+        return AppColors.warningBg;
       case 'failed':
-        return const Color(0xFFFEF2F2);
+        return AppColors.accentBg;
       default:
-        return const Color(0xFFF3F4F6);
+        return AppColors.mutedBg;
     }
   }
 
@@ -300,7 +301,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
     Color? color,
     VoidCallback? onTap,
   }) {
-    final c = color ?? const Color(0xFFDC2626);
+    final c = color ?? AppColors.primary;
     final content = Column(
       children: [
         Stack(
@@ -331,7 +332,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
         ),
         Text(
           label,
-          style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+          style: const TextStyle(fontSize: 11, color: AppColors.muted),
         ),
       ],
     );
@@ -352,7 +353,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
             left: 11,
             top: 26,
             bottom: 0,
-            child: Container(width: 2, color: const Color(0xFFF3F4F6)),
+            child: Container(width: 2, color: AppColors.mutedBg),
           ),
           Positioned(
             left: 6,
@@ -371,7 +372,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
       );
 
   Widget _statDivider() =>
-      Container(width: 1, height: 34, color: const Color(0xFFE5E7EB));
+      Container(width: 1, height: 34, color: AppColors.border);
 
   @override
   Widget build(BuildContext context) =>
@@ -379,7 +380,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
 
   Widget _buildScreen(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
+      backgroundColor: AppColors.mutedBg,
       body: Column(
         children: [
           EdonateHeader(
@@ -405,13 +406,13 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
           Expanded(
             child: RefreshIndicator(
               onRefresh: _refresh,
-              color: const Color(0xFFDC2626),
+              color: AppColors.primary,
               child: Padding(
                 padding: const EdgeInsets.all(15),
                 child: isLoading
                     ? const Center(
                         child: CircularProgressIndicator(
-                          color: Color(0xFFDC2626),
+                          color: AppColors.primary,
                         ),
                       )
                     : donations.isEmpty
@@ -433,12 +434,12 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
                               Icon(
                                 Icons.water_drop_outlined,
                                 size: 48,
-                                color: Colors.grey.shade300,
+                                color: AppColors.border,
                               ),
                               const SizedBox(height: 12),
                               const Text(
                                 "No donation history found.",
-                                style: TextStyle(color: Colors.grey),
+                                style: TextStyle(color: AppColors.muted),
                               ),
                               const SizedBox(height: 20),
                               SizedBox(
@@ -468,7 +469,9 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
                                     ),
                                   ),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFFDC2626),
+                                    backgroundColor: AppColors.primary,
+                                    disabledBackgroundColor: AppColors.border,
+                                    disabledForegroundColor: AppColors.muted,
                                     foregroundColor: Colors.white,
                                     elevation: 0,
                                     shape: RoundedRectangleBorder(
@@ -493,15 +496,9 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: const Color(0xFFE5E7EB),
+                                  color: AppColors.border,
                                 ),
-                                boxShadow: const [
-                                  BoxShadow(
-                                    color: Colors.black12,
-                                    blurRadius: 6,
-                                    offset: Offset(0, 2),
-                                  ),
-                                ],
+                                boxShadow: AppColors.cardShadow,
                               ),
                               child: Column(
                                 children: [
@@ -543,7 +540,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
                                         fontSize: 11,
-                                        color: Color(0xFF6B7280),
+                                        color: AppColors.muted,
                                       ),
                                     ),
                                   ],
@@ -557,9 +554,9 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
                             child: ListView.builder(
                               physics: const AlwaysScrollableScrollPhysics(),
                               padding: EdgeInsets.only(
-                                bottom:
-                                    kBottomNavBarHeight +
-                                    MediaQuery.of(context).padding.bottom,
+                                bottom: FloatingNavMetrics.bottomPadding(
+                                  context,
+                                ),
                               ),
                               itemCount: donations.length,
                               itemBuilder: (context, index) {
@@ -678,17 +675,18 @@ class _DonationCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 10),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: isExpanded
-                  ? const Color(0xFFDC2626).withValues(alpha: .12)
-                  : Colors.black.withValues(alpha: .06),
-              blurRadius: isExpanded ? 16 : 6,
-              offset: const Offset(0, 3),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border, width: 1.5),
+          // An open card lifts with a soft red glow.
+          boxShadow: isExpanded
+              ? [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: .12),
+                    blurRadius: 16,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : AppColors.cardShadow,
         ),
         child: Column(
           children: [
@@ -737,7 +735,7 @@ class _DonationCard extends StatelessWidget {
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFF111827),
+                            color: AppColors.foreground,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -745,7 +743,7 @@ class _DonationCard extends StatelessWidget {
                           formattedDate,
                           style: const TextStyle(
                             fontSize: 11,
-                            color: Color(0xFF9CA3AF),
+                            color: AppColors.muted,
                           ),
                         ),
                       ],
@@ -759,8 +757,8 @@ class _DonationCard extends StatelessWidget {
                     child: Icon(
                       Icons.keyboard_arrow_down_rounded,
                       color: isExpanded
-                          ? const Color(0xFFDC2626)
-                          : const Color(0xFFD1D5DB),
+                          ? AppColors.primary
+                          : AppColors.border,
                       size: 22,
                     ),
                   ),
@@ -780,7 +778,7 @@ class _DonationCard extends StatelessWidget {
                 children: [
                   Divider(
                     height: 1,
-                    color: Colors.grey.shade100,
+                    color: AppColors.mutedBg,
                     indent: 14,
                     endIndent: 14,
                   ),
@@ -852,7 +850,7 @@ class _DonationCard extends StatelessWidget {
                           width: double.infinity,
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFFF1F1),
+                            color: AppColors.accentBg,
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
@@ -861,9 +859,7 @@ class _DonationCard extends StatelessWidget {
                                 : "No remarks recorded.",
                             style: TextStyle(
                               fontSize: 13,
-                              color: const Color(
-                                0xFFDC2626,
-                              ).withValues(alpha: .85),
+                              color: AppColors.primary.withValues(alpha: .85),
                               height: 1.55,
                             ),
                           ),
@@ -903,9 +899,9 @@ class _DonationCard extends StatelessWidget {
   Widget _footerStat(IconData icon, String text) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      Icon(icon, size: 13, color: Colors.grey.shade400),
+      Icon(icon, size: 13, color: AppColors.muted),
       const SizedBox(width: 4),
-      Text(text, style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
+      Text(text, style: TextStyle(fontSize: 11, color: AppColors.muted)),
     ],
   );
 }

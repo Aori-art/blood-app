@@ -129,7 +129,7 @@ class _LoginScreenState extends State<LoginScreen>
   InputDecoration _inputDeco(String hint, {IconData? prefix, Widget? suffix}) =>
       InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(color: _kTextMuted.withOpacity(0.6), fontSize: 14),
+        hintStyle: TextStyle(color: _kTextMuted, fontSize: 14),
         filled: true,
         fillColor: _kInputFill,
         prefixIcon: prefix != null
@@ -199,7 +199,7 @@ class _LoginScreenState extends State<LoginScreen>
                     Text(
                       'Blood Donation App',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.65),
+                        color: AppColors.onPrimary,
                         fontSize: 13,
                         letterSpacing: 1.2,
                       ),

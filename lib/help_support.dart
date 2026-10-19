@@ -153,6 +153,8 @@ Thank you.''';
                   label: const Text('Contact Support'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: kCrimson,
+                    disabledBackgroundColor: kBorder,
+                    disabledForegroundColor: kTextMuted,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),

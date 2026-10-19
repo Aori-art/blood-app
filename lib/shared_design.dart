@@ -3,18 +3,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-// ─── Design tokens ────────────────────────────────────────────────────────────
-// Mirrors the palette used across home.dart / alerts.dart / book.dart / check.dart
-// so the auth flow (login, register, OTP) reads as part of the same app.
-const Color kCrimson = Color(0xFFDC2626);
-const Color kCrimsonDark = Color(0xFF750000);
-const Color kSurface = Colors.white;
-const Color kInputFill = Color(0xFFF9FAFB);
-const Color kBorder = Color(0xFFD1D5DB);
-const Color kTextPrimary = Color(0xFF111827);
-const Color kTextMuted = Color(0xFF6B7280);
+import 'app_colors.dart';
 
-const List<Color> kHeaderGradient = [kCrimsonDark, Color(0xFFFF4E4E)];
+// ─── Design tokens ────────────────────────────────────────────────────────────
+// Aliases of the app palette in app_colors.dart (the newsfeed's), kept under
+// their old names so every screen that uses them follows the palette at once.
+const Color kCrimson = AppColors.primary;
+const Color kCrimsonDark = AppColors.primaryDark;
+const Color kSurface = Colors.white;
+const Color kInputFill = AppColors.mutedBg;
+const Color kBorder = AppColors.border;
+const Color kTextPrimary = AppColors.foreground;
+const Color kTextMuted = AppColors.muted;
+
+const List<Color> kHeaderGradient = AppColors.primaryGradient;
 
 // ─── Full-bleed gradient background for auth screens ──────────────────────────
 // Wraps a screen's content so the crimson gradient fills the whole Scaffold
@@ -112,7 +114,11 @@ class EdonateHeader extends StatelessWidget {
           bottom != null ? 16 : screenHeight * 0.03,
         ),
         decoration: const BoxDecoration(
-          gradient: LinearGradient(colors: kHeaderGradient),
+          gradient: LinearGradient(
+            colors: kHeaderGradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -128,7 +134,7 @@ class EdonateHeader extends StatelessWidget {
                         Text(
                           eyebrow!,
                           style: const TextStyle(
-                            color: Colors.white70,
+                            color: AppColors.onPrimary,
                             fontSize: 13,
                           ),
                         ),
@@ -147,7 +153,7 @@ class EdonateHeader extends StatelessWidget {
                         Text(
                           subtitle!,
                           style: const TextStyle(
-                            color: Colors.white70,
+                            color: AppColors.onPrimary,
                             fontSize: 12,
                           ),
                         ),
@@ -250,7 +256,7 @@ class RegisterHeader extends StatelessWidget {
           Text(
             subtitle,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.75),
+              color: AppColors.onPrimary,
               fontSize: 12,
             ),
           ),
@@ -327,32 +333,35 @@ class AppTextField extends StatelessWidget {
     readOnly: readOnly,
     inputFormatters: inputFormatters,
     onTap: onTap,
+    cursorColor: AppColors.primary,
     style: const TextStyle(color: kTextPrimary, fontSize: 14),
     decoration: InputDecoration(
       hintText: hint,
-      hintStyle: TextStyle(color: kTextMuted.withOpacity(0.6), fontSize: 14),
+      hintStyle: const TextStyle(color: AppColors.muted, fontSize: 14),
       filled: true,
       fillColor: kInputFill,
       prefixIcon: prefixIcon != null
           ? Icon(prefixIcon, color: kTextMuted, size: 18)
           : null,
       suffixIcon: suffix,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: kBorder),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: kBorder),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: kCrimson, width: 1.5),
-      ),
+      errorStyle: const TextStyle(color: AppColors.primary, fontSize: 12),
+      border: _fieldBorder(kBorder),
+      enabledBorder: _fieldBorder(kBorder),
+      focusedBorder: _fieldBorder(AppColors.primary, 1.5),
+      errorBorder: _fieldBorder(AppColors.primary),
+      focusedErrorBorder: _fieldBorder(AppColors.primary, 1.5),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     ),
   );
 }
+
+// One outline for every state of a field (radius 14). Focus and error use the
+// brand red.
+OutlineInputBorder _fieldBorder(Color color, [double width = 1]) =>
+    OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(color: color, width: width),
+    );
 
 // ─── Dropdown ─────────────────────────────────────────────────────────────────
 class AppDropdown<T> extends StatelessWidget {
@@ -381,23 +390,17 @@ class AppDropdown<T> extends StatelessWidget {
     decoration: InputDecoration(
       filled: true,
       fillColor: kInputFill,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: kBorder),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: kBorder),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: kCrimson, width: 1.5),
-      ),
+      errorStyle: const TextStyle(color: AppColors.primary, fontSize: 12),
+      border: _fieldBorder(kBorder),
+      enabledBorder: _fieldBorder(kBorder),
+      focusedBorder: _fieldBorder(AppColors.primary, 1.5),
+      errorBorder: _fieldBorder(AppColors.primary),
+      focusedErrorBorder: _fieldBorder(AppColors.primary, 1.5),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     ),
     hint: Text(
       hint,
-      style: TextStyle(color: kTextMuted.withOpacity(0.6), fontSize: 14),
+      style: const TextStyle(color: AppColors.muted, fontSize: 14),
     ),
     style: const TextStyle(color: kTextPrimary, fontSize: 14),
     items: items,
@@ -418,33 +421,68 @@ class PrimaryButton extends StatelessWidget {
     required this.onTap,
   });
 
+  // The same look as the newsfeed's "Donate Now" button: the brand gradient
+  // (top-left to bottom-right) and a soft red shadow. With no onTap it turns a
+  // muted gray instead of a pale red; while loading it keeps its colors.
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: double.infinity,
-    height: 52,
-    child: ElevatedButton(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: kCrimson,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+  Widget build(BuildContext context) {
+    final disabled = onTap == null && !loading;
+    final radius = BorderRadius.circular(16);
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: disabled
+              ? null
+              : const LinearGradient(
+                  colors: AppColors.primaryGradient,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+          color: disabled ? AppColors.hint : null,
+          borderRadius: radius,
+          boxShadow: disabled
+              ? null
+              : [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.25),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+        ),
+        child: ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            disabledBackgroundColor: Colors.transparent,
+            foregroundColor: Colors.white,
+            disabledForegroundColor: Colors.white,
+            shadowColor: Colors.transparent,
+            elevation: 0,
+            shape: RoundedRectangleBorder(borderRadius: radius),
+          ),
+          onPressed: loading ? null : onTap,
+          child: loading
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: Colors.white,
+                  ),
+                )
+              : Text(
+                  label,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+        ),
       ),
-      onPressed: loading ? null : onTap,
-      child: loading
-          ? const SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.5,
-                color: Colors.white,
-              ),
-            )
-          : Text(
-              label,
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-            ),
-    ),
-  );
+    );
+  }
 }
 
 // ─── Outline button ───────────────────────────────────────────────────────────

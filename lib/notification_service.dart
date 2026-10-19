@@ -4,6 +4,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import 'app_colors.dart';
+
 /// Bridges Firebase Cloud Messaging with local (in-app) notification display
 /// and app navigation. MySQL (via get_notifications.php) remains the
 /// authoritative notification inbox — this service only tells the rest of
@@ -99,6 +101,8 @@ class NotificationService {
           channelDescription: _androidChannel.description,
           importance: Importance.high,
           priority: Priority.high,
+          // The accent of the notification: the brand red.
+          color: AppColors.primary,
         ),
       ),
     );

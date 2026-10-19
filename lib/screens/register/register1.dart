@@ -272,7 +272,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         child: Text(
                           '11-digit number starting with 09',
                           style: TextStyle(
-                              color: kTextMuted.withOpacity(0.7),
+                              color: kTextMuted,
                               fontSize: 11),
                         ),
                       ),

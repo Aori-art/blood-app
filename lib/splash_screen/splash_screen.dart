@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:blood/app_colors.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:blood/newsfeed.dart';
@@ -211,13 +212,7 @@ class _SplashScreenState extends State<SplashScreen>
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF4A0000),
-              Color(0xFF750000),
-              Color(0xFFDA2D2D),
-              Color(0xFFFF5E5E),
-            ],
-            stops: [0.0, 0.3, 0.7, 1.0],
+            colors: AppColors.primaryGradient,
           ),
         ),
         child: Stack(
@@ -355,7 +350,7 @@ class _SplashScreenState extends State<SplashScreen>
                             Text(
                               'Blood Donation Management',
                               style: TextStyle(
-                                color: Colors.white70,
+                                color: AppColors.onPrimary,
                                 fontSize: 13,
                                 letterSpacing: 0.5,
                                 fontWeight: FontWeight.w500,
@@ -405,7 +400,7 @@ class _SplashScreenState extends State<SplashScreen>
                           child: const Text(
                             'Every drop counts. Every life matters.',
                             style: TextStyle(
-                              color: Colors.white54,
+                              color: AppColors.onPrimaryMuted,
                               fontSize: 12,
                               letterSpacing: 0.3,
                             ),

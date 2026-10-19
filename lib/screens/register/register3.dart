@@ -297,7 +297,7 @@ class _Req extends StatelessWidget {
             decoration: BoxDecoration(
               color: met ? kCrimson : Colors.transparent,
               border: Border.all(
-                  color: met ? kCrimson : kTextMuted.withOpacity(0.4),
+                  color: met ? kCrimson : kTextMuted,
                   width: 1.5),
               borderRadius: BorderRadius.circular(9),
             ),

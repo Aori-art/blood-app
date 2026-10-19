@@ -17,6 +17,11 @@
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="edonate_notifications" />
 
+        <!-- Accent color of push notifications: the brand red. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/edonate_primary" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

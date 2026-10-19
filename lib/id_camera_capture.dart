@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'app_colors.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
@@ -240,7 +241,7 @@ class _IdCameraCaptureScreenState extends State<IdCameraCaptureScreen>
       StreakScreen(id: 'verify', child: _buildScreen(context));
 
   Widget _buildScreen(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFFF9FAFB),
+    backgroundColor: AppColors.mutedBg,
     body: SafeArea(
       child: Column(
         children: [
@@ -334,7 +335,7 @@ class _IdCameraCaptureScreenState extends State<IdCameraCaptureScreen>
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
-                  color: selected ? const Color(0xFFFFF1F1) : Colors.white,
+                  color: selected ? AppColors.accentBg : Colors.white,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
                     color: selected ? kCrimson : kBorder,
@@ -409,8 +410,8 @@ class _IdCameraCaptureScreenState extends State<IdCameraCaptureScreen>
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFFFEF2F2),
-              border: Border.all(color: const Color(0xFFFECACA)),
+              color: AppColors.accentBg,
+              border: Border.all(color: AppColors.primaryBorder),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Text(
@@ -520,7 +521,7 @@ class _IdCameraCaptureScreenState extends State<IdCameraCaptureScreen>
   Widget _processingStep() {
     if (_submitSucceeded) {
       return _resultGlow(
-        color: const Color(0xFF16A34A),
+        color: AppColors.success,
         icon: Icons.check_circle_rounded,
         title: 'Submitted!',
         subtitle: 'Redirecting you back...',

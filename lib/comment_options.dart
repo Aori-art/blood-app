@@ -4,7 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'newsfeed.dart' show AppColors;
+import 'app_colors.dart';
 import 'post_comments_api.dart';
 import 'shared_design.dart' show kCrimson;
 
@@ -387,7 +387,7 @@ class _ReportSheetState extends State<_ReportSheet> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: kCrimson,
                   foregroundColor: Colors.white,
-                  disabledBackgroundColor: kCrimson.withValues(alpha: 0.35),
+                  disabledBackgroundColor: AppColors.hint,
                   disabledForegroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(

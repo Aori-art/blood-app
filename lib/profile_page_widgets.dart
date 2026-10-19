@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'app_colors.dart';
 
 import 'anim.dart';
 import 'shared_design.dart';
@@ -16,7 +17,7 @@ class ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFFF9FAFB),
+    backgroundColor: AppColors.mutedBg,
     body: Column(
       children: [
         Container(
@@ -58,7 +59,7 @@ class ProfilePage extends StatelessWidget {
                     Text(
                       subtitle,
                       style: const TextStyle(
-                        color: Colors.white70,
+                        color: AppColors.onPrimary,
                         fontSize: 12,
                       ),
                     ),
@@ -92,13 +93,8 @@ class ProfileCard extends StatelessWidget {
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(.05),
-          blurRadius: 8,
-          offset: const Offset(0, 3),
-        ),
-      ],
+      border: Border.all(color: AppColors.border),
+      boxShadow: AppColors.cardShadow,
     ),
     child: child,
   );
@@ -126,7 +122,7 @@ class SettingsRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
       child: Row(
         children: [
-          Icon(icon, color: const Color(0xFF6B7280), size: 21),
+          Icon(icon, color: AppColors.muted, size: 21),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -159,7 +155,7 @@ class SettingsRow extends StatelessWidget {
                   ? const SizedBox()
                   : const Icon(
                       Icons.chevron_right_rounded,
-                      color: Color(0xFF9CA3AF),
+                      color: AppColors.muted,
                     )),
         ],
       ),
@@ -172,9 +168,9 @@ Widget profileInfoCard(String text, {IconData icon = Icons.info_outline}) =>
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF1F1),
+        color: AppColors.accentBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFFECACA)),
+        border: Border.all(color: AppColors.primaryBorder),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -185,7 +181,7 @@ Widget profileInfoCard(String text, {IconData icon = Icons.info_outline}) =>
             child: Text(
               text,
               style: const TextStyle(
-                color: Color(0xFF991B1B),
+                color: AppColors.primaryDark,
                 fontSize: 13,
                 height: 1.4,
               ),

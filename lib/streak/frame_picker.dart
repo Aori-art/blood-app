@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:blood/app_colors.dart';
 
 import '../shared_design.dart';
 import '../verify.dart';
@@ -159,7 +160,7 @@ class _FrameCatalogSheetState extends State<_FrameCatalogSheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE5E7EB),
+                    color: AppColors.border,
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
@@ -205,7 +206,7 @@ class _FrameCatalogSheetState extends State<_FrameCatalogSheet> {
             const Icon(
               Icons.cloud_off_rounded,
               size: 40,
-              color: Color(0xFF9CA3AF),
+              color: AppColors.muted,
             ),
             const SizedBox(height: 10),
             const Text(
@@ -272,10 +273,10 @@ class _FrameCatalogSheetState extends State<_FrameCatalogSheet> {
     child: Container(
       padding: const EdgeInsets.fromLTRB(6, 10, 6, 8),
       decoration: BoxDecoration(
-        color: equipped ? const Color(0xFFFFF7F7) : Colors.white,
+        color: equipped ? AppColors.accentBg : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: equipped ? kCrimson : const Color(0xFFE5E7EB),
+          color: equipped ? kCrimson : AppColors.border,
           width: equipped ? 1.5 : 1,
         ),
       ),
@@ -388,7 +389,7 @@ class _FrameCatalogSheetState extends State<_FrameCatalogSheet> {
               child: Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF6B7280),
+                  color: AppColors.muted,
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.white, width: 1.5),
                 ),
@@ -508,7 +509,7 @@ class _RequirementDialogState extends State<_RequirementDialog> {
                 value: v,
                 minHeight: 10,
                 color: kCrimson,
-                backgroundColor: const Color(0xFFF3F4F6),
+                backgroundColor: AppColors.mutedBg,
               ),
             ),
           ),
@@ -590,6 +591,8 @@ class _RequirementDialogState extends State<_RequirementDialog> {
                 Navigator.pop(context, d.isVerified ? 'refresh' : 'verify'),
             style: ElevatedButton.styleFrom(
               backgroundColor: kCrimson,
+              disabledBackgroundColor: AppColors.border,
+              disabledForegroundColor: AppColors.muted,
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(

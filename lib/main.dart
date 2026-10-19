@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
+import 'app_theme.dart';
 import 'config.dart';
 import 'firebase_options.dart';
 import 'notification_service.dart';
@@ -149,31 +150,9 @@ class MyApp extends StatelessWidget {
         ],
       ),
 
-      theme: ThemeData(
-        useMaterial3: true,
-
-        primarySwatch: Colors.red,
-
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFDC2626)),
-
-        splashFactory: InkSparkle.splashFactory,
-
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-
-        pageTransitionsTheme: const PageTransitionsTheme(
-          builders: {
-            TargetPlatform.android: CupertinoPageTransitionsBuilder(),
-
-            TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-
-            TargetPlatform.windows: CupertinoPageTransitionsBuilder(),
-
-            TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
-
-            TargetPlatform.linux: CupertinoPageTransitionsBuilder(),
-          },
-        ),
-      ),
+      // One theme for the whole app (see app_theme.dart): anything not styled by
+      // hand follows the same palette as the newsfeed.
+      theme: buildAppTheme(),
 
       home: SplashScreen(isLoggedIn: isLoggedIn),
     );

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:blood/app_colors.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -153,7 +154,7 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
     with TickerProviderStateMixin {
   static const double _base = 200; // Dugtong's size on this screen
   static const List<Color> _confettiColors = [
-    Color(0xFFDC2626),
+    AppColors.primary,
     Color(0xFFFF8FA3),
     Color(0xFFFFD54F),
     Colors.white,
@@ -207,7 +208,7 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
         Color(0xFFFF8FA3),
         Color(0xFFFFE082),
         Colors.white,
-        Color(0xFFEF4444),
+        AppColors.primary,
       ],
       shapes: const [
         ParticleShape.drop,
@@ -774,7 +775,7 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
     decoration: BoxDecoration(
       shape: BoxShape.circle,
       gradient: const LinearGradient(
-        colors: [Color(0xFF2563EB), Color(0xFF06B6D4)],
+        colors: [AppColors.info, Color(0xFF06B6D4)],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ),

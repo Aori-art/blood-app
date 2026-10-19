@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../app_colors.dart';
 import '../shared_design.dart';
 
 /// Visual-only evolution stages of Dugtong.
@@ -71,8 +72,8 @@ const Color _white = Colors.white;
 
 DugtongLook dugtongLookFor(DugtongStage stage) => switch (stage) {
   DugtongStage.rookie => const DugtongLook(
-    bodyA: kCrimson,
-    bodyB: Color(0xFF8B0000),
+    bodyA: AppColors.primary,
+    bodyB: AppColors.primaryDark,
     plateA: _white,
     plateB: _white,
     number: Color(0xFF991B1B),

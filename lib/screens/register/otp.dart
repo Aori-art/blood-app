@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:blood/config.dart';
+import 'package:blood/app_colors.dart';
 import 'package:blood/login.dart';
 import 'package:blood/shared_design.dart';
 import 'package:blood/streak/streak_screen.dart';
@@ -207,7 +208,7 @@ class _OtpScreenState extends State<OtpScreen>
                   Text(
                     "We've sent a 6-digit code to",
                     style: TextStyle(
-                        color: Colors.white.withOpacity(0.7),
+                        color: AppColors.onPrimary,
                         fontSize: 13),
                   ),
                   const SizedBox(height: 2),
@@ -289,17 +290,17 @@ class _OtpScreenState extends State<OtpScreen>
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: Colors.amber.withOpacity(0.08),
+                          color: AppColors.warningBg,
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                              color: Colors.amber.withOpacity(0.3),
+                              color: AppColors.warningBorder,
                               width: 1),
                         ),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Icon(Icons.shield_outlined,
-                                color: Colors.amber, size: 18),
+                                color: AppColors.warning, size: 18),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(

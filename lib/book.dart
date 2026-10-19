@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'app_colors.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,13 +11,12 @@ import 'streak/streak_screen.dart';
 import 'anim.dart';
 import 'check.dart';
 import 'config.dart';
+import 'home.dart' show FloatingNavMetrics, kBottomNavBarHeight;
 import 'shared_design.dart';
 
-// Shared soft shadow used across every card in this file (5.1 consistency
-// pass) — black at ~4% alpha, blur 10, offset (0, 3).
-const List<BoxShadow> kBookSoftShadow = [
-  BoxShadow(color: Color(0x0A000000), blurRadius: 10, offset: Offset(0, 3)),
-];
+// Shared soft shadow used across every card in this file: the app-wide card
+// shadow (black at 4 %, blur 6, offset (0, 2)).
+const List<BoxShadow> kBookSoftShadow = AppColors.cardShadow;
 
 // Sticky bottom bar's own content height (12 top pad + 50 confirm button
 // height + 12 bottom pad) — used so the scroll content ends exactly one
@@ -402,9 +402,9 @@ class _BookScreenState extends State<BookScreen>
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
-              primary: Color(0xFFDC2626),
+              primary: AppColors.primary,
               onPrimary: Colors.white,
-              onSurface: Color(0xFF111827),
+              onSurface: AppColors.foreground,
             ),
           ),
           child: child!,
@@ -446,7 +446,7 @@ class _BookScreenState extends State<BookScreen>
             Expanded(child: Text(message)),
           ],
         ),
-        backgroundColor: color ?? const Color(0xFFDC2626),
+        backgroundColor: color ?? AppColors.primary,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
@@ -481,7 +481,7 @@ class _BookScreenState extends State<BookScreen>
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE5E7EB),
+                    color: AppColors.border,
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
@@ -492,20 +492,20 @@ class _BookScreenState extends State<BookScreen>
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF111827),
+                  color: AppColors.foreground,
                 ),
               ),
               const SizedBox(height: 4),
               const Text(
                 'Please review your appointment details.',
-                style: TextStyle(fontSize: 12.5, color: Color(0xFF6B7280)),
+                style: TextStyle(fontSize: 12.5, color: AppColors.muted),
               ),
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF9FAFB),
-                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                  color: AppColors.mutedBg,
+                  border: Border.all(color: AppColors.border),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Column(
@@ -538,8 +538,8 @@ class _BookScreenState extends State<BookScreen>
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
-                  border: Border.all(color: const Color(0xFFBFDBFE)),
+                  color: AppColors.infoBg,
+                  border: Border.all(color: AppColors.infoBorder),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -548,13 +548,13 @@ class _BookScreenState extends State<BookScreen>
                     const Icon(
                       Icons.info_outline_rounded,
                       size: 16,
-                      color: Color(0xFF1D4ED8),
+                      color: AppColors.infoDark,
                     ),
                     const SizedBox(width: 8),
                     const Expanded(
                       child: Text(
                         'Arrive 10 minutes early and bring a valid ID.',
-                        style: TextStyle(fontSize: 12, color: Color(0xFF1D4ED8)),
+                        style: TextStyle(fontSize: 12, color: AppColors.infoDark),
                       ),
                     ),
                   ],
@@ -569,8 +569,8 @@ class _BookScreenState extends State<BookScreen>
                       child: OutlinedButton(
                         onPressed: () => Navigator.of(sheetContext).pop(),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF6B7280),
-                          side: const BorderSide(color: Color(0xFFE5E7EB)),
+                          foregroundColor: AppColors.muted,
+                          side: const BorderSide(color: AppColors.border),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),
@@ -592,7 +592,9 @@ class _BookScreenState extends State<BookScreen>
                           _submitBooking();
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFDC2626),
+                          backgroundColor: AppColors.primary,
+                          disabledBackgroundColor: AppColors.border,
+                          disabledForegroundColor: AppColors.muted,
                           foregroundColor: Colors.white,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
@@ -629,7 +631,7 @@ class _BookScreenState extends State<BookScreen>
           height: 32,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: const Color(0xFFFFF1F1),
+            color: AppColors.accentBg,
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(icon, size: 16, color: kCrimson),
@@ -641,21 +643,21 @@ class _BookScreenState extends State<BookScreen>
             children: [
               Text(
                 label,
-                style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+                style: const TextStyle(fontSize: 11, color: AppColors.muted),
               ),
               Text(
                 value,
                 style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF111827),
+                  color: AppColors.foreground,
                 ),
               ),
               if (sublabel != null) ...[
                 const SizedBox(height: 2),
                 Text(
                   sublabel,
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+                  style: const TextStyle(fontSize: 11, color: AppColors.muted),
                 ),
               ],
             ],
@@ -674,7 +676,7 @@ class _BookScreenState extends State<BookScreen>
     if (_currentAppointment != null) {
       _showSnack(
         "You already have an active appointment.",
-        color: const Color(0xFFF59E0B),
+        color: AppColors.warning,
         icon: Icons.schedule_rounded,
       );
       return;
@@ -752,7 +754,7 @@ class _BookScreenState extends State<BookScreen>
         if (!mounted) return;
         _showSnack(
           "Appointment booked successfully!",
-          color: Colors.green,
+          color: AppColors.success,
           icon: Icons.check_circle_outline,
         );
       } else {
@@ -844,20 +846,22 @@ class _BookScreenState extends State<BookScreen>
         ),
         content: const Text(
           "Your existing appointment will be changed to the new date and time.",
-          style: TextStyle(fontSize: 13, color: Color(0xFF6B7280), height: 1.5),
+          style: TextStyle(fontSize: 13, color: AppColors.muted, height: 1.5),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text(
               "Cancel",
-              style: TextStyle(color: Color(0xFF6B7280)),
+              style: TextStyle(color: AppColors.muted),
             ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFDC2626),
+              backgroundColor: AppColors.primary,
+              disabledBackgroundColor: AppColors.border,
+              disabledForegroundColor: AppColors.muted,
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(
@@ -942,7 +946,7 @@ class _BookScreenState extends State<BookScreen>
         if (!mounted) return;
         _showSnack(
           "Appointment rescheduled successfully.",
-          color: Colors.green,
+          color: AppColors.success,
           icon: Icons.check_circle_outline,
         );
       } else {
@@ -1079,18 +1083,18 @@ class _BookScreenState extends State<BookScreen>
     switch ((raw ?? '').toLowerCase()) {
       case 'cancelled':
       case 'canceled':
-        return const Color(0xFFDC2626);
+        return AppColors.primary;
       case 'pending':
       case 'scheduled':
-        return const Color(0xFFF59E0B);
+        return AppColors.warning;
       case 'rescheduled':
-        return const Color(0xFF2563EB);
+        return AppColors.info;
       case 'approved':
       case 'confirmed':
       case 'completed':
-        return const Color(0xFF16A34A);
+        return AppColors.success;
       default:
-        return const Color(0xFF6B7280);
+        return AppColors.muted;
     }
   }
 
@@ -1109,13 +1113,13 @@ class _BookScreenState extends State<BookScreen>
     final showingForm = _showingBookingForm;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
+      backgroundColor: AppColors.mutedBg,
       body: Column(
         children: [
           _header(showingForm),
           Expanded(
             child: RefreshIndicator(
-              color: const Color(0xFFDC2626),
+              color: AppColors.primary,
               onRefresh: _refreshStatuses,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
@@ -1123,7 +1127,11 @@ class _BookScreenState extends State<BookScreen>
                   16,
                   20,
                   16,
-                  showingForm ? kStickyBarHeight + 16 : 24,
+                  showingForm
+                      ? kStickyBarHeight + 16
+                      : (widget.showBackButton
+                            ? 24
+                            : FloatingNavMetrics.bottomPadding(context)),
                 ),
                 child: ConstrainedBox(
                   constraints: BoxConstraints(minHeight: screenHeight * 0.6),
@@ -1313,10 +1321,16 @@ class _BookScreenState extends State<BookScreen>
       ),
     );
 
-    // Tab mode: HomeScreen's own bottom navigation bar already handles the
-    // device inset, so this bar just ends at the bottom of our body.
+    // Tab mode: the floating nav sits at the bottom of the screen, so this bar
+    // rides above it (Check button included).
     // Pushed mode: there's no bottom navigation, so clear the gesture area.
-    return widget.showBackButton ? SafeArea(top: false, child: bar) : bar;
+    if (widget.showBackButton) return SafeArea(top: false, child: bar);
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: kBottomNavBarHeight + MediaQuery.paddingOf(context).bottom + 8,
+      ),
+      child: bar,
+    );
   }
 
   Widget _confirmButton({required bool isReschedule}) {
@@ -1349,10 +1363,12 @@ class _BookScreenState extends State<BookScreen>
           decoration: BoxDecoration(
             gradient: enabled
                 ? const LinearGradient(
-                    colors: [Color(0xFFDC2626), Color(0xFF991B1B)],
+                    colors: AppColors.primaryGradient,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   )
                 : null,
-            color: enabled ? null : const Color(0xFFE5E7EB),
+            color: enabled ? null : AppColors.border,
             borderRadius: BorderRadius.circular(14),
           ),
           child: _isSubmitting
@@ -1372,14 +1388,14 @@ class _BookScreenState extends State<BookScreen>
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
-                        color: enabled ? Colors.white : const Color(0xFF9CA3AF),
+                        color: enabled ? Colors.white : AppColors.hint,
                       ),
                     ),
                     const SizedBox(width: 6),
                     Icon(
                       Icons.arrow_forward_rounded,
                       size: 18,
-                      color: enabled ? Colors.white : const Color(0xFF9CA3AF),
+                      color: enabled ? Colors.white : AppColors.hint,
                     ),
                   ],
                 ),
@@ -1428,7 +1444,7 @@ class _BookScreenState extends State<BookScreen>
         child: Padding(
           padding: EdgeInsets.only(top: 60),
           child: CircularProgressIndicator(
-            color: Color(0xFFDC2626),
+            color: AppColors.primary,
             strokeWidth: 2.5,
           ),
         ),
@@ -1478,7 +1494,7 @@ class _BookScreenState extends State<BookScreen>
             children: [
               IconButton(
                 onPressed: _isSubmitting ? null : _cancelReschedule,
-                icon: const Icon(Icons.arrow_back, color: Color(0xFF6B7280)),
+                icon: const Icon(Icons.arrow_back, color: AppColors.muted),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
                 splashRadius: 18,
@@ -1489,7 +1505,7 @@ class _BookScreenState extends State<BookScreen>
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
-                  color: Color(0xFF111827),
+                  color: AppColors.foreground,
                 ),
               ),
             ],
@@ -1555,7 +1571,7 @@ class _BookScreenState extends State<BookScreen>
           isReschedule
               ? "Your appointment ID stays the same — only the date, time, and center are updated."
               : "You'll receive a confirmation message with all the details once your booking is confirmed.",
-          style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+          style: const TextStyle(fontSize: 11, color: AppColors.muted),
           textAlign: TextAlign.center,
         ),
       ],
@@ -1572,7 +1588,7 @@ class _BookScreenState extends State<BookScreen>
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: AppColors.border),
         borderRadius: BorderRadius.circular(16),
         boxShadow: kBookSoftShadow,
       ),
@@ -1581,14 +1597,14 @@ class _BookScreenState extends State<BookScreen>
         children: [
           Row(
             children: [
-              Icon(icon, color: const Color(0xFFDC2626), size: 20),
+              Icon(icon, color: AppColors.primary, size: 20),
               const SizedBox(width: 8),
               Text(
                 title,
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
-                  color: Color(0xFF111827),
+                  color: AppColors.foreground,
                 ),
               ),
             ],
@@ -1670,7 +1686,7 @@ class _BookScreenState extends State<BookScreen>
           decoration: BoxDecoration(
             gradient: selected
                 ? const LinearGradient(
-                    colors: [Color(0xFFDC2626), Color(0xFF991B1B)],
+                    colors: AppColors.primaryGradient,
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   )
@@ -1760,8 +1776,8 @@ class _BookScreenState extends State<BookScreen>
         height: 48,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: const Color(0xFFF9FAFB),
-          border: Border.all(color: const Color(0xFFD1D5DB)),
+          color: AppColors.mutedBg,
+          border: Border.all(color: AppColors.border),
           borderRadius: BorderRadius.circular(10),
         ),
         child: const SizedBox(
@@ -1769,7 +1785,7 @@ class _BookScreenState extends State<BookScreen>
           height: 16,
           child: CircularProgressIndicator(
             strokeWidth: 2,
-            color: Color(0xFFDC2626),
+            color: AppColors.primary,
           ),
         ),
       );
@@ -1780,14 +1796,14 @@ class _BookScreenState extends State<BookScreen>
         children: [
           const Icon(
             Icons.wifi_off_rounded,
-            color: Color(0xFF9CA3AF),
+            color: AppColors.muted,
             size: 18,
           ),
           const SizedBox(width: 8),
           const Expanded(
             child: Text(
               "Couldn't load donation centers",
-              style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+              style: TextStyle(fontSize: 13, color: AppColors.muted),
             ),
           ),
           TextButton(
@@ -1801,7 +1817,7 @@ class _BookScreenState extends State<BookScreen>
             child: const Text(
               "Retry",
               style: TextStyle(
-                color: Color(0xFFDC2626),
+                color: AppColors.primary,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -1813,7 +1829,7 @@ class _BookScreenState extends State<BookScreen>
     if (_facilities.isEmpty) {
       return const Text(
         "No donation centers are available right now.",
-        style: TextStyle(fontSize: 13, color: Color(0xFF9CA3AF)),
+        style: TextStyle(fontSize: 13, color: AppColors.muted),
       );
     }
 
@@ -1930,9 +1946,9 @@ class _BookScreenState extends State<BookScreen>
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFFFFF7F7) : Colors.white,
+          color: selected ? AppColors.accentBg : Colors.white,
           border: Border.all(
-            color: selected ? kCrimson : const Color(0xFFE5E7EB),
+            color: selected ? kCrimson : AppColors.border,
             width: selected ? 1.5 : 1,
           ),
           borderRadius: BorderRadius.circular(14),
@@ -1947,12 +1963,12 @@ class _BookScreenState extends State<BookScreen>
                   height: 40,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEFF6FF),
+                    color: AppColors.infoBg,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
                     _facilityTypeIcon(f['facility_type']?.toString()),
-                    color: const Color(0xFF2563EB),
+                    color: AppColors.info,
                     size: 20,
                   ),
                 ),
@@ -1996,7 +2012,7 @@ class _BookScreenState extends State<BookScreen>
                     border: selected
                         ? null
                         : Border.all(
-                            color: const Color(0xFFD1D5DB),
+                            color: AppColors.border,
                             width: 1.5,
                           ),
                   ),
@@ -2110,7 +2126,7 @@ class _BookScreenState extends State<BookScreen>
         if (morning.isNotEmpty) ...[
           _timeGroupHeader(
             Icons.wb_sunny_rounded,
-            const Color(0xFFD97706),
+            AppColors.warning,
             'Morning',
           ),
           const SizedBox(height: 8),
@@ -2120,7 +2136,7 @@ class _BookScreenState extends State<BookScreen>
           if (morning.isNotEmpty) const SizedBox(height: 14),
           _timeGroupHeader(
             Icons.wb_twilight_rounded,
-            const Color(0xFFEA580C),
+            AppColors.orange,
             'Afternoon',
           ),
           const SizedBox(height: 8),
@@ -2165,7 +2181,7 @@ class _BookScreenState extends State<BookScreen>
                 decoration: BoxDecoration(
                   color: selected ? kCrimson : Colors.white,
                   border: Border.all(
-                    color: selected ? kCrimson : const Color(0xFFE5E7EB),
+                    color: selected ? kCrimson : AppColors.border,
                   ),
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -2241,7 +2257,7 @@ class _BookScreenState extends State<BookScreen>
               width: 58,
               height: 64,
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF1F1),
+                color: AppColors.accentBg,
                 borderRadius: BorderRadius.circular(12),
               ),
               alignment: Alignment.center,
@@ -2277,7 +2293,7 @@ class _BookScreenState extends State<BookScreen>
                       const Icon(
                         Icons.confirmation_number_rounded,
                         size: 16,
-                        color: Color(0xFF16A34A),
+                        color: AppColors.success,
                       ),
                       const SizedBox(width: 6),
                       Text(
@@ -2334,13 +2350,13 @@ class _BookScreenState extends State<BookScreen>
             Icon(
               Icons.info_outline_rounded,
               size: 14,
-              color: Color(0xFF2563EB),
+              color: AppColors.info,
             ),
             SizedBox(width: 8),
             Expanded(
               child: Text(
                 'Arrive 10 minutes early and bring a valid ID.',
-                style: TextStyle(fontSize: 11.5, color: Color(0xFF1D4ED8)),
+                style: TextStyle(fontSize: 11.5, color: AppColors.infoDark),
               ),
             ),
           ],
@@ -2387,7 +2403,7 @@ class _BookingSkeletonState extends State<_BookingSkeleton>
     width: double.infinity,
     height: height,
     decoration: BoxDecoration(
-      color: const Color(0xFFF3F4F6),
+      color: AppColors.mutedBg,
       borderRadius: BorderRadius.circular(16),
     ),
   );
@@ -2428,7 +2444,7 @@ class _TicketCard extends StatelessWidget {
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: const Color(0xFFE5E7EB)),
+      border: Border.all(color: AppColors.border),
       boxShadow: kBookSoftShadow,
     ),
     child: Column(
@@ -2485,7 +2501,7 @@ class _TicketNotch extends StatelessWidget {
     height: 16,
     decoration: const BoxDecoration(
       shape: BoxShape.circle,
-      color: Color(0xFFF9FAFB),
+      color: AppColors.mutedBg,
     ),
   );
 }
@@ -2494,7 +2510,7 @@ class _DashedLinePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFFE5E7EB)
+      ..color = AppColors.border
       ..strokeWidth = 1;
     const dash = 6.0, gap = 4.0;
     final y = size.height / 2;
@@ -2541,12 +2557,12 @@ Widget _appointmentDateBlock(
         width: 58,
         height: 64,
         decoration: BoxDecoration(
-          color: const Color(0xFFFFF1F1),
+          color: AppColors.accentBg,
           borderRadius: BorderRadius.circular(12),
         ),
         alignment: Alignment.center,
         child: d == null
-            ? const Icon(Icons.calendar_today_rounded, color: Color(0xFFDC2626))
+            ? const Icon(Icons.calendar_today_rounded, color: AppColors.primary)
             : Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -2555,7 +2571,7 @@ Widget _appointmentDateBlock(
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFFDC2626),
+                      color: AppColors.primary,
                     ),
                   ),
                   Text(
@@ -2563,7 +2579,7 @@ Widget _appointmentDateBlock(
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w900,
-                      color: Color(0xFF111827),
+                      color: AppColors.foreground,
                     ),
                   ),
                 ],
@@ -2577,7 +2593,7 @@ Widget _appointmentDateBlock(
           children: [
             const Text(
               'Date',
-              style: TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+              style: TextStyle(fontSize: 11, color: AppColors.muted),
             ),
             const SizedBox(height: 2),
             Text(
@@ -2585,7 +2601,7 @@ Widget _appointmentDateBlock(
               style: const TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF111827),
+                color: AppColors.foreground,
               ),
             ),
           ],
@@ -2637,12 +2653,12 @@ class _AppointmentManagementView extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFF1F1),
+                  color: AppColors.accentBg,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
                   Icons.event_available_rounded,
-                  color: Color(0xFFDC2626),
+                  color: AppColors.primary,
                   size: 20,
                 ),
               ),
@@ -2652,7 +2668,7 @@ class _AppointmentManagementView extends StatelessWidget {
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 17,
-                  color: Color(0xFF111827),
+                  color: AppColors.foreground,
                 ),
               ),
             ],
@@ -2697,7 +2713,7 @@ class _AppointmentManagementView extends StatelessWidget {
                     subtitle,
                     style: const TextStyle(
                       fontSize: 12,
-                      color: Color(0xFF6B7280),
+                      color: AppColors.muted,
                     ),
                   ),
                 ],
@@ -2711,16 +2727,16 @@ class _AppointmentManagementView extends StatelessWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
+                      color: AppColors.infoBg,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFBFDBFE)),
+                      border: Border.all(color: AppColors.infoBorder),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Icon(
                           Icons.info_outline_rounded,
-                          color: Color(0xFF2563EB),
+                          color: AppColors.info,
                           size: 18,
                         ),
                         const SizedBox(width: 10),
@@ -2729,7 +2745,7 @@ class _AppointmentManagementView extends StatelessWidget {
                             "You're all set for this appointment. Reschedule only if something comes up — this keeps a slot open for another donor in the meantime.",
                             style: const TextStyle(
                               fontSize: 12,
-                              color: Color(0xFF1D4ED8),
+                              color: AppColors.infoDark,
                               height: 1.5,
                             ),
                           ),
@@ -2751,19 +2767,19 @@ class _AppointmentManagementView extends StatelessWidget {
                     appointment['appointment_time']?.toString(),
                   ),
                 ),
-                const Divider(height: 24, color: Color(0xFFF3F4F6)),
+                const Divider(height: 24, color: AppColors.mutedBg),
                 _infoRow(
                   icon: Icons.location_on_rounded,
                   label: "Donation Center",
                   value: appointment['donation_center']?.toString() ?? "N/A",
                 ),
-                const Divider(height: 24, color: Color(0xFFF3F4F6)),
+                const Divider(height: 24, color: AppColors.mutedBg),
                 Row(
                   children: [
                     const Icon(
                       Icons.confirmation_number_outlined,
                       size: 16,
-                      color: Color(0xFF9CA3AF),
+                      color: AppColors.muted,
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -2774,7 +2790,7 @@ class _AppointmentManagementView extends StatelessWidget {
                         fontFamily: 'monospace',
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF111827),
+                        color: AppColors.foreground,
                       ),
                     ),
                   ],
@@ -2782,7 +2798,7 @@ class _AppointmentManagementView extends StatelessWidget {
                 const SizedBox(height: 4),
                 const Text(
                   'Show this at the donation center',
-                  style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+                  style: TextStyle(fontSize: 11, color: AppColors.muted),
                 ),
               ],
             ),
@@ -2806,8 +2822,8 @@ class _AppointmentManagementView extends StatelessWidget {
                       ),
                     ),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFDC2626),
-                      side: const BorderSide(color: Color(0xFFDC2626)),
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -2824,7 +2840,9 @@ class _AppointmentManagementView extends StatelessWidget {
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFDC2626),
+                      backgroundColor: AppColors.primary,
+                      disabledBackgroundColor: AppColors.border,
+                      disabledForegroundColor: AppColors.muted,
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
@@ -2837,7 +2855,7 @@ class _AppointmentManagementView extends StatelessWidget {
         const SizedBox(height: 16),
         const Text(
           "You can only manage one active appointment at a time. Pull down to refresh once your appointment status changes.",
-          style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+          style: TextStyle(fontSize: 11, color: AppColors.muted),
           textAlign: TextAlign.center,
         ),
       ],
@@ -2854,7 +2872,7 @@ Widget _infoRow({
 }) {
   return Row(
     children: [
-      Icon(icon, size: 18, color: const Color(0xFF9CA3AF)),
+      Icon(icon, size: 18, color: AppColors.muted),
       const SizedBox(width: 10),
       Expanded(
         child: Column(
@@ -2862,7 +2880,7 @@ Widget _infoRow({
           children: [
             Text(
               label,
-              style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+              style: const TextStyle(fontSize: 11, color: AppColors.muted),
             ),
             const SizedBox(height: 2),
             Text(
@@ -2870,7 +2888,7 @@ Widget _infoRow({
               style: const TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF111827),
+                color: AppColors.foreground,
               ),
             ),
           ],
@@ -2943,7 +2961,7 @@ class _DonationSuccessView extends StatelessWidget {
         const SizedBox(height: 16),
         const Text(
           "Booking will reopen automatically on your next eligible date. Pull down to refresh.",
-          style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+          style: TextStyle(fontSize: 11, color: AppColors.muted),
           textAlign: TextAlign.center,
         ),
       ],
@@ -2964,11 +2982,11 @@ class _DonationSuccessView extends StatelessWidget {
             height: 110,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: const Color(0xFFF0FDF4),
-              border: Border.all(color: const Color(0xFFBBF7D0), width: 3),
+              color: AppColors.successBg,
+              border: Border.all(color: AppColors.successBorder, width: 3),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF16A34A).withValues(alpha: 0.18),
+                  color: AppColors.success.withValues(alpha: 0.18),
                   blurRadius: 24,
                   offset: const Offset(0, 8),
                 ),
@@ -2977,7 +2995,7 @@ class _DonationSuccessView extends StatelessWidget {
             child: const Icon(
               Icons.volunteer_activism_rounded,
               size: 50,
-              color: Color(0xFF16A34A),
+              color: AppColors.success,
             ),
           ),
         ),
@@ -2987,7 +3005,7 @@ class _DonationSuccessView extends StatelessWidget {
           style: TextStyle(
             fontSize: 21,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF111827),
+            color: AppColors.foreground,
           ),
           textAlign: TextAlign.center,
         ),
@@ -2996,7 +3014,7 @@ class _DonationSuccessView extends StatelessWidget {
           "Your donation was completed successfully. One donation can help save up to 3 lives.",
           style: TextStyle(
             fontSize: 13,
-            color: Color(0xFF6B7280),
+            color: AppColors.muted,
             height: 1.55,
           ),
           textAlign: TextAlign.center,
@@ -3005,9 +3023,9 @@ class _DonationSuccessView extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
           decoration: BoxDecoration(
-            color: const Color(0xFFF0FDF4),
+            color: AppColors.successBg,
             borderRadius: BorderRadius.circular(99),
-            border: Border.all(color: const Color(0xFFBBF7D0)),
+            border: Border.all(color: AppColors.successBorder),
           ),
           child: const Row(
             mainAxisSize: MainAxisSize.min,
@@ -3015,7 +3033,7 @@ class _DonationSuccessView extends StatelessWidget {
               Icon(
                 Icons.check_circle_rounded,
                 size: 15,
-                color: Color(0xFF16A34A),
+                color: AppColors.success,
               ),
               SizedBox(width: 7),
               Text(
@@ -3023,7 +3041,7 @@ class _DonationSuccessView extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF16A34A),
+                  color: AppColors.success,
                 ),
               ),
             ],
@@ -3051,7 +3069,7 @@ class _DonationSuccessView extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: AppColors.border),
         borderRadius: BorderRadius.circular(16),
         boxShadow: kBookSoftShadow,
       ),
@@ -3062,7 +3080,7 @@ class _DonationSuccessView extends StatelessWidget {
             children: [
               Icon(
                 Icons.event_repeat_rounded,
-                color: Color(0xFFDC2626),
+                color: AppColors.primary,
                 size: 20,
               ),
               SizedBox(width: 8),
@@ -3071,7 +3089,7 @@ class _DonationSuccessView extends StatelessWidget {
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
-                  color: Color(0xFF111827),
+                  color: AppColors.foreground,
                 ),
               ),
             ],
@@ -3082,7 +3100,7 @@ class _DonationSuccessView extends StatelessWidget {
               "We'll let you know when you can donate again.",
               style: TextStyle(
                 fontSize: 13,
-                color: Color(0xFF6B7280),
+                color: AppColors.muted,
                 height: 1.5,
               ),
             )
@@ -3092,7 +3110,7 @@ class _DonationSuccessView extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF111827),
+                color: AppColors.foreground,
               ),
             ),
             if (daysRemaining != null) ...[
@@ -3104,7 +3122,7 @@ class _DonationSuccessView extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFFDC2626),
+                  color: AppColors.primary,
                 ),
               ),
             ],
@@ -3115,8 +3133,8 @@ class _DonationSuccessView extends StatelessWidget {
                 child: LinearProgressIndicator(
                   value: progress,
                   minHeight: 8,
-                  color: const Color(0xFF16A34A),
-                  backgroundColor: const Color(0xFFE5E7EB),
+                  color: AppColors.success,
+                  backgroundColor: AppColors.border,
                 ),
               ),
               const SizedBox(height: 10),
@@ -3127,14 +3145,14 @@ class _DonationSuccessView extends StatelessWidget {
                     "Donated ${formatDate(donationDate)}",
                     style: const TextStyle(
                       fontSize: 11,
-                      color: Color(0xFF9CA3AF),
+                      color: AppColors.muted,
                     ),
                   ),
                   Text(
                     "Eligible ${formatDate(nextEligibleDate)}",
                     style: const TextStyle(
                       fontSize: 11,
-                      color: Color(0xFF9CA3AF),
+                      color: AppColors.muted,
                     ),
                   ),
                 ],
@@ -3156,7 +3174,7 @@ class _DonationSuccessView extends StatelessWidget {
     final rows = <Widget>[];
     void addRow(IconData icon, String label, String value) {
       if (rows.isNotEmpty) {
-        rows.add(const Divider(height: 24, color: Color(0xFFF3F4F6)));
+        rows.add(const Divider(height: 24, color: AppColors.mutedBg));
       }
       rows.add(_infoRow(icon: icon, label: label, value: value));
     }
@@ -3191,7 +3209,7 @@ class _DonationSuccessView extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: AppColors.border),
         borderRadius: BorderRadius.circular(16),
         boxShadow: kBookSoftShadow,
       ),
@@ -3202,7 +3220,7 @@ class _DonationSuccessView extends StatelessWidget {
             children: [
               Icon(
                 Icons.receipt_long_rounded,
-                color: Color(0xFFDC2626),
+                color: AppColors.primary,
                 size: 20,
               ),
               SizedBox(width: 8),
@@ -3211,7 +3229,7 @@ class _DonationSuccessView extends StatelessWidget {
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
-                  color: Color(0xFF111827),
+                  color: AppColors.foreground,
                 ),
               ),
             ],
@@ -3232,16 +3250,16 @@ class _DonationSuccessView extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFEFF6FF),
+        color: AppColors.infoBg,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFBFDBFE)),
+        border: Border.all(color: AppColors.infoBorder),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Icon(
             Icons.favorite_rounded,
-            color: Color(0xFF2563EB),
+            color: AppColors.info,
             size: 18,
           ),
           const SizedBox(width: 10),
@@ -3250,7 +3268,7 @@ class _DonationSuccessView extends StatelessWidget {
               text,
               style: const TextStyle(
                 fontSize: 12,
-                color: Color(0xFF1D4ED8),
+                color: AppColors.infoDark,
                 height: 1.5,
               ),
             ),
@@ -3265,11 +3283,9 @@ class _DonationSuccessView extends StatelessWidget {
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
       color: Colors.white,
-      border: Border.all(color: const Color(0xFFE5E7EB), width: 2),
-      borderRadius: BorderRadius.circular(14),
-      boxShadow: const [
-        BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
-      ],
+      border: Border.all(color: AppColors.border, width: 2),
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: AppColors.cardShadow,
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3278,7 +3294,7 @@ class _DonationSuccessView extends StatelessWidget {
           children: [
             Icon(
               Icons.health_and_safety_rounded,
-              color: Color(0xFFDC2626),
+              color: AppColors.primary,
               size: 20,
             ),
             SizedBox(width: 8),
@@ -3287,7 +3303,7 @@ class _DonationSuccessView extends StatelessWidget {
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
-                color: Color(0xFF111827),
+                color: AppColors.foreground,
               ),
             ),
           ],
@@ -3310,7 +3326,7 @@ class _DonationSuccessView extends StatelessWidget {
         const Icon(
           Icons.check_circle_rounded,
           size: 16,
-          color: Color(0xFF16A34A),
+          color: AppColors.success,
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -3318,7 +3334,7 @@ class _DonationSuccessView extends StatelessWidget {
             text,
             style: const TextStyle(
               fontSize: 13,
-              color: Color(0xFF111827),
+              color: AppColors.foreground,
               height: 1.4,
             ),
           ),
@@ -3342,7 +3358,7 @@ class _AppointmentFetchError extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: AppColors.border),
         borderRadius: BorderRadius.circular(16),
         boxShadow: kBookSoftShadow,
       ),
@@ -3350,7 +3366,7 @@ class _AppointmentFetchError extends StatelessWidget {
         children: [
           const Icon(
             Icons.wifi_off_rounded,
-            color: Color(0xFF9CA3AF),
+            color: AppColors.muted,
             size: 30,
           ),
           const SizedBox(height: 12),
@@ -3359,14 +3375,14 @@ class _AppointmentFetchError extends StatelessWidget {
             style: TextStyle(
               fontWeight: FontWeight.w600,
               fontSize: 14,
-              color: Color(0xFF111827),
+              color: AppColors.foreground,
             ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 4),
           const Text(
             "Please check your connection and try again.",
-            style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+            style: TextStyle(fontSize: 12, color: AppColors.muted),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 14),
@@ -3375,12 +3391,12 @@ class _AppointmentFetchError extends StatelessWidget {
             icon: const Icon(
               Icons.refresh_rounded,
               size: 18,
-              color: Color(0xFFDC2626),
+              color: AppColors.primary,
             ),
             label: const Text(
               "Retry",
               style: TextStyle(
-                color: Color(0xFFDC2626),
+                color: AppColors.primary,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -3446,14 +3462,14 @@ class _EligibilityGate extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Color accent = _isNotEligible
-        ? const Color(0xFFDC2626)
-        : const Color(0xFFF59E0B);
+        ? AppColors.primary
+        : AppColors.warning;
     final Color accentBg = _isNotEligible
-        ? const Color(0xFFFFF1F1)
-        : const Color(0xFFFFFBEB);
+        ? AppColors.accentBg
+        : AppColors.warningBg;
     final Color accentBorder = _isNotEligible
-        ? const Color(0xFFFECACA)
-        : const Color(0xFFFDE68A);
+        ? AppColors.primaryBorder
+        : AppColors.warningBorder;
     final IconData icon = _isNotEligible
         ? Icons.block_rounded
         : Icons.hourglass_top_rounded;
@@ -3495,7 +3511,7 @@ class _EligibilityGate extends StatelessWidget {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFE5E7EB)),
+            border: Border.all(color: AppColors.border),
             boxShadow: kBookSoftShadow,
           ),
           child: Column(
@@ -3525,7 +3541,7 @@ class _EligibilityGate extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 21,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF111827),
+                  color: AppColors.foreground,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -3534,7 +3550,7 @@ class _EligibilityGate extends StatelessWidget {
                 message,
                 style: const TextStyle(
                   fontSize: 13,
-                  color: Color(0xFF6B7280),
+                  color: AppColors.muted,
                   height: 1.55,
                 ),
                 textAlign: TextAlign.center,
@@ -3629,16 +3645,16 @@ class _EligibilityGate extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
+                  color: AppColors.infoBg,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFBFDBFE)),
+                  border: Border.all(color: AppColors.infoBorder),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Icon(
                       Icons.info_outline_rounded,
-                      color: Color(0xFF2563EB),
+                      color: AppColors.info,
                       size: 18,
                     ),
                     const SizedBox(width: 10),
@@ -3651,7 +3667,7 @@ class _EligibilityGate extends StatelessWidget {
                             : "Once your screening has been reviewed, this page will update automatically and you'll be able to book an appointment.",
                         style: const TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF1D4ED8),
+                          color: AppColors.infoDark,
                           height: 1.5,
                         ),
                       ),
@@ -3682,7 +3698,9 @@ class _EligibilityGate extends StatelessWidget {
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFDC2626),
+                      backgroundColor: AppColors.primary,
+                      disabledBackgroundColor: AppColors.border,
+                      disabledForegroundColor: AppColors.muted,
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
@@ -3696,7 +3714,7 @@ class _EligibilityGate extends StatelessWidget {
               const Text(
                 "Pull down to refresh this page after your status changes.",
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+                style: TextStyle(fontSize: 11, color: AppColors.muted),
               ),
             ],
           ),
