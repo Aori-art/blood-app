@@ -107,7 +107,7 @@ class EligibilityResultView extends StatelessWidget {
                 scale: Tween<double>(begin: 0.94, end: 1).animate(
                   CurvedAnimation(parent: entrance, curve: Curves.easeOutCubic),
                 ),
-                child: ResultStage(style: style),
+                child: ResultStage(style: style, celebrate: celebrate),
               ),
             ),
             Padding(

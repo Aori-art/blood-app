@@ -627,7 +627,12 @@ class _CheckScreenState extends State<CheckScreen>
 
   @override
   Widget build(BuildContext context) =>
-      StreakScreen(id: 'check', child: _buildScreen(context));
+      // The result stage has its own Dugtong: the floating one steps aside.
+      StreakScreen(
+        id: 'check',
+        hideBubble: _result,
+        child: _buildScreen(context),
+      );
 
   Widget _buildScreen(BuildContext context) {
     if (_loading || _checking) {

@@ -48,6 +48,17 @@ class InteractiveDugtong extends StatefulWidget {
   /// little beyond. Without it, it can only wander a short way from home.
   final GlobalKey? limitKey;
 
+  /// False: taps still play a reaction but show no line of their own (the
+  /// host shows its own words, see [onTapped]).
+  final bool speaks;
+
+  /// Called after every tap (not after a drag).
+  final VoidCallback? onTapped;
+
+  /// Where the eyes look while nobody holds it (each axis -1..1). Null keeps
+  /// the idle drift.
+  final Offset? restingLook;
+
   /// Test hooks.
   final math.Random? random;
   final DateTime Function()? clock;
@@ -59,6 +70,9 @@ class InteractiveDugtong extends StatefulWidget {
     this.size = 110,
     this.restingMood = DugtongMood.idle,
     this.limitKey,
+    this.speaks = true,
+    this.onTapped,
+    this.restingLook,
     this.random,
     this.clock,
   });
@@ -330,7 +344,23 @@ class InteractiveDugtongState extends State<InteractiveDugtong>
   /// trigger it without a gesture.
   void tapNow() => _tap();
 
+  /// Plays [r] without a line (and without counting toward dizziness), unless
+  /// it is held, dizzy or animations are removed.
+  void playReaction(DugtongReaction r) {
+    if (_pointer != null || _dizzy || _reduce || _react.isAnimating) return;
+    _lastReaction = r;
+    _reaction = r;
+    _react.duration = _durationOf(r);
+    _react.forward(from: 0).whenComplete(() {
+      if (mounted && !_react.isAnimating && _reaction == r) {
+        setState(() => _reaction = null);
+      }
+    });
+    setState(() {});
+  }
+
   void _tap() {
+    widget.onTapped?.call();
     if (_dizzy) return;
     final now = _now();
     _taps
@@ -372,10 +402,12 @@ class InteractiveDugtongState extends State<InteractiveDugtong>
     _lastReaction = r;
     _reaction = r;
     final lines = _reactionLines[r]!;
-    _say(
-      lines[_rand.nextInt(lines.length)],
-      const Duration(milliseconds: 2000),
-    );
+    if (widget.speaks) {
+      _say(
+        lines[_rand.nextInt(lines.length)],
+        const Duration(milliseconds: 2000),
+      );
+    }
     if (_reduce) {
       setState(() {});
       return;
@@ -392,7 +424,7 @@ class InteractiveDugtongState extends State<InteractiveDugtong>
   void _startDizzy() {
     _dizzy = true;
     _reaction = null;
-    _say(_dizzyLine, const Duration(milliseconds: 2200));
+    if (widget.speaks) _say(_dizzyLine, const Duration(milliseconds: 2200));
     if (!_reduce) {
       _react.duration = const Duration(milliseconds: 2000);
       _react.forward(from: 0);
@@ -561,7 +593,9 @@ class InteractiveDugtongState extends State<InteractiveDugtong>
               streak: widget.streak,
               stage: widget.stage,
               mood: _mood,
-              look: _look,
+              look: _pointer == null && widget.restingLook != null
+                  ? widget.restingLook!
+                  : _look,
               flutter: pose.flutter,
             ),
           ),
