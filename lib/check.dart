@@ -684,9 +684,9 @@ class _CheckScreenState extends State<CheckScreen>
                               padding: EdgeInsets.symmetric(
                                 horizontal: inQuestions ? 48 : 0,
                               ),
-                              child: const Column(
+                              child: Column(
                                 children: [
-                                  Text(
+                                  const Text(
                                     'Eligibility Check',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
@@ -695,11 +695,13 @@ class _CheckScreenState extends State<CheckScreen>
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                  SizedBox(height: 4),
+                                  const SizedBox(height: 4),
                                   Text(
-                                    'Answer all questions honestly',
+                                    _result
+                                        ? 'Your screening result'
+                                        : 'Answer all questions honestly',
                                     textAlign: TextAlign.center,
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       color: AppColors.onPrimary,
                                     ),
                                   ),
