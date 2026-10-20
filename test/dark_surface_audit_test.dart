@@ -1,5 +1,6 @@
 import 'package:blood/app_colors.dart';
 import 'package:blood/app_theme.dart';
+import 'package:blood/check.dart';
 import 'package:blood/privacy_statement.dart';
 import 'package:blood/streak/streak_controller.dart';
 import 'package:flutter/material.dart';
@@ -78,8 +79,33 @@ List<String> _whiteSurfaces(WidgetTester tester) {
   return found;
 }
 
+/// Every result of the eligibility check (the Dugtong stage, the cards and the
+/// buttons). Dugtong's own whites (eyes, label, the medal's check) are painted
+/// on a canvas, not widget fills, so they need no entry in [_allowed].
+PumpableScreen _result(String name, Map<String, dynamic> status) =>
+    PumpableScreen(
+      'check result: $name',
+      () => const CheckScreen(),
+      responses: {'get_eligibility_status.php': status},
+    );
+
+final _resultScreens = [
+  _result('eligible', {'status': 'eligible', 'can_book': true}),
+  _result('not eligible', {'status': 'not_eligible', 'can_retake': true}),
+  _result('retake countdown', {
+    'status': 'not_eligible',
+    'retake_available_date': '2099-01-01',
+    'retake_days_remaining': 7,
+  }),
+  _result('deferred', {
+    'status': 'temporary_deferred',
+    'next_eligible_date': '2099-01-01',
+  }),
+  _result('under review', {'status': 'for_review'}),
+];
+
 void main() {
-  for (final screen in pumpableScreens) {
+  for (final screen in [...pumpableScreens, ..._resultScreens]) {
     testWidgets(
       'no white surface in dark: ${screen.name}',
       (tester) async {

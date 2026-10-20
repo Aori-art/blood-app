@@ -153,7 +153,7 @@ class EligibilityResultView extends StatelessWidget {
                                 ),
                               ),
                             ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                     ..._buttons(
                       context,
                       color: color,
@@ -582,7 +582,7 @@ class EligibilityResultView extends StatelessWidget {
     return MergeSemantics(
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
         decoration: _cardBox(context),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -590,14 +590,21 @@ class EligibilityResultView extends StatelessWidget {
             Row(
               children: [
                 Container(
-                  width: 54,
-                  height: 58,
+                  constraints: const BoxConstraints(
+                    minWidth: 56,
+                    minHeight: 54,
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
                     color: style.tint,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: style.border),
                   ),
                   child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
