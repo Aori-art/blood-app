@@ -3,8 +3,10 @@
 // navigation stay in check.dart; this only draws what it is given.
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../anim.dart';
 import '../app_colors.dart';
 import '../app_palette.dart';
 import '../check.dart' show formatEligibilityDate, retakeWhenText;
@@ -63,7 +65,8 @@ class EligibilityResultView extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => ResultClock(child: _body(context));
+  Widget build(BuildContext context) =>
+      ResultClock(child: Builder(builder: _body));
 
   Widget _body(BuildContext context) {
     final eligible = data.status == 'eligible',
@@ -133,16 +136,21 @@ class EligibilityResultView extends StatelessWidget {
                         data.nextDate?.isNotEmpty == true &&
                         !(showRetakeCountdown &&
                             data.nextDate == data.retakeDate))
-                      Padding(
-                        padding: const EdgeInsets.only(top: 16),
-                        child: Text(
-                          'Next Eligible Date: ${formatEligibilityDate(data.nextDate!)}',
-                          style: TextStyle(
-                            color: color,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
+                      deferred && DateTime.tryParse(data.nextDate!) != null
+                          ? Padding(
+                              padding: const EdgeInsets.only(top: 12),
+                              child: _nextDateCountdown(context, style),
+                            )
+                          : Padding(
+                              padding: const EdgeInsets.only(top: 16),
+                              child: Text(
+                                'Next Eligible Date: ${formatEligibilityDate(data.nextDate!)}',
+                                style: TextStyle(
+                                  color: color,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
                     const SizedBox(height: 16),
                     ..._buttons(
                       context,
@@ -151,11 +159,15 @@ class EligibilityResultView extends StatelessWidget {
                       deferred: deferred,
                       review: review,
                       showRetakeCountdown: showRetakeCountdown,
+                      style: style,
                     ),
-                    if (review) ...[
-                      const SizedBox(height: 16),
-                      _reviewSteps(context),
-                    ],
+                    ..._guidance(
+                      context,
+                      style,
+                      eligible: eligible,
+                      deferred: deferred,
+                      review: review,
+                    ),
                     const SizedBox(height: 12),
                     TextButton.icon(
                       onPressed: onRefresh,
@@ -269,6 +281,7 @@ class EligibilityResultView extends StatelessWidget {
     required bool deferred,
     required bool review,
     required bool showRetakeCountdown,
+    required ResultStyle style,
   }) => [
     if (eligible && data.canBook)
       GlowPulse(
@@ -317,79 +330,7 @@ class EligibilityResultView extends StatelessWidget {
         ),
       ),
     if (showRetakeCountdown) ...[
-      Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: context.palette.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: .18)),
-          boxShadow: context.palette.shadow,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: color.withValues(alpha: .12),
-                  ),
-                  child: Icon(
-                    Icons.event_repeat_rounded,
-                    size: 20,
-                    color: color,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  'Retake Available',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: context.palette.foreground,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              formatEligibilityDate(data.retakeDate!),
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: context.palette.foreground,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'You can take the check again '
-              '${retakeWhenText(data.retakeDaysRemaining)}.',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: color,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              deferred
-                  ? 'You can take the check again once your deferral period ends.'
-                  : 'This short waiting period lets your health settle before '
-                        "you're screened again.",
-              style: TextStyle(
-                fontSize: 12,
-                color: context.palette.muted,
-                height: 1.5,
-              ),
-            ),
-          ],
-        ),
-      ),
+      _retakeCountdown(context, style, deferred),
       const SizedBox(height: 12),
       SizedBox(
         width: double.infinity,
@@ -412,16 +353,323 @@ class EligibilityResultView extends StatelessWidget {
     ],
   ];
 
+  // ─── Guidance cards ─────────────────────────────────────────────────────
+
+  /// The state's guidance, below the buttons.
+  List<Widget> _guidance(
+    BuildContext context,
+    ResultStyle style, {
+    required bool eligible,
+    required bool deferred,
+    required bool review,
+  }) {
+    final cards = <Widget>[
+      if (eligible)
+        _card(context, style, 'Before you donate', [
+          (Icons.badge_rounded, 'Bring a valid ID.'),
+          (
+            Icons.restaurant_rounded,
+            'Eat a healthy meal and drink plenty of water.',
+          ),
+          (Icons.bedtime_rounded, "Get a good night's sleep."),
+        ]),
+      if (!eligible && !deferred && !review)
+        _card(context, style, 'What you can do', [
+          (Icons.menu_book_rounded, 'Read the guidance above carefully.'),
+          if (data.retakeDate != null || data.canRetake)
+            (
+              Icons.event_repeat_rounded,
+              'You can take the check again when the waiting period ends.',
+            ),
+          (
+            Icons.support_agent_rounded,
+            'Questions? Contact the donation center or open Help & Support.',
+          ),
+        ]),
+      if (deferred)
+        _card(context, style, 'What a deferral means', [
+          (
+            Icons.hourglass_bottom_rounded,
+            'A deferral is a waiting period, not a permanent decision.',
+          ),
+          (
+            Icons.event_repeat_rounded,
+            'You can take the check again once your deferral period ends.',
+          ),
+        ]),
+      if (review) _reviewSteps(context, style),
+    ];
+    return [
+      for (final (i, card) in cards.indexed) ...[
+        const SizedBox(height: 12),
+        FadeSlideIn(index: i + 2, child: card),
+      ],
+    ];
+  }
+
+  BoxDecoration _cardBox(BuildContext context) => BoxDecoration(
+    color: context.palette.surface,
+    borderRadius: BorderRadius.circular(20),
+    border: Border.all(color: context.palette.border),
+    boxShadow: context.palette.shadow,
+  );
+
+  Widget _cardTitle(BuildContext context, String text) => Text(
+    text,
+    style: TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.bold,
+      color: context.palette.foreground,
+    ),
+  );
+
+  Widget _card(
+    BuildContext context,
+    ResultStyle style,
+    String title,
+    List<(IconData, String)> rows,
+  ) {
+    final p = context.palette;
+    return MergeSemantics(
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: _cardBox(context),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _cardTitle(context, title),
+            for (final (icon, text) in rows) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: style.tint,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, size: 17, color: style.accent),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      text,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: p.foreground,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── Countdowns ─────────────────────────────────────────────────────────
+
+  /// The retake date as a countdown (above the disabled "Available ..."
+  /// button).
+  Widget _retakeCountdown(
+    BuildContext context,
+    ResultStyle style,
+    bool deferred,
+  ) {
+    final days = data.retakeDaysRemaining;
+    return _countdownCard(
+      context,
+      style,
+      date: DateTime.tryParse(data.retakeDate!),
+      days: days,
+      label: days <= 0
+          ? 'You can take the check again today'
+          : days == 1
+          ? 'You can take the check again tomorrow'
+          : 'days until you can retake',
+      dateLine: formatEligibilityDate(data.retakeDate!),
+      note: deferred
+          ? 'You can take the check again once your deferral period ends.'
+          : 'This short waiting period lets your health settle before '
+                "you're screened again.",
+    );
+  }
+
+  /// A deferral's next eligible date as a countdown.
+  Widget _nextDateCountdown(BuildContext context, ResultStyle style) {
+    final date = DateTime.parse(data.nextDate!);
+    final now = DateTime.now();
+    final days = DateTime(
+      date.year,
+      date.month,
+      date.day,
+    ).difference(DateTime(now.year, now.month, now.day)).inDays;
+    return _countdownCard(
+      context,
+      style,
+      date: date,
+      days: days,
+      label: days <= 0 ? 'You can donate again' : 'until you can donate',
+      dateLine: 'Next eligible date: ${formatEligibilityDate(data.nextDate!)}',
+      daysWord: true,
+    );
+  }
+
+  /// A calendar tile beside a day count that counts up from 0 (once, over
+  /// 700 ms), the [label] and the long date.
+  Widget _countdownCard(
+    BuildContext context,
+    ResultStyle style, {
+    required DateTime? date,
+    required int days,
+    required String label,
+    required String dateLine,
+    String? note,
+    bool daysWord = false,
+  }) {
+    final p = context.palette;
+    const months = [
+      'JAN',
+      'FEB',
+      'MAR',
+      'APR',
+      'MAY',
+      'JUN',
+      'JUL',
+      'AUG',
+      'SEP',
+      'OCT',
+      'NOV',
+      'DEC',
+    ];
+    final countStyle = TextStyle(
+      fontSize: 26,
+      height: 1.1,
+      fontWeight: FontWeight.w800,
+      color: style.text,
+    );
+    String count(int n) {
+      if (days <= 0) return 'Today';
+      if (days == 1 && !daysWord) return 'Tomorrow';
+      return daysWord ? (n == 1 ? '1 day' : '$n days') : '$n';
+    }
+
+    final Widget number = days <= 0 || (days == 1 && !daysWord)
+        ? Text(count(days), style: countStyle)
+        : ValueListenableBuilder<Duration>(
+            valueListenable: ResultClock.of(context),
+            builder: (context, now, _) {
+              final u = ResultClock.stillOf(context)
+                  ? 1.0
+                  : Curves.easeOutCubic.transform(
+                      clockProgress(
+                        now,
+                        const Duration(milliseconds: 450),
+                        const Duration(milliseconds: 700),
+                      ),
+                    );
+              return Text(count((days * u).round()), style: countStyle);
+            },
+          );
+    return MergeSemantics(
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: _cardBox(context),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 54,
+                  height: 58,
+                  decoration: BoxDecoration(
+                    color: style.tint,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: style.border),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        date == null ? '—' : months[date.month - 1],
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.6,
+                          color: style.text,
+                        ),
+                      ),
+                      Text(
+                        date == null ? '' : '${date.day}',
+                        style: TextStyle(
+                          fontSize: 20,
+                          height: 1.1,
+                          fontWeight: FontWeight.w800,
+                          color: p.foreground,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      number,
+                      const SizedBox(height: 2),
+                      Text(
+                        label,
+                        style: TextStyle(fontSize: 12, color: p.muted),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              dateLine,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: p.foreground,
+              ),
+            ),
+            if (note != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                note,
+                style: TextStyle(fontSize: 12, color: p.muted, height: 1.5),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── Under review ───────────────────────────────────────────────────────
+
   /// "What happens next" while the screening is under review: a vertical
-  /// three-step stepper joined by a line.
-  Widget _reviewSteps(BuildContext context) {
+  /// three-step stepper. The line to the current step draws itself down
+  /// when the result first shows.
+  Widget _reviewSteps(BuildContext context, ResultStyle style) {
+    final p = context.palette;
     Widget step({
       required Widget marker,
       required String title,
       String? subtitle,
       required String state,
-      required Color lineColor,
-      bool last = false,
+      Widget? line,
     }) {
       return Semantics(
         label: '$title, $state',
@@ -439,15 +687,11 @@ class EligibilityResultView extends StatelessWidget {
                       height: 28,
                       child: Center(child: marker),
                     ),
-                    if (!last)
+                    if (line != null)
                       Expanded(
-                        child: Container(
-                          width: 2,
-                          margin: const EdgeInsets.symmetric(vertical: 2),
-                          decoration: BoxDecoration(
-                            color: lineColor,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: line,
                         ),
                       ),
                   ],
@@ -456,7 +700,10 @@ class EligibilityResultView extends StatelessWidget {
               const SizedBox(width: 14),
               Expanded(
                 child: Padding(
-                  padding: EdgeInsets.only(top: 4, bottom: last ? 0 : 18),
+                  padding: EdgeInsets.only(
+                    top: 4,
+                    bottom: line == null ? 0 : 18,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -465,9 +712,7 @@ class EligibilityResultView extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: state == 'upcoming'
-                              ? context.palette.muted
-                              : context.palette.foreground,
+                          color: state == 'upcoming' ? p.muted : p.foreground,
                         ),
                       ),
                       if (subtitle != null) ...[
@@ -476,7 +721,7 @@ class EligibilityResultView extends StatelessWidget {
                           subtitle,
                           style: TextStyle(
                             fontSize: 12,
-                            color: context.palette.muted,
+                            color: p.muted,
                             height: 1.4,
                           ),
                         ),
@@ -491,27 +736,34 @@ class EligibilityResultView extends StatelessWidget {
       );
     }
 
+    Widget bar(Color color) => Container(
+      width: 2,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(2),
+      ),
+    );
+
+    // Grows from the done step down to the current one.
+    final drawn = CustomPaint(
+      painter: _GrowingLinePainter(
+        clock: ResultClock.of(context),
+        still: ResultClock.stillOf(context),
+        track: p.border,
+        fill: p.success,
+      ),
+      child: const SizedBox(width: 2),
+    );
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: context.palette.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: context.palette.border),
-        boxShadow: context.palette.shadow,
-      ),
+      padding: const EdgeInsets.all(16),
+      decoration: _cardBox(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'What happens next',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: context.palette.foreground,
-            ),
-          ),
-          const SizedBox(height: 16),
+          _cardTitle(context, 'What happens next'),
+          const SizedBox(height: 14),
           step(
             marker: Container(
               width: 24,
@@ -528,16 +780,13 @@ class EligibilityResultView extends StatelessWidget {
             ),
             title: 'Answers submitted',
             state: 'done',
-            lineColor: context.palette.success,
+            line: drawn,
           ),
           step(
-            marker: _PulsingDot(
-              color: context.palette.warning,
-              animate: !MediaQuery.disableAnimationsOf(context),
-            ),
+            marker: _ClockDot(color: style.accent, size: 14),
             title: 'Team review',
             state: 'current',
-            lineColor: context.palette.border,
+            line: bar(p.border),
           ),
           step(
             marker: Container(
@@ -545,15 +794,13 @@ class EligibilityResultView extends StatelessWidget {
               height: 24,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: context.palette.surfaceAlt,
-                border: Border.all(color: context.palette.hint, width: 2),
+                color: p.surfaceAlt,
+                border: Border.all(color: p.hint, width: 2),
               ),
             ),
             title: 'You get the result',
             subtitle: "We'll notify you in the app",
             state: 'upcoming',
-            lineColor: context.palette.border,
-            last: true,
           ),
         ],
       ),
@@ -561,81 +808,49 @@ class EligibilityResultView extends StatelessWidget {
   }
 }
 
-/// The "current step" dot: a solid dot with a soft halo that pulses. With
-/// [animate] off (reduced motion) the halo stays still.
-class _PulsingDot extends StatefulWidget {
-  final Color color;
-  final bool animate;
+/// The stepper's line from the done step to the current one: it draws itself
+/// down once (500 ms in, over 700 ms).
+class _GrowingLinePainter extends CustomPainter {
+  final ValueListenable<Duration> clock;
+  final bool still;
+  final Color track;
+  final Color fill;
 
-  const _PulsingDot({required this.color, required this.animate});
-
-  @override
-  State<_PulsingDot> createState() => _PulsingDotState();
-}
-
-class _PulsingDotState extends State<_PulsingDot>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1400),
-  );
+  _GrowingLinePainter({
+    required this.clock,
+    required this.still,
+    required this.track,
+    required this.fill,
+  }) : super(repaint: still ? null : clock);
 
   @override
-  void initState() {
-    super.initState();
-    if (widget.animate) _c.repeat(reverse: true);
-  }
-
-  @override
-  void didUpdateWidget(covariant _PulsingDot old) {
-    super.didUpdateWidget(old);
-    if (widget.animate && !_c.isAnimating) {
-      _c.repeat(reverse: true);
-    } else if (!widget.animate && _c.isAnimating) {
-      _c.stop();
-    }
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _c,
-      builder: (context, _) {
-        final t = Curves.easeInOut.transform(_c.value);
-        return SizedBox(
-          width: 28,
-          height: 28,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Container(
-                width: 14 + 14 * t,
-                height: 14 + 14 * t,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: widget.color.withValues(alpha: 0.28 * (1 - t) + 0.06),
-                ),
-              ),
-              Container(
-                width: 14,
-                height: 14,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: widget.color,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+  void paint(Canvas canvas, Size size) {
+    final u = still
+        ? 1.0
+        : Curves.easeInOutCubic.transform(
+            clockProgress(
+              clock.value,
+              const Duration(milliseconds: 500),
+              const Duration(milliseconds: 700),
+            ),
+          );
+    final r = Radius.circular(size.width / 2);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Offset.zero & size, r),
+      Paint()..color = track,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, 0, size.width, size.height * u),
+        r,
+      ),
+      Paint()..color = fill,
     );
   }
+
+  @override
+  bool shouldRepaint(covariant _GrowingLinePainter old) =>
+      old.still != still || old.track != track || old.fill != fill;
 }
 
 /// The result as a pill: "ELIGIBLE", "NOT ELIGIBLE", "DEFERRED" or "UNDER
@@ -681,8 +896,8 @@ class _StatusChip extends StatelessWidget {
 /// removed).
 class _ClockDot extends StatelessWidget {
   final Color color;
-  final double size = 8;
-  const _ClockDot({required this.color});
+  final double size;
+  const _ClockDot({required this.color, this.size = 8});
 
   @override
   Widget build(BuildContext context) {
