@@ -12,6 +12,7 @@ import 'shared_design.dart' show HeaderIconButton;
 import 'home.dart' show FloatingNavMetrics;
 import 'streak/streak_screen.dart';
 import 'app_palette.dart';
+import 'widgets/glow_pulse.dart';
 
 class Question {
   Question({
@@ -2245,7 +2246,9 @@ class _CheckScreenState extends State<CheckScreen>
                     ),
                   const SizedBox(height: 28),
                   if (eligible && _canBook)
-                    Container(
+                    GlowPulse(
+                      color: AppColors.success,
+                      child: Container(
                       width: double.infinity,
                       height: 54,
                       decoration: BoxDecoration(
@@ -2286,6 +2289,7 @@ class _CheckScreenState extends State<CheckScreen>
                           ),
                         ),
                       ),
+                    ),
                     ),
                   if (!eligible && !review && _canRetake)
                     SizedBox(

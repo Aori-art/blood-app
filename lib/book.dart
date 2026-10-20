@@ -14,6 +14,7 @@ import 'config.dart';
 import 'home.dart' show FloatingNavMetrics, kBottomNavBarHeight;
 import 'shared_design.dart';
 import 'app_palette.dart';
+import 'widgets/glow_pulse.dart';
 
 // Sticky bottom bar's own content height (12 top pad + 50 confirm button
 // height + 12 bottom pad) — used so the scroll content ends exactly one
@@ -1437,7 +1438,9 @@ class _BookScreenState extends State<BookScreen>
 
   Widget _confirmButton({required bool isReschedule}) {
     final enabled = _allSelected && !_isSubmitting;
-    return AnimatedBuilder(
+    return GlowPulse(
+      enabled: enabled,
+      child: AnimatedBuilder(
       animation: _pulseController,
       builder: (_, child) {
         final scale = enabled ? 1.0 + (_pulseController.value * 0.02) : 1.0;
@@ -1502,6 +1505,7 @@ class _BookScreenState extends State<BookScreen>
                   ],
                 ),
         ),
+      ),
       ),
     );
   }
@@ -2993,7 +2997,9 @@ class _AppointmentManagementView extends StatelessWidget {
         const SizedBox(height: 20),
         FadeSlideIn(
           index: 2,
-          child: SizedBox(
+          child: GlowPulse(
+            borderRadius: const BorderRadius.all(Radius.circular(12)),
+            child: SizedBox(
             width: double.infinity,
             height: 50,
             child: isConfirmed
@@ -3036,6 +3042,7 @@ class _AppointmentManagementView extends StatelessWidget {
                       ),
                     ),
                   ),
+          ),
           ),
         ),
         const SizedBox(height: 16),
