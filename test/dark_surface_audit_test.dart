@@ -119,7 +119,7 @@ void main() {
             found = _whiteSurfaces(tester);
             await tester.pumpWidget(const SizedBox());
             await tester.pump(const Duration(seconds: 10));
-          }, () => MockClient(pumpableServer));
+          }, () => MockClient(screen.server));
         } finally {
           FlutterError.onError = previous;
         }
