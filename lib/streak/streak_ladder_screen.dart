@@ -1,4 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../shared_design.dart';
@@ -7,12 +10,20 @@ import 'dugtong.dart';
 import 'interactive_dugtong.dart';
 import 'streak_controller.dart';
 import 'streak_screen.dart';
+import 'streak_scenery.dart';
 import 'streak_share.dart';
 import '../app_palette.dart';
+import '../theme_transition.dart';
 
 
 /// Size of the big Dugtong in the summary card.
 const double _kDugtongSize = 110;
+
+/// Sky above Dugtong in the summary card's hospital scene (sun, moon, clouds).
+const double _kSkyBand = 56;
+
+/// Space under Dugtong's row where the pavement and the road show.
+const double _kRoadGap = 48;
 
 /// Shown in the "About Dugtong" card.
 const String _kAboutDugtong =
@@ -22,7 +33,8 @@ const String _kAboutDugtong =
     "one person's gift to another person's life, and every day of your streak "
     "connects to the day before it. In Filipino, 'dugtong-buhay' even "
     "describes something that extends a life. Dugtong is the link, and you "
-    'keep the connection going.';
+    'keep the connection going. Each day of your streak lights a window in '
+    'the eDonate Hospital.';
 // (the card shadow comes from the palette: context.palette.shadow)
 
 /// Icon + colour for a badge reward. The server decides which badges exist;
@@ -60,6 +72,12 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
   // The summary card is the area the interactive Dugtong can be dragged in.
   final GlobalKey _summaryKey = GlobalKey();
 
+  // The scene's sun / moon (a theme switch grows from it) and the scroll
+  // offset for its parallax.
+  final GlobalKey _sunMoonKey = GlobalKey();
+  final ScrollController _scroll = ScrollController();
+  final ValueNotifier<double> _scrollOffset = ValueNotifier(0);
+
   @override
   void initState() {
     super.initState();
@@ -69,6 +87,9 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
     );
     _loadName();
     _refresh();
+    _scroll.addListener(() {
+      if (_scroll.hasClients) _scrollOffset.value = _scroll.offset;
+    });
   }
 
   @override
@@ -86,6 +107,8 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
   @override
   void dispose() {
     _pulse.dispose();
+    _scroll.dispose();
+    _scrollOffset.dispose();
     super.dispose();
   }
 
@@ -171,6 +194,7 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
                   final data = _c.data;
                   if (data == null) return _emptyState();
                   return SingleChildScrollView(
+                    controller: _scroll,
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
                     child: _content(data),
@@ -298,7 +322,8 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
         column,
         Positioned(
           left: 16,
-          top: 16,
+          // Dugtong stands on the scene's ground line.
+          top: 16 + _kSkyBand,
           width: _kDugtongSize,
           height: _kDugtongSize,
           child: InteractiveDugtong(
@@ -361,18 +386,23 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
         : (_c.freezeUsedNow
               ? 'Your Streak Freeze just saved your streak!'
               : null);
-    return _card(
-      key: _summaryKey,
+    return _sceneCard(
+      d,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const SizedBox(height: _kSkyBand),
           Row(
             children: [
               // Where the interactive Dugtong rests (it is drawn in a layer above).
               const SizedBox(width: _kDugtongSize, height: _kDugtongSize),
               const SizedBox(width: 16),
               Expanded(
-                child: Column(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: _frosted(
+                    child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     FittedBox(
@@ -418,10 +448,17 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
                     ),
                   ],
                 ),
+                  ),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: _kRoadGap),
+          _frosted(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -517,7 +554,58 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
               ),
             ),
           ],
+              ],
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  /// Text over the scene sits on a frosted panel so it reads in both modes.
+  Widget _frosted({
+    required Widget child,
+    EdgeInsetsGeometry padding = const EdgeInsets.symmetric(
+      horizontal: 12,
+      vertical: 10,
+    ),
+  }) => Container(
+    padding: padding,
+    decoration: BoxDecoration(
+      color: context.palette.surface.withValues(alpha: 0.88),
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: child,
+  );
+
+  /// The summary card, with the day / night eDonate Hospital behind it.
+  Widget _sceneCard(StreakData d, {required Widget child}) {
+    final groundY = 16 + _kSkyBand + _kDugtongSize * 0.96;
+    return Container(
+      key: _summaryKey,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: context.palette.border),
+        boxShadow: context.palette.shadow,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(19),
+        child: ValueListenableBuilder<double>(
+          valueListenable: _scrollOffset,
+          builder: (context, offset, content) => StreakScenery(
+            height: groundY + StreakScenery.roadBand,
+            litWindows: math.min(d.current, 24),
+            parallax: offset,
+            sunMoonKey: _sunMoonKey,
+            onSunMoonTap: () {
+              HapticFeedback.selectionClick();
+              ThemeTransition.toggle(context, originKey: _sunMoonKey);
+            },
+            child: content,
+          ),
+          child: Padding(padding: const EdgeInsets.all(16), child: child),
+        ),
       ),
     );
   }

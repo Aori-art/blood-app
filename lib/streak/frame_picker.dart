@@ -399,7 +399,7 @@ class _FrameCatalogSheetState extends State<_FrameCatalogSheet> {
                 decoration: BoxDecoration(
                   color: context.palette.muted,
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 1.5),
+                  border: Border.all(color: context.palette.surface, width: 1.5),
                 ),
                 child: const Icon(
                   Icons.lock_rounded,
