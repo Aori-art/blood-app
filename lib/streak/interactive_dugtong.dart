@@ -344,21 +344,6 @@ class InteractiveDugtongState extends State<InteractiveDugtong>
   /// trigger it without a gesture.
   void tapNow() => _tap();
 
-  /// Plays [r] without a line (and without counting toward dizziness), unless
-  /// it is held, dizzy or animations are removed.
-  void playReaction(DugtongReaction r) {
-    if (_pointer != null || _dizzy || _reduce || _react.isAnimating) return;
-    _lastReaction = r;
-    _reaction = r;
-    _react.duration = _durationOf(r);
-    _react.forward(from: 0).whenComplete(() {
-      if (mounted && !_react.isAnimating && _reaction == r) {
-        setState(() => _reaction = null);
-      }
-    });
-    setState(() {});
-  }
-
   void _tap() {
     widget.onTapped?.call();
     if (_dizzy) return;

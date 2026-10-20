@@ -64,6 +64,14 @@ class EligibilityResultView extends StatelessWidget {
     required this.onPullRefresh,
   });
 
+  /// The result's title (also announced when the result appears).
+  static String titleFor(String status) => switch (status) {
+    'eligible' => "You're Eligible to Donate!",
+    'temporary_deferred' => 'Temporarily Deferred',
+    'for_review' || 'pending' => 'Under Review',
+    _ => "You're Not Eligible Right Now",
+  };
+
   @override
   Widget build(BuildContext context) =>
       ResultClock(child: Builder(builder: _body));
@@ -81,13 +89,7 @@ class EligibilityResultView extends StatelessWidget {
         ? context.palette.warning
         : context.palette.primaryText;
     final style = ResultStyle.of(context, data.status);
-    final title = eligible
-        ? "You're Eligible to Donate!"
-        : deferred
-        ? 'Temporarily Deferred'
-        : review
-        ? 'Under Review'
-        : "You're Not Eligible Right Now";
+    final title = titleFor(data.status);
     final fallback = eligible
         ? 'Your automated eligibility screening indicates that you may proceed to schedule a blood donation appointment. Final donor clearance will still take place at the donation center.'
         : deferred
@@ -755,54 +757,56 @@ class EligibilityResultView extends StatelessWidget {
       child: const SizedBox(width: 2),
     );
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: _cardBox(context),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _cardTitle(context, 'What happens next'),
-          const SizedBox(height: 14),
-          step(
-            marker: Container(
-              width: 24,
-              height: 24,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.success,
+    return MergeSemantics(
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: _cardBox(context),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _cardTitle(context, 'What happens next'),
+            const SizedBox(height: 14),
+            step(
+              marker: Container(
+                width: 24,
+                height: 24,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.success,
+                ),
+                child: const Icon(
+                  Icons.check_rounded,
+                  size: 16,
+                  color: Colors.white,
+                ),
               ),
-              child: const Icon(
-                Icons.check_rounded,
-                size: 16,
-                color: Colors.white,
-              ),
+              title: 'Answers submitted',
+              state: 'done',
+              line: drawn,
             ),
-            title: 'Answers submitted',
-            state: 'done',
-            line: drawn,
-          ),
-          step(
-            marker: _ClockDot(color: style.accent, size: 14),
-            title: 'Team review',
-            state: 'current',
-            line: bar(p.border),
-          ),
-          step(
-            marker: Container(
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: p.surfaceAlt,
-                border: Border.all(color: p.hint, width: 2),
-              ),
+            step(
+              marker: _ClockDot(color: style.accent, size: 14),
+              title: 'Team review',
+              state: 'current',
+              line: bar(p.border),
             ),
-            title: 'You get the result',
-            subtitle: "We'll notify you in the app",
-            state: 'upcoming',
-          ),
-        ],
+            step(
+              marker: Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: p.surfaceAlt,
+                  border: Border.all(color: p.hint, width: 2),
+                ),
+              ),
+              title: 'You get the result',
+              subtitle: "We'll notify you in the app",
+              state: 'upcoming',
+            ),
+          ],
+        ),
       ),
     );
   }

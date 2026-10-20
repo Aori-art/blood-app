@@ -102,7 +102,6 @@ class ResultStageState extends State<ResultStage> {
   final GlobalKey<InteractiveDugtongState> _dugtongKey = GlobalKey();
   late int _line = math.Random().nextInt(3);
   Duration _lineStart = _typeFrom;
-  Duration _lastJump = Duration.zero;
   ValueListenable<Duration>? _clock;
 
   ResultKind get _kind => widget.style.kind;
@@ -114,28 +113,7 @@ class ResultStageState extends State<ResultStage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final clock = ResultClock.of(context);
-    if (clock != _clock) {
-      _clock?.removeListener(_onTick);
-      _clock = clock..addListener(_onTick);
-    }
-  }
-
-  @override
-  void dispose() {
-    _clock?.removeListener(_onTick);
-    super.dispose();
-  }
-
-  // Eligible: a small celebratory jump every ~3 s.
-  void _onTick() {
-    if (_kind != ResultKind.eligible || ResultClock.stillOf(context)) return;
-    final now = _clock!.value;
-    if (now < const Duration(milliseconds: 1500)) return;
-    if (now - _lastJump >= const Duration(seconds: 3)) {
-      _lastJump = now;
-      _dugtongKey.currentState?.playReaction(DugtongReaction.jump);
-    }
+    _clock = ResultClock.of(context);
   }
 
   void _nextLine() {
@@ -262,12 +240,17 @@ class ResultStageState extends State<ResultStage> {
       builder: (context, now, child) {
         final u = clockProgress(now, _dugtongIn, _dugtongPop);
         final scale = 0.6 + 0.4 * Curves.easeOutBack.transform(u);
+        final hop = _kind == ResultKind.eligible ? _jump(now) : 0.0;
         return Opacity(
           opacity: u == 0 ? 0 : math.min(1, u * 3),
-          child: Transform.scale(
-            scale: scale,
-            alignment: Alignment.bottomCenter,
-            child: child ?? dugtong(Offset(_sweep(now) * 0.9, 0.15)),
+          child: Transform.translate(
+            offset: Offset(0, -d.height * 0.12 * hop),
+            child: Transform.scale(
+              scaleX: scale,
+              scaleY: scale * (1 + 0.06 * hop),
+              alignment: Alignment.bottomCenter,
+              child: child ?? dugtong(Offset(_sweep(now) * 0.9, 0.15)),
+            ),
           ),
         );
       },
@@ -315,6 +298,16 @@ class ResultStageState extends State<ResultStage> {
       ),
     );
   }
+}
+
+/// 0..1, the height of the eligible hop: a small jump every 3 s once the
+/// entrance is over.
+double _jump(Duration now) {
+  final ms = now.inMilliseconds - 1500;
+  if (ms < 0) return 0;
+  final phase = ms % 3000;
+  if (phase >= 600) return 0;
+  return math.sin(math.pi * phase / 600);
 }
 
 /// -1..1, the magnifier's sweep under review (0 at rest).

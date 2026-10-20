@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -98,6 +100,10 @@ class _CheckScreenState extends State<CheckScreen>
   final _matKey = GlobalKey();
   late final AnimationController _shake;
 
+  // Confetti for the first eligible result (see _onResultShown).
+  bool _celebrate = false;
+  Timer? _celebrateTimer;
+
   @override
   void initState() {
     super.initState();
@@ -114,6 +120,7 @@ class _CheckScreenState extends State<CheckScreen>
 
   @override
   void dispose() {
+    _celebrateTimer?.cancel();
     _scroll.dispose();
     _shake.dispose();
     _resultAnimation.dispose();
@@ -136,7 +143,45 @@ class _CheckScreenState extends State<CheckScreen>
   /// together. [silent] (pull-to-refresh) never shows the full-screen loader,
   /// so the indicator and the scroll position survive; only the first load
   /// shows it.
+  /// A result has just appeared (not a pull-to-refresh): the first eligible
+  /// result per eligibility gets confetti and a firm tap, any other state a
+  /// light one, and the title is announced.
+  Future<void> _onResultShown() async {
+    final status = _status;
+    final id = await _donorId();
+    var celebrate = false;
+    if (id != null) {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'check_celebrated_eligible_$id';
+      if (status == 'eligible') {
+        celebrate = prefs.getString(key) != 'true';
+        if (celebrate) await prefs.setString(key, 'true');
+      } else {
+        await prefs.remove(key);
+      }
+    }
+    if (!mounted || _status != status) return;
+    final still = MediaQuery.disableAnimationsOf(context);
+    setState(() => _celebrate = celebrate && !still);
+    if (_celebrate) {
+      HapticFeedback.mediumImpact();
+      // Done after the burst, so a later rebuild never plays it again.
+      _celebrateTimer?.cancel();
+      _celebrateTimer = Timer(const Duration(seconds: 3), () {
+        if (mounted) setState(() => _celebrate = false);
+      });
+    } else if (status != 'eligible') {
+      HapticFeedback.lightImpact();
+    }
+    SemanticsService.sendAnnouncement(
+      View.of(context),
+      EligibilityResultView.titleFor(status),
+      Directionality.of(context),
+    );
+  }
+
   Future<void> _refresh({bool silent = false}) async {
+    _celebrate = false;
     if (!silent && mounted) {
       setState(() {
         _loading = true;
@@ -179,7 +224,10 @@ class _CheckScreenState extends State<CheckScreen>
           _applyStatus(d);
           _checking = false;
         });
-        if (_result && !wasResult) _resultAnimation.forward(from: 0);
+        if (_result && !wasResult) {
+          _resultAnimation.forward(from: 0);
+          _onResultShown();
+        }
       } else {
         setState(() => _checking = false);
       }
@@ -551,6 +599,7 @@ class _CheckScreenState extends State<CheckScreen>
           _started = false;
         });
         _resultAnimation.forward(from: 0);
+        _onResultShown();
         _success(
           result['message']?.toString() ?? 'Screening evaluated successfully.',
         );
@@ -1978,6 +2027,7 @@ class _CheckScreenState extends State<CheckScreen>
       canRetake: _canRetake,
     ),
     entrance: _resultAnimation,
+    celebrate: _celebrate,
     onBook: () => Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute(builder: (_) => const BookScreen(showBackButton: true)),
     ),
