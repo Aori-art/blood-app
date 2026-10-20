@@ -33,20 +33,26 @@ class StreakMoreMenu extends StatelessWidget {
           children: [
             StreakIconTile(icon: icon, color: tint, background: tintBg),
             const SizedBox(width: 12),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: p.foreground,
+            // Wraps (instead of overflowing) with large text.
+            Flexible(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: p.foreground,
+                    ),
                   ),
-                ),
-                Text(subtitle, style: TextStyle(fontSize: 12, color: p.muted)),
-              ],
+                  Text(
+                    subtitle,
+                    style: TextStyle(fontSize: 12, color: p.muted),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

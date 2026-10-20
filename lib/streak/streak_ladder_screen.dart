@@ -1,41 +1,12 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../app_palette.dart';
 import '../shared_design.dart';
 import 'avatar_frame.dart';
-import 'dugtong.dart';
-import 'interactive_dugtong.dart';
+import 'next_reward_row.dart';
 import 'streak_controller.dart';
 import 'streak_screen.dart';
-import 'streak_scenery.dart';
-import 'streak_share.dart';
-import '../app_palette.dart';
-import '../theme_transition.dart';
-
-
-/// Size of the big Dugtong in the summary card.
-const double _kDugtongSize = 110;
-
-/// Sky above Dugtong in the summary card's hospital scene (sun, moon, clouds).
-const double _kSkyBand = 56;
-
-/// Space under Dugtong's row where the pavement and the road show.
-const double _kRoadGap = 48;
-
-/// Shown in the "About Dugtong" card.
-const String _kAboutDugtong =
-    "Meet Dugtong! The name comes from the Tagalog word 'dugtong', which "
-    "means 'to connect' or 'to join'. It also begins with 'dug', the start of "
-    "'dugo' (blood). That is the idea behind it: every blood donation connects "
-    "one person's gift to another person's life, and every day of your streak "
-    "connects to the day before it. In Filipino, 'dugtong-buhay' even "
-    "describes something that extends a life. Dugtong is the link, and you "
-    'keep the connection going. Each day of your streak lights a window in '
-    'the eDonate Hospital.';
-// (the card shadow comes from the palette: context.palette.shadow)
 
 /// Icon + colour for a badge reward. The server decides which badges exist;
 /// this only picks a look for them.
@@ -51,6 +22,8 @@ const String _kAboutDugtong =
   return looks[(index.abs()) % looks.length];
 }
 
+/// The Streak Ladder: every reward rung, its frame preview and the Equip /
+/// Remove frame actions. Opened from the streak home's menu.
 class StreakLadderScreen extends StatefulWidget {
   const StreakLadderScreen({super.key});
 
@@ -67,16 +40,6 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
   // Frame key whose request is running ('' while removing a frame).
   String? _busyFrame;
   bool _refreshing = false;
-  bool _sharing = false;
-
-  // The summary card is the area the interactive Dugtong can be dragged in.
-  final GlobalKey _summaryKey = GlobalKey();
-
-  // The scene's sun / moon (a theme switch grows from it) and the scroll
-  // offset for its parallax.
-  final GlobalKey _sunMoonKey = GlobalKey();
-  final ScrollController _scroll = ScrollController();
-  final ValueNotifier<double> _scrollOffset = ValueNotifier(0);
 
   @override
   void initState() {
@@ -87,9 +50,6 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
     );
     _loadName();
     _refresh();
-    _scroll.addListener(() {
-      if (_scroll.hasClients) _scrollOffset.value = _scroll.offset;
-    });
   }
 
   @override
@@ -107,8 +67,6 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
   @override
   void dispose() {
     _pulse.dispose();
-    _scroll.dispose();
-    _scrollOffset.dispose();
     super.dispose();
   }
 
@@ -135,23 +93,6 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
     );
   }
 
-  Future<void> _share(BuildContext buttonContext, StreakData d) async {
-    if (_sharing) return;
-    final origin = shareOriginFor(buttonContext);
-    setState(() => _sharing = true);
-    try {
-      await shareStreak(
-        context,
-        streak: d.current,
-        stage: dugtongStageFor(d.current),
-        origin: origin,
-      );
-    } catch (_) {
-      _snack("Couldn't create the share image. Please try again.");
-    }
-    if (mounted) setState(() => _sharing = false);
-  }
-
   Future<void> _setFrame(String? key) async {
     if (_busyFrame != null) return;
     setState(() => _busyFrame = key ?? '');
@@ -169,7 +110,7 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
   @override
   Widget build(BuildContext context) => StreakScreen(
     id: 'streak_ladder',
-    // The ladder has its own interactive Dugtong.
+    // Dugtong is on the streak home; the floating bubble stays off here too.
     hideBubble: true,
     child: Scaffold(
       backgroundColor: context.palette.background,
@@ -177,7 +118,7 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
         children: [
           EdonateHeader(
             title: 'Streak Ladder',
-            subtitle: 'Open eDonate every day to climb',
+            subtitle: 'Your rewards and frames',
             leading: HeaderIconButton(
               icon: Icons.arrow_back_rounded,
               tooltip: 'Back',
@@ -187,6 +128,7 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
           Expanded(
             child: RefreshIndicator(
               color: context.palette.primaryText,
+              backgroundColor: context.palette.surface,
               onRefresh: _refresh,
               child: ListenableBuilder(
                 listenable: _c,
@@ -194,7 +136,6 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
                   final data = _c.data;
                   if (data == null) return _emptyState();
                   return SingleChildScrollView(
-                    controller: _scroll,
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
                     child: _content(data),
@@ -214,7 +155,9 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
     children: [
       const SizedBox(height: 60),
       if (_refreshing)
-        Center(child: CircularProgressIndicator(color: context.palette.primaryText))
+        Center(
+          child: CircularProgressIndicator(color: context.palette.primaryText),
+        )
       else ...[
         Icon(Icons.cloud_off_rounded, size: 52, color: context.palette.muted),
         const SizedBox(height: 14),
@@ -231,7 +174,11 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
         Text(
           'Check your connection and pull down to try again.',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 13, color: context.palette.muted, height: 1.4),
+          style: TextStyle(
+            fontSize: 13,
+            color: context.palette.muted,
+            height: 1.4,
+          ),
         ),
         const SizedBox(height: 20),
         Center(
@@ -248,14 +195,10 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
     final rungs = [...d.ladder]..sort((a, b) => b.days.compareTo(a.days));
     // The largest milestone the donor has reached (list is highest-first).
     final here = rungs.where((m) => m.days <= d.current).firstOrNull;
-    final column = Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _summaryCard(d),
-        const SizedBox(height: 14),
-        _aboutCard(),
-        const SizedBox(height: 14),
-        _nextRewardCard(d),
         const SizedBox(height: 22),
         Row(
           children: [
@@ -287,7 +230,7 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
         const SizedBox(height: 8),
         if (rungs.isEmpty)
           Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
+            padding: const EdgeInsets.symmetric(vertical: 16),
             child: Text(
               'No rewards to show yet.',
               textAlign: TextAlign.center,
@@ -302,435 +245,94 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
               i,
               isHere: here != null && rungs[i].days == here.days,
             ),
-        const SizedBox(height: 18),
-        _settingsCard(),
         const SizedBox(height: 16),
         Text(
           'Rewards are cosmetic. Your best streak keeps your unlocked rewards '
           'even if your current streak resets.',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 11.5, color: context.palette.muted, height: 1.5),
-        ),
-      ],
-    );
-
-    // The interactive Dugtong sits in a layer above every card, so it never
-    // slides under the cards that follow the summary.
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        column,
-        Positioned(
-          left: 16,
-          // Dugtong stands on the scene's ground line.
-          top: 16 + _kSkyBand,
-          width: _kDugtongSize,
-          height: _kDugtongSize,
-          child: InteractiveDugtong(
-            size: _kDugtongSize,
-            streak: d.current,
-            restingMood: d.current == 0 ? DugtongMood.sleepy : DugtongMood.idle,
-            limitKey: _summaryKey,
+          style: TextStyle(
+            fontSize: 11.5,
+            color: context.palette.muted,
+            height: 1.5,
           ),
         ),
       ],
     );
   }
 
-  // ─── Cards ───────────────────────────────────────────────────────────────
-
-  Widget _card({required Widget child, Color? border, Key? key}) => Container(
-    key: key,
-    width: double.infinity,
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: context.palette.surface,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: border ?? context.palette.border),
-      boxShadow: context.palette.shadow,
-    ),
-    child: child,
-  );
-
-  Widget _aboutCard() => _card(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(Icons.favorite_rounded, size: 18, color: context.palette.primaryText),
-            SizedBox(width: 8),
-            Text(
-              'About Dugtong',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-                color: context.palette.foreground,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          _kAboutDugtong,
-          style: TextStyle(fontSize: 13, color: context.palette.muted, height: 1.5),
-        ),
-      ],
-    ),
-  );
-
+  /// Current and best streak, and the progress to the next reward.
   Widget _summaryCard(StreakData d) {
-    final notice = _c.streakLostNow
-        ? 'Your streak restarted${_c.previousStreak > 0 ? ' (it was ${_c.previousStreak} days)' : ''}. '
-              'Your best streak keeps your rewards.'
-        : (_c.freezeUsedNow
-              ? 'Your Streak Freeze just saved your streak!'
-              : null);
-    return _sceneCard(
-      d,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: _kSkyBand),
-          Row(
-            children: [
-              // Where the interactive Dugtong rests (it is drawn in a layer above).
-              const SizedBox(width: _kDugtongSize, height: _kDugtongSize),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: _frosted(
-                    child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        '${d.current}',
-                        style: TextStyle(
-                          fontSize: 48,
-                          fontWeight: FontWeight.w900,
-                          color: context.palette.primaryText,
-                          height: 1.0,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'day streak',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: context.palette.muted,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: context.palette.accentBg,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        dugtongStageFor(d.current).stageName,
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w800,
-                          color: context.palette.primaryText,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: _kRoadGap),
-          _frosted(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _chip(Icons.emoji_events_rounded, 'Best streak', '${d.longest}'),
-              _chip(
-                Icons.calendar_month_rounded,
-                'Total days',
-                '${d.totalCheckins}',
-              ),
-              _chip(
-                Icons.ac_unit_rounded,
-                'Streak Freeze',
-                d.freezeAvailable ? 'Ready' : 'Recharging',
-                valueColor: d.freezeAvailable
-                    ? context.palette.success
-                    : context.palette.warning,
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.info_outline_rounded, size: 14, color: context.palette.muted),
-              SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'Protects 1 missed day, once every 30 days',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    color: context.palette.muted,
-                    height: 1.4,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Builder(
-            builder: (buttonContext) => SizedBox(
-              width: double.infinity,
-              height: 44,
-              child: OutlinedButton(
-                onPressed: _sharing ? null : () => _share(buttonContext, d),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: context.palette.primaryText,
-                  side: BorderSide(color: context.palette.primaryText, width: 1.3),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: _sharing
-                    ? SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.2,
-                          color: context.palette.primaryText,
-                        ),
-                      )
-                    : const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.ios_share_rounded, size: 18),
-                          SizedBox(width: 8),
-                          Text(
-                            'Share',
-                            style: TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                        ],
-                      ),
-              ),
-            ),
-          ),
-          if (notice != null) ...[
-            const SizedBox(height: 10),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: context.palette.infoBg,
-                border: Border.all(color: context.palette.infoBorder),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                notice,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: context.palette.infoText,
-                  height: 1.4,
-                ),
-              ),
-            ),
-          ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Text over the scene sits on a frosted panel so it reads in both modes.
-  Widget _frosted({
-    required Widget child,
-    EdgeInsetsGeometry padding = const EdgeInsets.symmetric(
-      horizontal: 12,
-      vertical: 10,
-    ),
-  }) => Container(
-    padding: padding,
-    decoration: BoxDecoration(
-      color: context.palette.surface.withValues(alpha: 0.88),
-      borderRadius: BorderRadius.circular(14),
-    ),
-    child: child,
-  );
-
-  /// The summary card, with the day / night eDonate Hospital behind it.
-  Widget _sceneCard(StreakData d, {required Widget child}) {
-    final groundY = 16 + _kSkyBand + _kDugtongSize * 0.96;
-    return Container(
-      key: _summaryKey,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: context.palette.border),
-        boxShadow: context.palette.shadow,
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(19),
-        child: ValueListenableBuilder<double>(
-          valueListenable: _scrollOffset,
-          builder: (context, offset, content) => StreakScenery(
-            height: groundY + StreakScenery.roadBand,
-            litWindows: math.min(d.current, 24),
-            parallax: offset,
-            sunMoonKey: _sunMoonKey,
-            onSunMoonTap: () {
-              HapticFeedback.selectionClick();
-              ThemeTransition.toggle(context, originKey: _sunMoonKey);
-            },
-            child: content,
-          ),
-          child: Padding(padding: const EdgeInsets.all(16), child: child),
-        ),
-      ),
-    );
-  }
-
-  Widget _chip(
-    IconData icon,
-    String label,
-    String value, {
-    Color? valueColor,
-  }) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-    decoration: BoxDecoration(
-      color: context.palette.surfaceAlt,
-      border: Border.all(color: context.palette.border),
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 16, color: context.palette.primaryText),
-        const SizedBox(width: 6),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: TextStyle(fontSize: 10, color: context.palette.muted),
-            ),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                color: valueColor ?? context.palette.foreground,
-              ),
-            ),
-          ],
-        ),
-      ],
-    ),
-  );
-
-  Widget _nextRewardCard(StreakData d) {
-    final next = d.nextMilestone;
-    if (next == null) {
-      return _card(
+    final p = context.palette;
+    Widget stat(
+      IconData icon,
+      Color tint,
+      Color tintBg,
+      String value,
+      String label,
+    ) => Expanded(
+      child: MergeSemantics(
         child: Row(
           children: [
-            Icon(
-              Icons.emoji_events_rounded,
-              color: context.palette.warning,
-              size: 28,
+            Container(
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: tintBg, shape: BoxShape.circle),
+              child: Icon(icon, size: 18, color: tint),
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                "You've climbed the whole ladder!",
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: context.palette.foreground,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: p.foreground,
+                    ),
+                  ),
+                  Text(label, style: TextStyle(fontSize: 11.5, color: p.muted)),
+                ],
               ),
             ),
           ],
         ),
-      );
-    }
-    final remaining = next.remaining ?? (next.days - d.current);
-    final progress = next.days <= 0
-        ? 1.0
-        : (d.current / next.days).clamp(0.0, 1.0);
-    return _card(
+      ),
+    );
+    String days(int n) => n == 1 ? '1 day' : '$n days';
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: p.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: p.border),
+        boxShadow: p.shadow,
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'NEXT REWARD',
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.8,
-              color: context.palette.muted,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '$remaining more ${remaining == 1 ? 'day' : 'days'} to ${next.label}',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: context.palette.foreground,
-            ),
-          ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: TweenAnimationBuilder<double>(
-              tween: Tween<double>(begin: 0, end: progress),
-              duration:
-                  (MediaQuery.maybeOf(context)?.disableAnimations ?? false)
-                  ? Duration.zero
-                  : const Duration(milliseconds: 900),
-              curve: Curves.easeOutCubic,
-              builder: (context, value, _) => LinearProgressIndicator(
-                value: value,
-                minHeight: 10,
-                color: context.palette.primaryText,
-                backgroundColor: context.palette.surfaceAlt,
+          Row(
+            children: [
+              stat(
+                Icons.local_fire_department_rounded,
+                p.primaryText,
+                p.accentBg,
+                days(d.current),
+                'Current streak',
               ),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              '${d.current} / ${next.days}',
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w600,
-                color: context.palette.muted,
+              const SizedBox(width: 12),
+              stat(
+                Icons.emoji_events_rounded,
+                p.orange,
+                p.orangeBg,
+                days(d.longest),
+                'Best streak',
               ),
-            ),
+            ],
           ),
+          Divider(height: 28, color: p.border),
+          NextRewardRow(data: d, initials: _initials),
         ],
       ),
     );
@@ -837,7 +439,9 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
         shape: BoxShape.circle,
         color: unlocked ? kCrimson : context.palette.surface,
         border: Border.all(
-          color: unlocked ? context.palette.primaryText : context.palette.border,
+          color: unlocked
+              ? context.palette.primaryText
+              : context.palette.border,
           width: 2,
         ),
         boxShadow: unlocked
@@ -902,7 +506,9 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
-                color: unlocked ? context.palette.primaryText : context.palette.muted,
+                color: unlocked
+                    ? context.palette.primaryText
+                    : context.palette.muted,
               ),
             ),
             if (isHere) ...[
@@ -984,24 +590,37 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
 
   Widget _preview(Milestone m, bool unlocked, int index) {
     if (m.isFrame) {
-      return Opacity(
-        opacity: unlocked ? 1 : 0.5,
-        child: StreakAvatarFrame(
-          frameKey: m.key,
-          radius: 20,
-          child: CircleAvatar(
-            radius: 20,
-            backgroundColor: kCrimson,
-            child: Text(
-              _initials,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
-            ),
+      // A locked frame is dimmed, but its initials stay readable: muted text
+      // on a neutral disc (white on a faded red would not be).
+      final p = context.palette;
+      final avatar = CircleAvatar(
+        radius: 20,
+        backgroundColor: unlocked ? kCrimson : p.surfaceAlt,
+        child: Text(
+          _initials,
+          style: TextStyle(
+            color: unlocked ? Colors.white : p.muted,
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
           ),
         ),
+      );
+      if (unlocked) {
+        return StreakAvatarFrame(frameKey: m.key, radius: 20, child: avatar);
+      }
+      return Stack(
+        alignment: Alignment.center,
+        children: [
+          Opacity(
+            opacity: 0.5,
+            child: StreakAvatarFrame(
+              frameKey: m.key,
+              radius: 20,
+              child: const SizedBox.square(dimension: 40),
+            ),
+          ),
+          avatar,
+        ],
       );
     }
     final (icon, color) = badgeVisualFor(context, m.key, index);
@@ -1025,7 +644,8 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
       return _SmallPill(
         icon: Icons.check_circle_rounded,
         label: 'Equipped',
-        color: context.palette.success,
+        // A text role: the readable green on its tint.
+        color: context.palette.successDark,
       );
     }
     return SizedBox(
@@ -1054,84 +674,6 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
       ),
     );
   }
-
-  // ─── Settings ────────────────────────────────────────────────────────────
-
-  Widget _settingsCard() => _card(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Settings',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.bold,
-            color: context.palette.foreground,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                'Show floating streak',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: context.palette.foreground,
-                ),
-              ),
-            ),
-            Switch(
-              value: _c.showBubblePref,
-              activeThumbColor: context.palette.primaryText,
-              onChanged: (v) => _c.setShowBubble(v),
-            ),
-          ],
-        ),
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                'Dugtong chat',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: context.palette.foreground,
-                ),
-              ),
-            ),
-            Switch(
-              value: _c.chatEnabled,
-              activeThumbColor: context.palette.primaryText,
-              onChanged: (v) => _c.setChatEnabled(v),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        SizedBox(
-          width: double.infinity,
-          height: 44,
-          child: OutlinedButton.icon(
-            onPressed: () async {
-              await _c.resetBubblePosition();
-              _snack('Bubble position reset.');
-            },
-            icon: const Icon(Icons.open_with_rounded, size: 18),
-            label: const Text('Reset bubble position'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: context.palette.primaryText,
-              side: BorderSide(color: context.palette.primaryBorder),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              textStyle: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
 }
 
 class _SmallPill extends StatelessWidget {

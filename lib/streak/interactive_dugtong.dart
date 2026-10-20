@@ -25,7 +25,7 @@ const Map<DugtongReaction, List<String>> _reactionLines = {
 
 const String _dizzyLine = 'Dizzy... too many taps!';
 
-/// A big, playful Dugtong for the Streak Ladder.
+/// A big, playful Dugtong for the streak home (and the Check results).
 ///
 /// * Hold and drag: it is picked up (a little bigger, with a soft shadow) and
 ///   follows the finger anywhere inside [limitKey]'s box and a little beyond,

@@ -7,15 +7,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../app_colors.dart';
 import '../app_palette.dart';
-import '../shared_design.dart' show PrimaryButton, kCrimson;
+import '../shared_design.dart' show PrimaryButton;
 import '../theme_transition.dart';
-import 'avatar_frame.dart';
 import 'dugtong.dart';
 import 'dugtong_chatter.dart';
 import 'dugtong_top_bubble.dart';
 import 'interactive_dugtong.dart';
+import 'next_reward_row.dart';
 import 'streak_controller.dart';
-import 'streak_ladder_screen.dart' show badgeVisualFor;
 import 'streak_menu.dart';
 import 'streak_scenery.dart';
 import 'streak_screen.dart';
@@ -138,6 +137,10 @@ class StreakHomeScreenState extends State<StreakHomeScreen>
   /// What Dugtong is saying (for tests).
   @visibleForTesting
   String? get currentLine => _line;
+
+  /// Makes Dugtong say [text] (tests use the longest line).
+  @visibleForTesting
+  void debugSay(String text) => _say(text);
 
   @override
   void initState() {
@@ -479,28 +482,35 @@ class StreakHomeScreenState extends State<StreakHomeScreen>
   Widget _bubble(StreakHomeLayout layout) {
     final text = _line!;
     final scaler = MediaQuery.textScalerOf(context);
+    // Between the hero and his head: a long line (or large text) shrinks to
+    // fit instead of covering the chips above.
     return Positioned(
       left: 16,
       right: 16,
+      top: layout.top + StreakHomeLayout.topBar + layout.hero + 4,
       bottom: layout.height - layout.dugtongRect.top - 2,
       child: IgnorePointer(
         child: Align(
-          // Centred on Dugtong (inside the 16 px margins).
+          // Centred on Dugtong (inside the 16 px margins), resting on him.
           alignment: Alignment(
             ((layout.dugtongX - 16) / (layout.width - 32) * 2 - 1).clamp(
               -1.0,
               1.0,
             ),
-            0,
+            1,
           ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 260),
-            child: ValueListenableBuilder<int>(
-              valueListenable: _typed,
-              builder: (context, shown, _) => DugtongTopBubble(
-                text: text,
-                shown: shown.clamp(0, text.length),
-                textScaler: scaler,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.bottomCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 260),
+              child: ValueListenableBuilder<int>(
+                valueListenable: _typed,
+                builder: (context, shown, _) => DugtongTopBubble(
+                  text: text,
+                  shown: shown.clamp(0, text.length),
+                  textScaler: scaler,
+                ),
               ),
             ),
           ),
@@ -580,30 +590,37 @@ class StreakHomeScreenState extends State<StreakHomeScreen>
                     track: p.border.withValues(alpha: 0.6),
                   ),
                   child: Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          d == null
-                              ? '–'
-                              : '${(current * ringIn.value).round()}',
-                          style: TextStyle(
-                            fontSize: 44 * layout.s,
-                            height: 1.05,
-                            fontWeight: FontWeight.w800,
-                            color: p.foreground,
-                          ),
+                    // Stays inside the ring at any text size.
+                    child: Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              d == null
+                                  ? '–'
+                                  : '${(current * ringIn.value).round()}',
+                              style: TextStyle(
+                                fontSize: 44 * layout.s,
+                                height: 1.05,
+                                fontWeight: FontWeight.w800,
+                                color: p.foreground,
+                              ),
+                            ),
+                            Text(
+                              current == 0 ? 'Start your streak' : 'DAY STREAK',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: current == 0 ? 0.2 : 1.2,
+                                color: p.muted,
+                              ),
+                            ),
+                          ],
                         ),
-                        Text(
-                          current == 0 ? 'Start your streak' : 'DAY STREAK',
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: current == 0 ? 0.2 : 1.2,
-                            color: p.muted,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
@@ -934,168 +951,6 @@ class _StatTile extends StatelessWidget {
             ),
     );
   }
-}
-
-/// "N more days to" the next reward: a preview of it, a slim bar and the
-/// count. Shared by the home and the ladder page.
-class NextRewardRow extends StatelessWidget {
-  final StreakData data;
-  final String initials;
-
-  /// Grows the bar in (0..1); null shows it at once.
-  final Animation<double>? grow;
-
-  const NextRewardRow({
-    super.key,
-    required this.data,
-    required this.initials,
-    this.grow,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    final next = data.nextMilestone;
-    if (next == null) {
-      return Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: p.warningBg,
-            ),
-            child: Icon(Icons.star_rounded, color: p.warning, size: 24),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              "You've climbed the whole ladder!",
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: p.foreground,
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-    final remaining = next.remaining ?? (next.days - data.current);
-    final progress = next.days <= 0
-        ? 1.0
-        : (data.current / next.days).clamp(0.0, 1.0);
-    final index = data.ladder.indexWhere((m) => m.days == next.days);
-    final Widget preview;
-    if (next.isFrame) {
-      preview = StreakAvatarFrame(
-        frameKey: next.key,
-        radius: 16,
-        child: CircleAvatar(
-          radius: 16,
-          backgroundColor: kCrimson,
-          child: Text(
-            initials,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 11,
-            ),
-          ),
-        ),
-      );
-    } else {
-      final (icon, color) = badgeVisualFor(context, next.key, index);
-      preview = Container(
-        width: 40,
-        height: 40,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: color.withValues(alpha: .14),
-        ),
-        child: Icon(icon, color: color, size: 22),
-      );
-    }
-    final bar = grow;
-    return MergeSemantics(
-      child: Row(
-        children: [
-          SizedBox.square(dimension: 40, child: Center(child: preview)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$remaining more ${remaining == 1 ? 'day' : 'days'} to ${next.label}',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: p.foreground,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: SizedBox(
-                    height: 8,
-                    child: bar == null
-                        ? _Bar(value: progress)
-                        : AnimatedBuilder(
-                            animation: bar,
-                            builder: (context, _) => _Bar(
-                              value:
-                                  progress *
-                                  Curves.easeOutCubic.transform(
-                                    ((bar.value - 0.4) / 0.6).clamp(0.0, 1.0),
-                                  ),
-                            ),
-                          ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            '${data.current}/${next.days}',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: p.muted,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Bar extends StatelessWidget {
-  final double value;
-  const _Bar({required this.value});
-
-  @override
-  Widget build(BuildContext context) => Stack(
-    fit: StackFit.expand,
-    children: [
-      ColoredBox(color: context.palette.surfaceAlt),
-      FractionallySizedBox(
-        alignment: Alignment.centerLeft,
-        widthFactor: value,
-        child: const DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(colors: AppColors.primaryGradient),
-          ),
-        ),
-      ),
-    ],
-  );
 }
 
 /// The count's progress ring on a frosted disc.
