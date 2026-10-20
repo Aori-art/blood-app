@@ -12,7 +12,7 @@ import 'dugtong.dart';
 import 'dugtong_chatter.dart';
 import 'milestone_celebration.dart';
 import 'streak_controller.dart';
-import 'streak_ladder_screen.dart';
+import 'streak_routes.dart';
 import 'streak_particles.dart';
 import '../app_palette.dart';
 
@@ -419,10 +419,10 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
 
   // ─── Actions ────────────────────────────────────────────────────────────
 
-  void _openLadder() {
+  void _openStreak() {
     if (_didDrag) return;
     appNavigatorKey.currentState?.push(
-      MaterialPageRoute<void>(builder: (_) => const StreakLadderScreen()),
+      streakHomeRoute(),
     );
   }
 
@@ -496,7 +496,7 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
                             ),
                             SizedBox(height: 2),
                             Text(
-                              'You can turn it back on in Streak Ladder > Settings.',
+                              'You can turn it back on in Streak > Streak settings.',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: context.palette.muted,
@@ -521,7 +521,7 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
     if (nav != null && nav.mounted) {
       ScaffoldMessenger.maybeOf(nav)?.showSnackBar(
         SnackBar(
-          content: const Text('Turn it back on in Streak Ladder > Settings'),
+          content: const Text('Turn it back on in Streak > Streak settings'),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
@@ -793,7 +793,7 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
       onPointerCancel: _pointerUp,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: _openLadder,
+        onTap: _openStreak,
         onLongPress: _showMenu,
         child: AnimatedOpacity(
           duration: const Duration(milliseconds: 300),

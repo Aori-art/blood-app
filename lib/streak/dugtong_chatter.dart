@@ -104,12 +104,12 @@ final List<_Pool> _pools = [
     _Line('Your blood type matters. Keep your profile up to date!'),
   ]),
   _Pool('tips', 3, [
-    _Line('Tap me to see your streak ladder!'),
+    _Line('Tap me to see your streak!'),
     _Line('Drag me anywhere you like.'),
     _Line('Have you checked your eligibility lately? Open the Check tab.'),
     _Line('Need a slot? Try the Book tab.'),
     _Line(
-      'Long-press me to hide me. Bring me back in Streak Ladder > Settings.',
+      'Long-press me to hide me. Bring me back in Streak > Streak settings.',
     ),
     _Line('You can change your profile frame from your profile page.'),
     _Line('Frames are cosmetic, but they look great on your profile!'),
