@@ -4,17 +4,29 @@ import 'package:flutter/material.dart';
 
 import '../app_palette.dart';
 
-/// A day / night hospital scene drawn in code (no assets), used as the
-/// background of the Streak Ladder's summary card. Dugtong stands on its
-/// ground line; the card's content sits on top as [child].
+/// A day / night hospital scene drawn in code (no assets). Full screen (the
+/// streak home): give it [groundFraction] and it takes its size from its
+/// constraints, with the ground line at that fraction of its height; Dugtong
+/// stands on that line. As a card background, give it [height] instead.
 ///
 /// Every color and position is a function of `night` (0 = sunny noon,
 /// 1 = clear midnight, animated when the mode changes) and of the time in one
 /// 60 s loop.
 class StreakScenery extends StatefulWidget {
-  /// Height of the landscape band, from the top of the card to the bottom of
-  /// the road. The ground line sits [roadBand] px above it.
-  final double height;
+  /// Card mode: height of the landscape band, from the top of the card to the
+  /// bottom of the road. The ground line sits [roadBand] px above it.
+  final double? height;
+
+  /// Full-screen mode: where the ground line is, 0 (top) .. 1 (bottom).
+  final double? groundFraction;
+
+  /// Dugtong's drag offset: the layers shift up to 12 px the other way (far
+  /// layers less than near ones).
+  final Offset drag;
+
+  /// Full-screen mode: centre of the sun / moon, and the caption's top left.
+  final Offset? celestial;
+  final Offset? captionAt;
 
   /// Windows of the eDonate Hospital that are lit (one per streak day, max 24).
   final int litWindows;
@@ -34,13 +46,17 @@ class StreakScenery extends StatefulWidget {
 
   const StreakScenery({
     super.key,
-    required this.height,
+    this.height,
+    this.groundFraction,
     required this.litWindows,
     this.child,
     this.parallax = 0,
+    this.drag = Offset.zero,
+    this.celestial,
+    this.captionAt,
     this.onSunMoonTap,
     this.sunMoonKey,
-  });
+  }) : assert(height != null || groundFraction != null);
 
   /// The road and pavement below the ground line.
   static const double roadBand = 44;
@@ -80,11 +96,32 @@ class _StreakSceneryState extends State<StreakScenery>
 
   @override
   Widget build(BuildContext context) {
+    if (widget.groundFraction == null) {
+      return _scene(context, widget.height! - StreakScenery.roadBand, null);
+    }
+    return LayoutBuilder(
+      builder: (context, box) =>
+          _scene(context, box.maxHeight * widget.groundFraction!, box.biggest),
+    );
+  }
+
+  Widget _scene(BuildContext context, double groundY, Size? full) {
     final p = context.palette;
     final dark = p.isDark;
-    final groundY = widget.height - StreakScenery.roadBand;
     final lit = widget.litWindows.clamp(0, 24);
     final parallax = (widget.parallax * 0.08).clamp(0.0, 12.0);
+    // Opposite to the drag, at most 12 px on each axis.
+    final shift = Offset(
+      (-widget.drag.dx * 0.08).clamp(-12.0, 12.0),
+      (-widget.drag.dy * 0.08).clamp(-12.0, 12.0),
+    );
+    final tall = full != null;
+    final celestial =
+        widget.celestial ??
+        Offset(
+          (full?.width ?? 0) - StreakScenery.celestialFromTopRight.dx,
+          StreakScenery.celestialFromTopRight.dy,
+        );
 
     CustomPaint scene(double night, {Animation<double>? clock}) => CustomPaint(
       painter: _ScenePainter(
@@ -94,6 +131,9 @@ class _StreakSceneryState extends State<StreakScenery>
         groundY: groundY,
         lit: lit,
         parallax: parallax,
+        shift: shift,
+        tall: tall,
+        celestial: tall ? celestial : null,
         data: _data,
       ),
     );
@@ -129,8 +169,11 @@ class _StreakSceneryState extends State<StreakScenery>
         ?widget.child,
         // The sun / moon button (where both rest).
         Positioned(
-          right: StreakScenery.celestialFromTopRight.dx - 24,
-          top: StreakScenery.celestialFromTopRight.dy - 24,
+          left: tall ? celestial.dx - 24 : null,
+          top: tall
+              ? celestial.dy - 24
+              : StreakScenery.celestialFromTopRight.dy - 24,
+          right: tall ? null : StreakScenery.celestialFromTopRight.dx - 24,
           width: 48,
           height: 48,
           child: Semantics(
@@ -144,10 +187,11 @@ class _StreakSceneryState extends State<StreakScenery>
             ),
           ),
         ),
-        // A tiny caption on the road.
+        // A tiny caption (on the road in a card, under the back button full
+        // screen).
         Positioned(
-          left: 12,
-          top: groundY + 12,
+          left: widget.captionAt?.dx ?? 12,
+          top: widget.captionAt?.dy ?? groundY + 12,
           child: ExcludeSemantics(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -207,6 +251,10 @@ class _Tree {
 class _SceneData {
   final List<_Star> stars;
   final List<_Cloud> clouds;
+
+  /// A tall (full-screen) sky gets more of both.
+  final List<_Star> tallStars;
+  final List<_Cloud> tallClouds;
   final List<_Block> blocks;
   final List<_Tree> trees;
 
@@ -216,6 +264,8 @@ class _SceneData {
   _SceneData(
     this.stars,
     this.clouds,
+    this.tallStars,
+    this.tallClouds,
     this.blocks,
     this.trees,
     this.shootingStars,
@@ -238,9 +288,29 @@ class _SceneData {
       _Cloud(0.24, 0.75, 6, 0.55),
       _Cloud(0.06, 0.6, 4, 0.8),
     ];
+    final tallStars = [
+      ...stars,
+      for (var i = 0; i < 40; i++)
+        _Star(
+          r.nextDouble(),
+          r.nextDouble() * 0.85,
+          0.5 + r.nextDouble() * 1.0,
+          r.nextDouble(),
+          0.5 + r.nextDouble() * 2.5,
+        ),
+    ];
+    const tallClouds = [
+      _Cloud(0.20, 1.15, 8, 0.05),
+      _Cloud(0.31, 0.8, 6, 0.55),
+      _Cloud(0.42, 0.95, 5, 0.3),
+      _Cloud(0.54, 0.7, 7, 0.8),
+      _Cloud(0.64, 0.6, 4, 0.15),
+      _Cloud(0.72, 0.85, 3, 0.65),
+    ];
     final blocks = <_Block>[];
-    var x = -0.02;
-    while (x < 1.02) {
+    // A little past both edges, so the parallax never shows a gap.
+    var x = -0.06;
+    while (x < 1.06) {
       final w = 0.05 + r.nextDouble() * 0.06;
       blocks.add(_Block(x, w, 0.18 + r.nextDouble() * 0.22));
       x += w + 0.01;
@@ -253,7 +323,15 @@ class _SceneData {
     ];
     // Every 15 to 25 s.
     const shooting = [6.0, 27.0, 46.0];
-    return _SceneData(stars, clouds, blocks, trees, shooting);
+    return _SceneData(
+      stars,
+      clouds,
+      tallStars,
+      tallClouds,
+      blocks,
+      trees,
+      shooting,
+    );
   }
 }
 
@@ -268,6 +346,14 @@ class _ScenePainter extends CustomPainter {
   final double parallax;
   final _SceneData data;
 
+  /// Dugtong's drag, mapped to a shift of the nearest layer (far layers get
+  /// a fraction of it).
+  final Offset shift;
+
+  /// Full screen: a tall sky, with the sun / moon at [celestial].
+  final bool tall;
+  final Offset? celestial;
+
   _ScenePainter({
     required this.night,
     required this.clock,
@@ -276,7 +362,18 @@ class _ScenePainter extends CustomPainter {
     required this.lit,
     required this.parallax,
     required this.data,
+    this.shift = Offset.zero,
+    this.tall = false,
+    this.celestial,
   }) : super(repaint: clock);
+
+  void _layer(Canvas canvas, double depth, void Function() draw) {
+    if (shift == Offset.zero) return draw();
+    canvas.save();
+    canvas.translate(shift.dx * depth, shift.dy * depth);
+    draw();
+    canvas.restore();
+  }
 
   Color _mix(int day, int nightColor) =>
       Color.lerp(Color(day), Color(nightColor), night)!;
@@ -335,8 +432,10 @@ class _ScenePainter extends CustomPainter {
     final far = parallax; // far layers shift most inside the card
 
     // ── Stars and a shooting star ──
+    canvas.save();
+    canvas.translate(shift.dx * 0.25, shift.dy * 0.25);
     if (n > 0.02) {
-      for (final s in data.stars) {
+      for (final s in tall ? data.tallStars : data.stars) {
         final tw =
             0.55 +
             0.45 * math.sin(2 * math.pi * (sec / 60 * s.speed + s.phase));
@@ -349,7 +448,10 @@ class _ScenePainter extends CustomPainter {
       for (final start in data.shootingStars) {
         final p = (sec - start) / 1.1;
         if (p < 0 || p > 1 || n < 0.5) continue;
-        final from = Offset(w * (0.2 + start / 120), 14 + start % 9 + far);
+        final from = Offset(
+          w * (0.2 + start / 120),
+          (tall ? gY * 0.12 : 14) + start % 9 + far,
+        );
         final head = from + Offset(90 * p, 34 * p);
         final tail = head - const Offset(34, 13);
         canvas.drawLine(
@@ -369,10 +471,12 @@ class _ScenePainter extends CustomPainter {
     }
 
     // ── Sun (sets along an arc) and moon (rises) ──
-    final rest = Offset(
-      w - StreakScenery.celestialFromTopRight.dx,
-      StreakScenery.celestialFromTopRight.dy,
-    );
+    final rest =
+        celestial ??
+        Offset(
+          w - StreakScenery.celestialFromTopRight.dx,
+          StreakScenery.celestialFromTopRight.dy,
+        );
     final sun = Offset(
       rest.dx + 70 * n,
       rest.dy + (gY + 30 - rest.dy) * n * n,
@@ -403,9 +507,12 @@ class _ScenePainter extends CustomPainter {
       canvas.drawCircle(moon + const Offset(-6, -4), 3.6, crater);
       canvas.drawCircle(moon + const Offset(5, 6), 2.6, crater);
     }
+    canvas.restore();
 
     // ── Clouds ──
-    for (final c in data.clouds) {
+    canvas.save();
+    canvas.translate(shift.dx * 0.4, shift.dy * 0.4);
+    for (final c in tall ? data.tallClouds : data.clouds) {
       final span = w + 140;
       final x = ((sec * c.speed + c.phase * span) % span) - 70;
       _cloud(
@@ -428,7 +535,11 @@ class _ScenePainter extends CustomPainter {
           ..color = Color.fromRGBO(40, 55, 75, 0.7 * (1 - n));
         for (var i = 0; i < 3; i++) {
           final x = -20 + (w + 40) * p - i * 14;
-          final y = 26 + i * 6 + 4 * math.sin(p * 8 + i) + far * 0.8;
+          final y =
+              (tall ? gY * 0.34 : 26) +
+              i * 6 +
+              4 * math.sin(p * 8 + i) +
+              far * 0.8;
           final flap = 3 * math.sin(sec * 9 + i * 1.7);
           final path = Path()
             ..moveTo(x - 5, y - flap)
@@ -439,25 +550,36 @@ class _ScenePainter extends CustomPainter {
       }
     }
 
-    // ── Back row of blocks ──
+    canvas.restore();
+
+    // ── Back row of blocks ── (a tall scene keeps them a skyline, not towers)
     final blockColor = _mix(0xFFB9C9DA, 0xFF18223B);
-    for (final b in data.blocks) {
-      final bh = b.h * gY;
-      canvas.drawRect(
-        Rect.fromLTWH(b.x * w, gY - bh + far * 0.7, b.w * w, bh + 12),
-        _fill(blockColor),
-      );
-    }
+    final blockScale = tall ? math.min(gY, 260.0) : gY;
+    _layer(canvas, 0.55, () {
+      for (final b in data.blocks) {
+        final bh = b.h * blockScale;
+        canvas.drawRect(
+          Rect.fromLTWH(b.x * w, gY - bh + far * 0.7, b.w * w, bh + 12),
+          _fill(blockColor),
+        );
+      }
+    });
 
     // ── Hills ──
-    _hill(canvas, w, gY, 30, far * 0.6, _mix(0xFF9BD5A2, 0xFF16324F), 0.0);
-    _hill(canvas, w, gY, 18, far * 0.45, _mix(0xFF7FC48E, 0xFF10263F), 0.5);
+    _layer(canvas, 0.7, () {
+      _hill(canvas, w, gY, 30, far * 0.6, _mix(0xFF9BD5A2, 0xFF16324F), 0.0);
+      _hill(canvas, w, gY, 18, far * 0.45, _mix(0xFF7FC48E, 0xFF10263F), 0.5);
+    });
 
     // ── Buildings ──
+    canvas.save();
+    canvas.translate(shift.dx * 0.85, shift.dy * 0.85);
     final bShift = far * 0.3;
     _building(
       canvas,
-      Rect.fromLTRB(w * 0.27, gY - 50 + bShift, w * 0.27 + 34, gY + 4),
+      tall
+          ? Rect.fromLTRB(w * 0.03, gY - 50 + bShift, w * 0.03 + 34, gY + 4)
+          : Rect.fromLTRB(w * 0.27, gY - 50 + bShift, w * 0.27 + 34, gY + 4),
       body: _mix(0xFFF2F7FC, 0xFF1E2A44),
       trim: _mix(0xFFCFE2F3, 0xFF26344F),
       rows: 2,
@@ -465,18 +587,29 @@ class _ScenePainter extends CustomPainter {
     );
     _building(
       canvas,
-      Rect.fromLTRB(w * 0.70, gY - 62 + bShift, w * 0.70 + 54, gY + 4),
+      tall
+          ? Rect.fromLTRB(w - 58, gY - 62 + bShift, w - 4, gY + 4)
+          : Rect.fromLTRB(w * 0.70, gY - 62 + bShift, w * 0.70 + 54, gY + 4),
       body: _mix(0xFFF4FAFF, 0xFF1E2A44),
       trim: _mix(0xFFCFE6F7, 0xFF26344F),
       rows: 2,
       cols: 3,
     );
     _hospital(canvas, w, gY, bShift, sec);
+    canvas.restore();
 
     // ── Trees (sway gently) ──
-    for (final t in data.trees) {
-      _tree(canvas, Offset(t.x * w, gY + 2 + far * 0.1), t.size, sec, t.phase);
-    }
+    _layer(canvas, 1, () {
+      for (final t in data.trees) {
+        _tree(
+          canvas,
+          Offset(t.x * w, gY + 2 + far * 0.1),
+          t.size,
+          sec,
+          t.phase,
+        );
+      }
+    });
 
     // ── Ground: grass, pavement, road ──
     canvas.drawRect(
@@ -555,17 +688,18 @@ class _ScenePainter extends CustomPainter {
     Color color,
     double phase,
   ) {
-    final path = Path()..moveTo(0, gY + 4);
+    // A little past both edges, for the parallax.
+    final path = Path()..moveTo(-16, gY + 4);
     const steps = 4;
     for (var i = 0; i < steps; i++) {
-      final x0 = w * i / steps;
-      final x1 = w * (i + 1) / steps;
+      final x0 = -16 + (w + 32) * i / steps;
+      final x1 = -16 + (w + 32) * (i + 1) / steps;
       final peak = gY - height * (0.6 + 0.4 * math.sin((i + phase) * 2.1));
       path.quadraticBezierTo((x0 + x1) / 2, peak + dy, x1, gY + 2 + dy * 0.2);
     }
     path
-      ..lineTo(w, gY + 6)
-      ..lineTo(0, gY + 6)
+      ..lineTo(w + 16, gY + 6)
+      ..lineTo(-16, gY + 6)
       ..close();
     canvas.drawPath(path, _fill(color));
   }
@@ -599,7 +733,8 @@ class _ScenePainter extends CustomPainter {
 
   void _hospital(Canvas canvas, double w, double gY, double dy, double sec) {
     final n = night;
-    final cx = w * 0.49;
+    // Full screen, Dugtong stands left of centre: the hospital shows beside him.
+    final cx = w * (tall ? 0.74 : 0.49);
     final wingW = math.min(96.0, w * 0.27);
     final towerW = wingW * 0.72;
     final wingTop = gY - 62 + dy;
@@ -896,5 +1031,8 @@ class _ScenePainter extends CustomPainter {
       old.groundY != groundY ||
       old.lit != lit ||
       old.parallax != parallax ||
+      old.shift != shift ||
+      old.tall != tall ||
+      old.celestial != celestial ||
       old.clock != clock;
 }
