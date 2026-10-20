@@ -14,6 +14,7 @@ import 'package:blood/edit_profile.dart';
 import 'package:blood/forgot_password.dart';
 import 'package:blood/help_support.dart';
 import 'package:blood/history.dart';
+import 'package:blood/home.dart';
 import 'package:blood/login.dart';
 import 'package:blood/newsfeed.dart';
 import 'package:blood/notification_settings.dart';
@@ -283,4 +284,38 @@ final List<PumpableScreen> pumpableScreens = [
   PumpableScreen('digital ID', () => const DigitalIdScreen()),
   PumpableScreen('blood requests', () => const BloodRequestsScreen()),
   PumpableScreen('streak ladder', () => const StreakLadderScreen()),
+  PumpableScreen(
+    'home',
+    () => HomeContent(onNavigateToTab: (_) {}),
+    responses: {
+      'get_profile.php': {
+        'status': 'success',
+        'data': {'blood_type': 'O+', 'total_donations': 4},
+      },
+      'get_eligibility.php': {
+        'status': 'success',
+        'eligibility': 'pending',
+        'next_eligible_date': '2099-11-28',
+      },
+      'get_appointments.php': {
+        'status': 'success',
+        'data': [
+          {
+            'appointment_date': '2099-10-25',
+            'appointment_time': '09:00:00',
+            'donation_center': 'City Blood Center',
+            'status': 'approved',
+          },
+        ],
+      },
+      'get_blood_request_summary.php': {
+        'status': 'success',
+        'can_request': true,
+        'open_count': 3,
+        'matching_count': 2,
+        'urgent_matching_count': 1,
+        'top_urgent': {'request_id': 9, 'reference': 'BR-0009'},
+      },
+    },
+  ),
 ];

@@ -35,6 +35,10 @@ import 'streak/streak_controller.dart';
 import 'unread_notifications.dart';
 import 'verify.dart';
 import 'app_palette.dart';
+import 'skeleton.dart';
+import 'widgets/count_up_text.dart';
+import 'widgets/glow_pulse.dart';
+import 'widgets/home_widgets.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -1956,44 +1960,32 @@ class _HomeContentState extends State<HomeContent> {
   Widget _bloodRequestsCardShell(Widget child) => Container(
     width: double.infinity,
     padding: const EdgeInsets.all(18),
-    decoration: BoxDecoration(
-      color: context.palette.surface,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: context.palette.border),
-      boxShadow: context.palette.shadow,
-    ),
+    decoration: homeCardDecoration(context),
     child: child,
   );
 
   Widget _brHeaderRow() => Row(
     children: [
       Container(
-        width: 36,
-        height: 36,
+        width: 40,
+        height: 40,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: context.palette.accentBg,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Icon(
           Icons.bloodtype_rounded,
           color: context.palette.primaryText,
-          size: 20,
+          size: 22,
         ),
       ),
-      const SizedBox(width: 10),
+      const SizedBox(width: 12),
       Expanded(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Blood Requests',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: context.palette.foreground,
-              ),
-            ),
+            const HomeSectionTitle('Blood Requests'),
             Text(
               'Request blood or help a patient in need',
               style: TextStyle(fontSize: 11, color: context.palette.muted),
@@ -2084,23 +2076,29 @@ class _HomeContentState extends State<HomeContent> {
     onTap: _openRequestBlood,
     child: Container(
       height: 118,
-      padding: const EdgeInsets.all(14),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: AppColors.primaryGradient,
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: .3),
+            color: AppColors.primary.withValues(
+              alpha: context.palette.isDark ? .18 : .3,
+            ),
             blurRadius: 12,
             offset: const Offset(0, 5),
           ),
         ],
       ),
-      child: Column(
+      child: CustomPaint(
+        painter: const DropPatternPainter(),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -2134,6 +2132,8 @@ class _HomeContentState extends State<HomeContent> {
           ),
         ],
       ),
+        ),
+      ),
     ),
   );
 
@@ -2148,7 +2148,7 @@ class _HomeContentState extends State<HomeContent> {
           decoration: BoxDecoration(
             color: context.palette.accentBg,
             border: Border.all(color: context.palette.primaryBorder, width: 1.5),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2159,7 +2159,7 @@ class _HomeContentState extends State<HomeContent> {
                 height: 36,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: context.palette.accentBg,
+                  color: context.palette.surface,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -2364,46 +2364,33 @@ class _HomeContentState extends State<HomeContent> {
   Widget _brHeaderRowSkeleton() => Row(
     children: [
       Container(
-        width: 36,
-        height: 36,
+        width: 40,
+        height: 40,
         decoration: BoxDecoration(
           color: context.palette.surfaceAlt,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(12),
         ),
       ),
-      const SizedBox(width: 10),
-      Expanded(
-        child: Text(
-          'Blood Requests',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.bold,
-            color: context.palette.foreground,
-          ),
-        ),
-      ),
+      const SizedBox(width: 12),
+      const Expanded(child: HomeSectionTitle('Blood Requests')),
     ],
   );
 
-  Widget _brSkeletonTile() => Container(
-    height: 118,
-    decoration: BoxDecoration(
-      color: context.palette.surfaceAlt,
-      borderRadius: BorderRadius.circular(14),
-    ),
-  );
+  Widget _brSkeletonTile() => const SkeletonBox(height: 118, radius: 16);
 
   Widget _brLoadingBody() => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       _brHeaderRowSkeleton(),
       const SizedBox(height: 14),
-      Row(
-        children: [
-          Expanded(child: _brSkeletonTile()),
-          const SizedBox(width: 12),
-          Expanded(child: _brSkeletonTile()),
-        ],
+      SkeletonPulse(
+        child: Row(
+          children: [
+            Expanded(child: _brSkeletonTile()),
+            const SizedBox(width: 12),
+            Expanded(child: _brSkeletonTile()),
+          ],
+        ),
       ),
     ],
   );
@@ -2483,17 +2470,15 @@ class _HomeContentState extends State<HomeContent> {
       StreakScreen(id: 'home', child: _buildScreen(context));
 
   Widget _buildScreen(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
     final firstName = userName.split(' ').first;
 
     return Scaffold(
       backgroundColor: context.palette.background,
       body: Column(
         children: [
-          EdonateHeader(
-            eyebrow: _greetingText(),
+          HomeHeader(
+            greeting: _greetingText(),
             title: firstName,
-            titleSize: 24,
             subtitle: 'Thank you for saving lives',
             actions: [
               HeaderIconButton(
@@ -2551,13 +2536,16 @@ class _HomeContentState extends State<HomeContent> {
           Expanded(
             child: RefreshIndicator(
               color: context.palette.primaryText,
+              backgroundColor: context.palette.surface,
+              strokeWidth: 2.5,
+              displacement: 32,
               onRefresh: _refreshHomeData,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: EdgeInsets.fromLTRB(
-                  screenWidth * 0.05,
+                  16,
                   20,
-                  screenWidth * 0.05,
+                  16,
                   FloatingNavMetrics.bottomPadding(context),
                 ),
                 child: Column(
@@ -2567,9 +2555,10 @@ class _HomeContentState extends State<HomeContent> {
                       child: Row(
                         children: [
                           Expanded(
-                            child: _statCard(
+                            child: HomeStatTile(
                               label: 'Blood Type',
-                              value: isProfileLoading ? '...' : bloodType,
+                              text: bloodType,
+                              loading: isProfileLoading,
                               icon: Icons.water_drop_rounded,
                               iconColor: context.palette.primaryText,
                               iconBg: context.palette.accentBg,
@@ -2577,11 +2566,10 @@ class _HomeContentState extends State<HomeContent> {
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: _statCard(
+                            child: HomeStatTile(
                               label: 'Donations',
-                              value: isProfileLoading
-                                  ? '...'
-                                  : totalDonations.toString(),
+                              number: totalDonations,
+                              loading: isProfileLoading,
                               icon: Icons.favorite_rounded,
                               iconColor: context.palette.pink,
                               iconBg: context.palette.pinkBg,
@@ -2589,11 +2577,10 @@ class _HomeContentState extends State<HomeContent> {
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: _statCard(
+                            child: HomeStatTile(
                               label: 'Lives Saved',
-                              value: isProfileLoading
-                                  ? '...'
-                                  : '${totalDonations * 3}',
+                              number: totalDonations * 3,
+                              loading: isProfileLoading,
                               icon: Icons.people_rounded,
                               iconColor: context.palette.success,
                               iconBg: context.palette.successBg,
@@ -2607,97 +2594,7 @@ class _HomeContentState extends State<HomeContent> {
                       FadeSlideIn(index: 1, child: _digitalIdCard()),
                       const SizedBox(height: 16),
                     ],
-                    FadeSlideIn(
-                      index: 2,
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(18),
-                        decoration: BoxDecoration(
-                          color: context.palette.surface,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: context.palette.border),
-                          boxShadow: context.palette.shadow,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: context.palette.accentBg,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Icon(
-                                    Icons.verified_user_rounded,
-                                    color: context.palette.primaryText,
-                                    size: 20,
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Text(
-                                  'Donation Eligibility',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15,
-                                    color: context.palette.foreground,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 14),
-                            _eligibilityRow(
-                              'Next Eligible',
-                              isEligibilityLoading
-                                  ? 'Loading...'
-                                  : nextEligibleDate,
-                              Icons.calendar_today_rounded,
-                              context.palette.info,
-                            ),
-                            const SizedBox(height: 8),
-                            _eligibilityRow(
-                              'Status',
-                              isEligibilityLoading
-                                  ? 'Loading...'
-                                  : formatEligibilityStatus(eligibilityStatus),
-                              Icons.circle,
-                              getEligibilityStatusColor(eligibilityStatus),
-                            ),
-                            const SizedBox(height: 14),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 42,
-                              child: ElevatedButton.icon(
-                                onPressed: () => widget.onNavigateToTab(2),
-                                icon: const Icon(
-                                  Icons.play_arrow_rounded,
-                                  size: 18,
-                                ),
-                                label: Text(
-                                  _isUnderReview(eligibilityStatus)
-                                      ? 'View Status'
-                                      : 'Check Eligibility',
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
-                                  disabledBackgroundColor: context.palette.border,
-                                  disabledForegroundColor: context.palette.muted,
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  textStyle: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                    FadeSlideIn(index: 2, child: _eligibilityCard()),
                     const SizedBox(height: 16),
                     FadeSlideIn(index: 3, child: _bloodRequestsCard()),
                     const SizedBox(height: 16),
@@ -2735,14 +2632,7 @@ class _HomeContentState extends State<HomeContent> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'Upcoming Appointment',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                              color: context.palette.foreground,
-                            ),
-                          ),
+                          const HomeSectionTitle('Upcoming Appointment'),
                           if (!isAppointmentsLoading && appointments.isNotEmpty)
                             GestureDetector(
                               onTap: () => widget.onNavigateToTab(3),
@@ -2759,23 +2649,14 @@ class _HomeContentState extends State<HomeContent> {
                     ),
                     const SizedBox(height: 10),
                     if (isAppointmentsLoading)
-                      Center(
-                        child: CircularProgressIndicator(
-                          color: context.palette.primaryText,
-                        ),
-                      )
+                      const HomeAppointmentSkeleton()
                     else if (appointments.isEmpty)
                       FadeSlideIn(
                         index: 6,
                         child: Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: context.palette.surface,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: context.palette.border),
-                            boxShadow: context.palette.shadow,
-                          ),
+                          decoration: homeCardDecoration(context),
                           child: Column(
                             children: [
                               Icon(
@@ -2795,7 +2676,7 @@ class _HomeContentState extends State<HomeContent> {
                               Text(
                                 'Book one to get started!',
                                 style: TextStyle(
-                                  color: context.palette.border,
+                                  color: context.palette.hint,
                                   fontSize: 11,
                                 ),
                               ),
@@ -2822,7 +2703,7 @@ class _HomeContentState extends State<HomeContent> {
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(20),
                         ),
                         child: Row(
                           children: [
@@ -2875,7 +2756,7 @@ class _HomeContentState extends State<HomeContent> {
                         ),
                         decoration: BoxDecoration(
                           color: context.palette.successBg,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(16),
                           border: Border.all(color: context.palette.successBorder),
                         ),
                         child: Row(
@@ -2917,73 +2798,196 @@ class _HomeContentState extends State<HomeContent> {
     return 'Good evening,';
   }
 
-  Widget _statCard({
-    required String label,
-    required String value,
-    required IconData icon,
-    required Color iconColor,
-    required Color iconBg,
-  }) {
+  // ── Donation Eligibility card ───────────────────────────────────────────
+
+  Widget _eligibilityCard() {
+    final p = context.palette;
+    final underReview = _isUnderReview(eligibilityStatus);
+    final statusColor = getEligibilityStatusColor(eligibilityStatus);
+    final label = underReview ? 'View Status' : 'Check Eligibility';
+    final chipText = statusColor == p.success
+        ? p.successDark
+        : statusColor == p.warning
+        ? p.warningText
+        : statusColor;
+    final chipBg = statusColor == p.success
+        ? p.successBg
+        : statusColor == p.warning
+        ? p.warningBg
+        : p.accentBg;
+
+    // Countdown to the next eligible date, when it is known.
+    final next = isEligibilityLoading ? null : parseLongDate(nextEligibleDate);
+    final today = DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+    final daysLeft = next?.difference(todayDate).inDays;
+    final last = DateTime.tryParse(
+      _digitalId?.donations.lastDonationDate ?? '',
+    );
+    double? progress;
+    if (next != null && last != null && daysLeft != null && daysLeft > 0) {
+      final span = next.difference(last).inDays;
+      if (span > 0) progress = todayDate.difference(last).inDays / span;
+    }
+
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
-      decoration: BoxDecoration(
-        color: context.palette.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: context.palette.border),
-        boxShadow: context.palette.shadow,
-      ),
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: homeCardDecoration(context),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
-            child: Icon(icon, color: iconColor, size: 18),
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: p.accentBg,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.verified_user_rounded,
+                  color: p.primaryText,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const HomeSectionTitle('Donation Eligibility'),
+                    const SizedBox(height: 6),
+                    if (isEligibilityLoading)
+                      const SkeletonPulse(
+                        child: SkeletonBox(width: 84, height: 22, radius: 11),
+                      )
+                    else
+                      HomeStatusChip(
+                        label: formatEligibilityStatus(eligibilityStatus),
+                        color: chipText,
+                        background: chipBg,
+                        dot: underReview
+                            ? _PulsingDot(color: statusColor, size: 8)
+                            : Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: statusColor,
+                                ),
+                              ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: context.palette.foreground,
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: p.surfaceAlt,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: p.infoBg,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.calendar_today_rounded,
+                        size: 16,
+                        color: p.info,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Next Eligible',
+                            style: TextStyle(fontSize: 11, color: p.muted),
+                          ),
+                          const SizedBox(height: 2),
+                          if (isEligibilityLoading)
+                            const SkeletonPulse(
+                              child: SkeletonBox(width: 120, height: 14),
+                            )
+                          else
+                            Text(
+                              nextEligibleDate,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: p.foreground,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    if (daysLeft != null && daysLeft > 0) ...[
+                      const SizedBox(width: 8),
+                      Text(
+                        daysLeft == 1 ? '1 day to go' : '$daysLeft days to go',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: p.primaryText,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                if (progress != null) ...[
+                  const SizedBox(height: 10),
+                  SlimProgressBar(
+                    value: progress,
+                    color: AppColors.primary,
+                    trackColor: p.border,
+                  ),
+                ],
+              ],
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 10, color: context.palette.muted),
+          const SizedBox(height: 16),
+          GlowPulse(
+            enabled: label == 'Check Eligibility',
+            sheen: true,
+            child: SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: ElevatedButton.icon(
+                onPressed: () => widget.onNavigateToTab(2),
+                icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                label: Text(label),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  disabledBackgroundColor: p.border,
+                  disabledForegroundColor: p.muted,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  textStyle: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _eligibilityRow(
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Row(
-      children: [
-        Icon(icon, size: 14, color: color),
-        const SizedBox(width: 6),
-        Text(
-          '$label: ',
-          style: TextStyle(fontSize: 13, color: context.palette.muted),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
-          ),
-        ),
-      ],
     );
   }
 
@@ -2999,12 +3003,7 @@ class _HomeContentState extends State<HomeContent> {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: context.palette.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: context.palette.border),
-          boxShadow: context.palette.shadow,
-        ),
+        decoration: homeCardDecoration(context),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -3047,12 +3046,7 @@ class _HomeContentState extends State<HomeContent> {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.palette.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: context.palette.border),
-        boxShadow: context.palette.shadow,
-      ),
+      decoration: homeCardDecoration(context),
       child: Row(
         children: [
           Container(
@@ -3210,7 +3204,9 @@ class _LightSweepState extends State<_LightSweep>
 // Small pulsing dot for the Blood Requests card's urgent banner — mirrors
 // UrgencyChip's critical-urgency pulse in blood_request_widgets.dart.
 class _PulsingDot extends StatefulWidget {
-  const _PulsingDot();
+  final Color color;
+  final double size;
+  const _PulsingDot({this.color = Colors.white, this.size = 10});
 
   @override
   State<_PulsingDot> createState() => _PulsingDotState();
@@ -3226,7 +3222,20 @@ class _PulsingDotState extends State<_PulsingDot>
     _ctrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Steady (no ticker) with animations removed.
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _ctrl
+        ..stop()
+        ..value = 1;
+    } else if (!_ctrl.isAnimating) {
+      _ctrl.repeat(reverse: true);
+    }
   }
 
   @override
@@ -3241,12 +3250,9 @@ class _PulsingDotState extends State<_PulsingDot>
     builder: (_, child) =>
         Opacity(opacity: 0.35 + (_ctrl.value * 0.65), child: child),
     child: Container(
-      width: 10,
-      height: 10,
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.white,
-      ),
+      width: widget.size,
+      height: widget.size,
+      decoration: BoxDecoration(shape: BoxShape.circle, color: widget.color),
     ),
   );
 }
