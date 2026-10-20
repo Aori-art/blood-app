@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'app_colors.dart';
 import 'app_palette.dart';
 import 'streak/streak_screen.dart';
@@ -25,6 +24,7 @@ import 'unread_notifications.dart';
 import 'donor_avatar.dart';
 import 'streak/streak_ladder_screen.dart';
 import 'theme_controller.dart';
+import 'theme_transition.dart';
 import 'verify.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -758,14 +758,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
       );
   /// The Dark mode switch. It lives next to the other settings rows; toggling
   /// it changes the whole app at once (the theme fades between the modes).
+  final GlobalKey _darkSwitchKey = GlobalKey();
+
   Widget _darkModeRow() => ListenableBuilder(
     listenable: ThemeController.instance,
     builder: (context, _) {
       final dark = ThemeController.instance.isDark;
       final p = context.palette;
+      // The new theme grows out of the switch as a circle (theme_transition).
       void toggle(bool value) {
-        HapticFeedback.selectionClick();
-        ThemeController.instance.setDark(value);
+        if (value == dark) return;
+        ThemeTransition.toggle(context, originKey: _darkSwitchKey);
       }
 
       return Semantics(
@@ -788,8 +791,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     shape: BoxShape.circle,
                     color: p.accentBg,
                   ),
+                  // Sun and moon morph into each other: a half turn plus a pop.
                   child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 250),
+                    duration: const Duration(milliseconds: 300),
+                    transitionBuilder: (child, animation) => RotationTransition(
+                      turns: Tween<double>(begin: 0.5, end: 1).animate(animation),
+                      child: ScaleTransition(scale: animation, child: child),
+                    ),
                     child: Icon(
                       dark
                           ? Icons.dark_mode_rounded
@@ -822,9 +830,23 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ),
                 ),
                 Switch(
+                  key: _darkSwitchKey,
                   value: dark,
                   onChanged: toggle,
                   thumbColor: WidgetStateProperty.all(Colors.white),
+                  thumbIcon: WidgetStateProperty.resolveWith(
+                    (states) => states.contains(WidgetState.selected)
+                        ? const Icon(
+                            Icons.dark_mode_rounded,
+                            size: 14,
+                            color: AppColors.primary,
+                          )
+                        : Icon(
+                            Icons.light_mode_rounded,
+                            size: 14,
+                            color: p.muted,
+                          ),
+                  ),
                   trackColor: WidgetStateProperty.resolveWith(
                     (states) => states.contains(WidgetState.selected)
                         ? AppColors.primary

@@ -16,6 +16,7 @@ import 'streak/streak_bubble.dart';
 import 'streak/streak_controller.dart';
 import 'streak/streak_screen.dart';
 import 'theme_controller.dart';
+import 'theme_transition.dart';
 
 /// The floating streak bubble lives above the Navigator, so it reaches routes,
 /// dialogs and sheets through this key.
@@ -138,7 +139,10 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: ThemeController.instance,
+      listenable: Listenable.merge([
+        ThemeController.instance,
+        ThemeTransition.running,
+      ]),
       builder: (context, _) => _buildApp(),
     );
   }
@@ -161,8 +165,19 @@ class MyApp extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            child ?? const SizedBox.shrink(),
-            const StreakBubbleOverlay(),
+            // Everything the light/dark reveal captures...
+            RepaintBoundary(
+              key: ThemeTransition.boundaryKey,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  child ?? const SizedBox.shrink(),
+                  const StreakBubbleOverlay(),
+                ],
+              ),
+            ),
+            // ...and the reveal itself, above everything (the bubble too).
+            const ThemeRevealHost(),
           ],
         ),
       ),
@@ -172,7 +187,11 @@ class MyApp extends StatelessWidget {
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: dark ? ThemeMode.dark : ThemeMode.light,
-      themeAnimationDuration: const Duration(milliseconds: 250),
+      // During the circular reveal the theme switches instantly underneath
+      // it; otherwise it fades.
+      themeAnimationDuration: ThemeTransition.running.value
+          ? Duration.zero
+          : const Duration(milliseconds: 250),
       themeAnimationCurve: Curves.easeInOut,
 
       home: SplashScreen(isLoggedIn: isLoggedIn),
