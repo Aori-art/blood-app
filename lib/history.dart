@@ -426,7 +426,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             ),
                           ),
                           style: OutlinedButton.styleFrom(
-                            backgroundColor: Colors.white,
+                            backgroundColor: context.palette.surface,
+                            foregroundColor: context.palette.primaryText,
                             side: BorderSide(color: context.palette.primaryBorder),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
