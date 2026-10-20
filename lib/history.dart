@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
@@ -9,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'anim.dart';
 import 'config.dart';
+import 'digital_id.dart';
 import 'edit_profile.dart';
 import 'help_support.dart';
 import 'login.dart';
@@ -17,6 +19,7 @@ import 'pin_screen.dart'; // PIN: logout reset
 import 'privacy_security.dart';
 import 'privacy_statement.dart';
 import 'shared_design.dart';
+import 'skeleton.dart';
 import 'streak/avatar_frame.dart';
 import 'streak/frame_picker.dart';
 import 'streak/streak_controller.dart';
@@ -26,6 +29,7 @@ import 'streak/streak_ladder_screen.dart';
 import 'theme_controller.dart';
 import 'theme_transition.dart';
 import 'verify.dart';
+import 'widgets/count_up_text.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -138,15 +142,44 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
+        backgroundColor: context.palette.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        icon: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: context.palette.accentBg,
+          ),
+          child: Icon(Icons.logout, color: context.palette.primaryText),
+        ),
+        title: Text(
+          'Logout',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: context.palette.foreground,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to logout?',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: context.palette.muted),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
+            style: TextButton.styleFrom(
+              foregroundColor: context.palette.muted,
+            ),
             child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(
+              foregroundColor: context.palette.primaryText,
+              textStyle: const TextStyle(fontWeight: FontWeight.w700),
+            ),
             child: const Text('OK'),
           ),
         ],
@@ -251,70 +284,70 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final total =
         int.tryParse((profile?['total_donations'] ?? 0).toString()) ?? 0;
     final active = days(profile?['date_registered']);
+    final showSkeleton = loading && profile == null;
     return Scaffold(
       backgroundColor: context.palette.background,
-      body: Column(
-        children: [
-          _header(context),
-          Expanded(
-            child: SafeArea(
-              top: false,
-              child: RefreshIndicator(
-                color: context.palette.primaryText,
-                onRefresh: () => _load(progress: false),
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      body: SafeArea(
+        top: false,
+        child: RefreshIndicator(
+          color: context.palette.primaryText,
+          backgroundColor: context.palette.surface,
+          onRefresh: () => _load(progress: false),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: 24),
+            child: Column(
+              children: [
+                _bannerAndProfile(context, name, skeleton: showSkeleton),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (notice != null) ...[
                         _notice(notice!),
                         const SizedBox(height: 16),
                       ],
-                      if (loading)
-                        Padding(
-                          padding: EdgeInsets.all(18),
-                          child: CircularProgressIndicator(color: context.palette.primaryText),
+                      if (showSkeleton)
+                        _skeleton()
+                      else ...[
+                        FadeSlideIn(
+                          index: 1,
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: _stat(
+                                  Icons.water_drop,
+                                  'Donations',
+                                  context.palette.primaryText,
+                                  context.palette.accentBg,
+                                  number: total,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _stat(
+                                  Icons.calendar_today,
+                                  'Days Active',
+                                  context.palette.info,
+                                  context.palette.infoBg,
+                                  text: active,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _stat(
+                                  Icons.emoji_events,
+                                  'Lives Helped',
+                                  context.palette.warning,
+                                  context.palette.warningBg,
+                                  number: total * 3,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      FadeSlideIn(index: 0, child: _profileCard(name)),
-                      const SizedBox(height: 16),
-                      FadeSlideIn(
-                        index: 1,
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: _stat(
-                                Icons.water_drop,
-                                total.toString(),
-                                'Donations',
-                                context.palette.primaryText,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _stat(
-                                Icons.calendar_today,
-                                active,
-                                'Days Active',
-                                context.palette.info,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _stat(
-                                Icons.emoji_events,
-                                (total * 3).toString(),
-                                'Lives Helped',
-                                context.palette.warning,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      FadeSlideIn(
-                        index: 2,
-                        child: _card('Personal Information', [
+                        _section(2, 'Personal Information', [
                           _info(
                             Icons.phone,
                             'Phone Number',
@@ -333,11 +366,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           ),
                           _info(Icons.timer, 'Days Active', active),
                         ]),
-                      ),
-                      const SizedBox(height: 16),
-                      FadeSlideIn(
-                        index: 3,
-                        child: _card('Donation Status', [
+                        _section(3, 'Donation Status', [
                           _info(
                             Icons.water_drop,
                             'Last Donation',
@@ -347,15 +376,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             Icons.event_available,
                             'Next Eligible',
                             _next(),
-                            color: context.palette.success,
+                            color: context.palette.successDark,
                           ),
                         ]),
-                      ),
-                      const SizedBox(height: 16),
-                      FadeSlideIn(
-                        index: 4,
-                        child: _card(null, [
-                          _menu(Icons.edit, 'Edit Profile', () async {
+                      ],
+                      _section(4, 'Account', [
+                        _menu(
+                          Icons.edit,
+                          'Edit Profile',
+                          () async {
                             final changed = await Navigator.push<bool>(
                               context,
                               MaterialPageRoute(
@@ -363,93 +392,121 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               ),
                             );
                             if (changed == true) _load(progress: false);
-                          }),
-                          _menu(
-                            Icons.local_fire_department_rounded,
-                            'Daily Streak',
-                            () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const StreakLadderScreen(),
+                          },
+                          subtitle: 'Update your personal details',
+                          tint: context.palette.info,
+                          tintBg: context.palette.infoBg,
+                        ),
+                        _menu(
+                          Icons.badge_rounded,
+                          'Digital Donor ID',
+                          () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const DigitalIdScreen(),
+                            ),
+                          ),
+                          subtitle: 'Your donor card and QR code',
+                          tint: context.palette.primaryText,
+                          tintBg: context.palette.accentBg,
+                        ),
+                      ]),
+                      _section(5, 'Preferences', [
+                        _menu(
+                          Icons.notifications,
+                          'Notification Settings',
+                          () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  const NotificationSettingsScreen(),
+                            ),
+                          ),
+                          subtitle: 'Choose what you hear about',
+                          tint: context.palette.warning,
+                          tintBg: context.palette.warningBg,
+                        ),
+                        _darkModeRow(),
+                        _menu(
+                          Icons.shield,
+                          'Privacy & Security',
+                          () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => PrivacySecurityScreen(
+                                showChangePin: verificationStatus == 'verified',
                               ),
                             ),
                           ),
-                          _menu(
-                            Icons.notifications,
-                            'Notification Settings',
-                            () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    const NotificationSettingsScreen(),
-                              ),
+                          subtitle: 'PIN, password and your data',
+                          tint: context.palette.success,
+                          tintBg: context.palette.successBg,
+                        ),
+                      ]),
+                      _section(6, 'Support', [
+                        _menu(
+                          Icons.help_outline,
+                          'Help & Support',
+                          () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const HelpSupportScreen(),
                             ),
                           ),
-                          _menu(
-                            Icons.shield,
-                            'Privacy & Security',
-                            () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => PrivacySecurityScreen(
-                                  showChangePin:
-                                      verificationStatus == 'verified',
-                                ),
-                              ),
-                            ),
-                          ),
-                          _menu(
-                            Icons.help_outline,
-                            'Help & Support',
-                            () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const HelpSupportScreen(),
-                              ),
-                            ),
-                          ),
-                          _darkModeRow(),
-                        ]),
-                      ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: OutlinedButton.icon(
-                          onPressed: _logout,
-                          icon: Icon(Icons.logout, color: context.palette.primaryText),
-                          label: Text(
-                            'Logout',
-                            style: TextStyle(
+                          subtitle: 'FAQs and ways to reach us',
+                          tint: context.palette.purple,
+                          tintBg: context.palette.purpleBg,
+                        ),
+                      ]),
+                      const SizedBox(height: 24),
+                      FadeSlideIn(
+                        index: 7,
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: OutlinedButton.icon(
+                            onPressed: _logout,
+                            icon: Icon(
+                              Icons.logout,
                               color: context.palette.primaryText,
-                              fontWeight: FontWeight.w600,
                             ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            backgroundColor: context.palette.surface,
-                            foregroundColor: context.palette.primaryText,
-                            side: BorderSide(color: context.palette.primaryBorder),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                            label: Text(
+                              'Logout',
+                              style: TextStyle(
+                                color: context.palette.primaryText,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: context.palette.surface,
+                              foregroundColor: context.palette.primaryText,
+                              side: BorderSide(
+                                color: context.palette.primaryBorder,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
                             ),
                           ),
                         ),
                       ),
                       const SizedBox(height: 16),
-                      Text(
-                        'Version 1.0.0',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: context.palette.muted,
+                      Center(
+                        child: Text(
+                          'Version 1.0.0',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: context.palette.muted,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
-              ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -463,28 +520,380 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
-  Widget _header(BuildContext c) => EdonateHeader(
-    title: 'My Profile',
-    subtitle: 'Manage your account & donations',
-    leading: HeaderIconButton(
-      icon: Icons.arrow_back_rounded,
-      tooltip: 'Back',
-      onTap: () => Navigator.pop(c),
+  // ── Banner and profile card ─────────────────────────────────────────────
+
+  static const double _avatarRadius = 44;
+
+  /// The gradient banner with the framed avatar overlapping its bottom edge,
+  /// over the card with the name, email, blood type, verification and streak.
+  Widget _bannerAndProfile(
+    BuildContext context,
+    String name, {
+    required bool skeleton,
+  }) {
+    final top = math.max(
+      MediaQuery.paddingOf(context).top + 8,
+      MediaQuery.sizeOf(context).height * 0.06,
+    );
+    final bannerHeight = top + 168;
+    // The card starts this far above the banner's bottom edge.
+    const overlap = 44.0;
+    const avatarBox = _avatarRadius * 2 + 16;
+    return Stack(
+      children: [
+        Container(
+          height: bannerHeight,
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: AppColors.primaryGradient,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+          ),
+          child: ClipRRect(
+            borderRadius: const BorderRadius.vertical(
+              bottom: Radius.circular(28),
+            ),
+            child: Stack(
+              children: [
+                Positioned(right: -50, top: -40, child: _ring(170, .09)),
+                Positioned(left: -40, bottom: -60, child: _ring(140, .06)),
+                Positioned(right: 70, bottom: 10, child: _ring(46, .07)),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(20, top, 20, 0),
+                  child: Row(
+                    children: [
+                      HeaderIconButton(
+                        icon: Icons.arrow_back_rounded,
+                        tooltip: 'Back',
+                        onTap: () => Navigator.pop(context),
+                      ),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'My Profile',
+                              style: TextStyle(
+                                color: AppColors.onPrimary,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Manage your account & donations',
+                              style: TextStyle(
+                                color: AppColors.onPrimary,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Padding(
+          padding: EdgeInsets.fromLTRB(16, bannerHeight - overlap, 16, 0),
+          child: FadeSlideIn(
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(20, avatarBox / 2 + 12, 20, 20),
+              decoration: BoxDecoration(
+                color: context.palette.surface,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: context.palette.border),
+                boxShadow: context.palette.shadow,
+              ),
+              child: skeleton
+                  ? const SkeletonPulse(
+                      child: Column(
+                        children: [
+                          SkeletonBox(width: 96, height: 26, radius: 13),
+                          SizedBox(height: 16),
+                          SkeletonBox(width: 170, height: 20),
+                          SizedBox(height: 8),
+                          SkeletonBox(width: 140, height: 12),
+                          SizedBox(height: 16),
+                          SkeletonBox(width: 200, height: 26, radius: 13),
+                        ],
+                      ),
+                    )
+                  : _profileDetails(name),
+            ),
+          ),
+        ),
+        // The framed avatar, half on the banner and half on the card.
+        Positioned(
+          top: bannerHeight - overlap - avatarBox / 2,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: Container(
+              width: avatarBox,
+              height: avatarBox,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: context.palette.surface,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(
+                      alpha: context.palette.isDark ? .35 : .12,
+                    ),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: ListenableBuilder(
+                listenable: StreakController.instance,
+                builder: (context, _) => StreakAvatarFrame(
+                  frameKey: StreakController.instance.equippedFrame,
+                  radius: _avatarRadius,
+                  child: CircleAvatar(
+                    radius: _avatarRadius,
+                    backgroundColor: kCrimson,
+                    child: Text(
+                      initials(name),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _ring(double size, double alpha) => Container(
+    width: size,
+    height: size,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      color: AppColors.onPrimary.withValues(alpha: alpha),
     ),
   );
-  BoxDecoration _box({Gradient? gradient, Color? border}) => BoxDecoration(
-    color: gradient == null ? context.palette.surface : null,
-    gradient: gradient,
-    borderRadius: BorderRadius.circular(16),
-    border: border == null ? null : Border.all(color: border),
-    boxShadow: [
-      BoxShadow(
-        color: Colors.black.withOpacity(.05),
-        blurRadius: 8,
-        offset: const Offset(0, 3),
+
+  Widget _profileDetails(String name) => Column(
+    children: [
+      Builder(
+        builder: (context) => Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(999),
+            onTap: () =>
+                showFrameCatalogSheet(context, initials: initials(name)),
+            child: Ink(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: context.palette.accentBg,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: context.palette.primaryBorder),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.auto_awesome_rounded,
+                    size: 14,
+                    color: context.palette.primaryText,
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    'Edit Frame',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: context.palette.primaryText,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+      const SizedBox(height: 14),
+      Text(
+        name,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: 22,
+          fontWeight: FontWeight.bold,
+          color: context.palette.foreground,
+        ),
+      ),
+      const SizedBox(height: 4),
+      Text(
+        safe(profile?['email']),
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 13, color: context.palette.muted),
+      ),
+      const SizedBox(height: 14),
+      Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+            decoration: BoxDecoration(
+              color: kCrimson,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.water_drop_rounded,
+                  size: 13,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  '${safe(profile?['blood_type'])} Blood Type',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _verificationBadge(),
+          _streakChip(),
+        ],
       ),
     ],
   );
+
+  /// The current streak (from what StreakController already has); opens the
+  /// Streak Ladder.
+  Widget _streakChip() => ListenableBuilder(
+    listenable: StreakController.instance,
+    builder: (context, _) {
+      final current = StreakController.instance.data?.current;
+      final p = context.palette;
+      return Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const StreakLadderScreen()),
+          ),
+          child: Ink(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+            decoration: BoxDecoration(
+              color: p.orangeBg,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: p.orangeBorder),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.local_fire_department_rounded,
+                  size: 14,
+                  color: p.orange,
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  current == null
+                      ? 'Daily Streak'
+                      : current == 1
+                      ? '1-day streak'
+                      : '$current-day streak',
+                  style: TextStyle(
+                    color: p.foreground,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 2),
+                Icon(Icons.chevron_right_rounded, size: 15, color: p.muted),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+
+  Widget _skeleton() => SkeletonPulse(
+    child: Column(
+      children: [
+        const Row(
+          children: [
+            Expanded(child: SkeletonBox(height: 96, radius: 20)),
+            SizedBox(width: 12),
+            Expanded(child: SkeletonBox(height: 96, radius: 20)),
+            SizedBox(width: 12),
+            Expanded(child: SkeletonBox(height: 96, radius: 20)),
+          ],
+        ),
+        const SizedBox(height: 24),
+        for (var i = 0; i < 2; i++) ...[
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: SkeletonBox(width: 120, height: 10),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: context.palette.surface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: context.palette.border),
+            ),
+            child: Column(
+              children: [
+                for (var r = 0; r < 3; r++)
+                  Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      children: [
+                        SkeletonBox(width: 36, height: 36, radius: 10),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SkeletonBox(width: 80, height: 10),
+                              SizedBox(height: 6),
+                              SkeletonBox(width: 150, height: 12),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+      ],
+    ),
+  );
+
   Widget _notice(String text) => Container(
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
@@ -509,135 +918,43 @@ class _HistoryScreenState extends State<HistoryScreen> {
       ],
     ),
   );
-  Widget _profileCard(String name) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(24),
-    decoration: _box(
-      gradient: LinearGradient(
-        colors: [context.palette.accentBg, context.palette.accentBg],
-      ),
-      border: context.palette.primaryBorder,
-    ),
-    child: Column(
-      children: [
-        ListenableBuilder(
-          listenable: StreakController.instance,
-          builder: (context, _) => StreakAvatarFrame(
-            frameKey: StreakController.instance.equippedFrame,
-            radius: 44,
-            child: CircleAvatar(
-              radius: 44,
-              backgroundColor: kCrimson,
-              child: Text(
-                initials(name),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        Builder(
-          builder: (context) => GestureDetector(
-            onTap: () =>
-                showFrameCatalogSheet(context, initials: initials(name)),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: context.palette.accentBg,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: context.palette.primaryBorder),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.auto_awesome_rounded, size: 14, color: context.palette.primaryText),
-                  SizedBox(width: 5),
-                  Text(
-                    'Edit Frame',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: context.palette.primaryText,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          name,
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: context.palette.foreground,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          safe(profile?['email']),
-          style: TextStyle(fontSize: 13, color: context.palette.muted),
-        ),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-          decoration: BoxDecoration(
-            color: kCrimson,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(
-            safe(profile?['blood_type']) + ' Blood Type',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        _verificationBadge(),
-      ],
-    ),
-  );
 
   Widget _verificationBadge() {
     late Color fg;
+    late Color iconColor;
     late Color bg;
     late String label;
     late IconData icon;
 
     switch (verificationStatus) {
       case 'verified':
-        fg = context.palette.success;
+        fg = context.palette.successDark;
+        iconColor = context.palette.success;
         bg = context.palette.successSoft;
         label = 'Verified';
         icon = Icons.verified_user_rounded;
         break;
       case 'pending':
-        fg = context.palette.warning;
+        fg = context.palette.warningText;
+        iconColor = context.palette.warning;
         bg = context.palette.warningBg;
         label = 'Verification Pending';
         icon = Icons.hourglass_top_rounded;
         break;
       case 'rejected':
-        fg = context.palette.primaryText;
+        fg = iconColor = context.palette.primaryText;
         bg = context.palette.accentBg;
         label = 'Verification Rejected';
         icon = Icons.gpp_bad_outlined;
         break;
       case 'unverified':
-        fg = context.palette.primaryText;
+        fg = iconColor = context.palette.primaryText;
         bg = context.palette.accentBg;
         label = 'Not Verified';
         icon = Icons.shield_outlined;
         break;
       default:
-        fg = context.palette.muted;
+        fg = iconColor = context.palette.muted;
         bg = context.palette.surfaceAlt;
         label = 'Checking...';
         icon = Icons.hourglass_empty_rounded;
@@ -645,91 +962,166 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     final isVerified = verificationStatus == 'verified';
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(20),
-      onTap: isVerified
-          ? null
-          : () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const VerifyScreen()),
-            ),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: fg),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: fg,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+    return Material(
+      type: MaterialType.transparency,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: isVerified
+            ? null
+            : () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const VerifyScreen()),
               ),
-            ),
-          ],
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: iconColor),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: fg,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _stat(IconData icon, String value, String label, Color color) =>
-      Container(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-        decoration: _box(),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 21),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 10, color: context.palette.muted),
-            ),
-          ],
-        ),
-      );
-  Widget _card(String? title, List<Widget> content) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(16),
-    decoration: _box(),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (title != null) ...[
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: context.palette.foreground,
+  Widget _stat(
+    IconData icon,
+    String label,
+    Color color,
+    Color bg, {
+    int? number,
+    String? text,
+  }) {
+    final style = TextStyle(
+      fontWeight: FontWeight.bold,
+      fontSize: 16,
+      color: context.palette.foreground,
+    );
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+      decoration: BoxDecoration(
+        color: context.palette.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: context.palette.border),
+        boxShadow: context.palette.shadow,
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+            child: Icon(icon, color: color, size: 18),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 22,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: number != null
+                  ? CountUpText(number, style: style)
+                  : Text(text ?? 'N/A', style: style),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 11, color: context.palette.muted),
+            ),
+          ),
         ],
-        ...content,
-      ],
+      ),
+    );
+  }
+
+  /// A small uppercase label over a grouped surface card; rows are split by
+  /// hairline dividers.
+  Widget _section(int index, String title, List<Widget> rows) => FadeSlideIn(
+    index: index,
+    child: Padding(
+      padding: const EdgeInsets.only(top: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 8),
+            child: Text(
+              title.toUpperCase(),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1,
+                color: context.palette.muted,
+              ),
+            ),
+          ),
+          Container(
+            width: double.infinity,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: context.palette.surface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: context.palette.border),
+              boxShadow: context.palette.shadow,
+            ),
+            child: Material(
+              type: MaterialType.transparency,
+              child: Column(
+                children: [
+                  for (var i = 0; i < rows.length; i++) ...[
+                    if (i > 0)
+                      Divider(
+                        height: 1,
+                        thickness: 1,
+                        indent: 64,
+                        color: context.palette.border,
+                      ),
+                    rows[i],
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     ),
   );
+
+  Widget _iconTile(IconData icon, Color color, Color bg) => Container(
+    width: 36,
+    height: 36,
+    alignment: Alignment.center,
+    decoration: BoxDecoration(
+      color: bg,
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Icon(icon, size: 18, color: color),
+  );
+
   Widget _info(IconData icon, String label, String value, {Color? color}) =>
       Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 18, color: context.palette.muted),
+            _iconTile(icon, context.palette.muted, context.palette.surfaceAlt),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -746,7 +1138,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   Text(
                     value,
                     style: TextStyle(
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                       fontSize: 14,
                       color: color ?? context.palette.foreground,
                     ),
@@ -757,8 +1149,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ],
         ),
       );
+
   /// The Dark mode switch. It lives next to the other settings rows; toggling
-  /// it changes the whole app at once (the theme fades between the modes).
+  /// it changes the whole app at once (the new theme grows out of the switch).
   final GlobalKey _darkSwitchKey = GlobalKey();
 
   Widget _darkModeRow() => ListenableBuilder(
@@ -779,17 +1172,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
         onTap: () => toggle(!dark),
         excludeSemantics: true,
         child: InkWell(
-          borderRadius: BorderRadius.circular(10),
           onTap: () => toggle(!dark),
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
             child: Row(
               children: [
                 Container(
-                  width: 32,
-                  height: 32,
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
+                    borderRadius: BorderRadius.circular(10),
                     color: p.accentBg,
                   ),
                   // Sun and moon morph into each other: a half turn plus a pop.
@@ -817,7 +1209,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       Text(
                         'Dark mode',
                         style: TextStyle(
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.w600,
                           fontSize: 14,
                           color: p.foreground,
                         ),
@@ -825,6 +1217,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       const SizedBox(height: 2),
                       Text(
                         'Easier on the eyes in low light',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(fontSize: 12, color: p.muted),
                       ),
                     ],
@@ -872,14 +1266,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
     String label,
     VoidCallback action, {
     String? subtitle,
+    Color? tint,
+    Color? tintBg,
   }) => InkWell(
-    borderRadius: BorderRadius.circular(10),
     onTap: action,
     child: Padding(
-      padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 4),
+      padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: context.palette.muted),
+          _iconTile(
+            icon,
+            tint ?? context.palette.muted,
+            tintBg ?? context.palette.surfaceAlt,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -888,7 +1287,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 Text(
                   label,
                   style: TextStyle(
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w600,
                     fontSize: 14,
                     color: context.palette.foreground,
                   ),
@@ -897,6 +1296,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 12,
                       color: context.palette.muted,

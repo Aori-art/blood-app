@@ -14,6 +14,7 @@ import 'package:blood/edit_profile.dart';
 import 'package:blood/forgot_password.dart';
 import 'package:blood/help_support.dart';
 import 'package:blood/history.dart';
+import 'package:blood/home.dart';
 import 'package:blood/login.dart';
 import 'package:blood/newsfeed.dart';
 import 'package:blood/notification_settings.dart';
@@ -151,6 +152,9 @@ class PumpableScreen {
   final Widget Function() build;
   final Map<String, Object> prefs;
 
+  /// Endpoint (file name) -> JSON body, answered before [pumpableServer].
+  final Map<String, Map<String, dynamic>> responses;
+
   /// Set when the shipped LIGHT look already misses the guideline here. Light
   /// mode must stay exactly as it is, so the light run is skipped (the dark
   /// run is still asserted) and the gap is reported instead.
@@ -160,9 +164,46 @@ class PumpableScreen {
     this.name,
     this.build, {
     this.prefs = const {},
+    this.responses = const {},
     this.lightGap,
   });
+
+  /// The mock server for this screen.
+  Future<http.Response> server(http.Request r) async {
+    final body = responses[r.url.path.split('/').last];
+    return body != null ? okJson(body) : pumpableServer(r);
+  }
 }
+
+final _donations = [
+  {
+    'donation_id': 3,
+    'donation_date': '2026-10-01',
+    'blood_type': 'O+',
+    'blood_units': 1,
+    'donation_status': 'pending',
+    'created_at': '2026-10-01 09:12:00',
+  },
+  {
+    'donation_id': 2,
+    'donation_date': '2026-09-02',
+    'facility_name': 'City Blood Center',
+    'blood_type': 'O+',
+    'blood_units': 1,
+    'donation_status': 'completed',
+    'remarks': 'Donor felt well.',
+    'created_at': '2026-09-02 09:12:00',
+  },
+  {
+    'donation_id': 1,
+    'donation_date': '2026-05-10',
+    'blood_type': 'O+',
+    'blood_units': 0,
+    'donation_status': 'deferred',
+    'deferred_reason': 'Low hemoglobin.',
+    'created_at': '2026-05-10 10:00:00',
+  },
+];
 
 final List<PumpableScreen> pumpableScreens = [
   PumpableScreen('splash', () => const SplashScreen(isLoggedIn: false)),
@@ -222,18 +263,54 @@ final List<PumpableScreen> pumpableScreens = [
   PumpableScreen('change password', () => const ChangePasswordScreen()),
   PumpableScreen('edit profile', () => const EditProfileScreen()),
   PumpableScreen('verify', () => const VerifyScreen()),
-  PumpableScreen(
-    'profile',
-    () => const HistoryScreen(),
-    lightGap:
-        'the green "Verified" chip is 3.0:1 (success on its soft green fill)',
-  ),
+  PumpableScreen('profile', () => const HistoryScreen()),
   PumpableScreen('alerts', () => const AlertsScreen(donorId: 7)),
   PumpableScreen('eligibility check', () => const CheckScreen()),
   PumpableScreen('book', () => const BookScreen()),
   PumpableScreen('newsfeed', () => const NewsfeedPage()),
-  PumpableScreen('donation history', () => DonationHistoryScreen()),
+  PumpableScreen('donation history', () => const DonationHistoryScreen()),
+  PumpableScreen(
+    'donation history (with donations)',
+    () => const DonationHistoryScreen(),
+    responses: {
+      'get_donation_history.php': {'status': 'success', 'data': _donations},
+    },
+  ),
   PumpableScreen('digital ID', () => const DigitalIdScreen()),
   PumpableScreen('blood requests', () => const BloodRequestsScreen()),
   PumpableScreen('streak ladder', () => const StreakLadderScreen()),
+  PumpableScreen(
+    'home',
+    () => HomeContent(onNavigateToTab: (_) {}),
+    responses: {
+      'get_profile.php': {
+        'status': 'success',
+        'data': {'blood_type': 'O+', 'total_donations': 4},
+      },
+      'get_eligibility.php': {
+        'status': 'success',
+        'eligibility': 'pending',
+        'next_eligible_date': '2099-11-28',
+      },
+      'get_appointments.php': {
+        'status': 'success',
+        'data': [
+          {
+            'appointment_date': '2099-10-25',
+            'appointment_time': '09:00:00',
+            'donation_center': 'City Blood Center',
+            'status': 'approved',
+          },
+        ],
+      },
+      'get_blood_request_summary.php': {
+        'status': 'success',
+        'can_request': true,
+        'open_count': 3,
+        'matching_count': 2,
+        'urgent_matching_count': 1,
+        'top_urgent': {'request_id': 9, 'reference': 'BR-0009'},
+      },
+    },
+  ),
 ];

@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,6 +14,7 @@ import 'shared_design.dart' show HeaderIconButton;
 import 'home.dart' show FloatingNavMetrics;
 import 'streak/streak_screen.dart';
 import 'app_palette.dart';
+import 'check/eligibility_result_view.dart';
 
 class Question {
   Question({
@@ -97,6 +100,10 @@ class _CheckScreenState extends State<CheckScreen>
   final _matKey = GlobalKey();
   late final AnimationController _shake;
 
+  // Confetti for the first eligible result (see _onResultShown).
+  bool _celebrate = false;
+  Timer? _celebrateTimer;
+
   @override
   void initState() {
     super.initState();
@@ -113,6 +120,7 @@ class _CheckScreenState extends State<CheckScreen>
 
   @override
   void dispose() {
+    _celebrateTimer?.cancel();
     _scroll.dispose();
     _shake.dispose();
     _resultAnimation.dispose();
@@ -135,7 +143,45 @@ class _CheckScreenState extends State<CheckScreen>
   /// together. [silent] (pull-to-refresh) never shows the full-screen loader,
   /// so the indicator and the scroll position survive; only the first load
   /// shows it.
+  /// A result has just appeared (not a pull-to-refresh): the first eligible
+  /// result per eligibility gets confetti and a firm tap, any other state a
+  /// light one, and the title is announced.
+  Future<void> _onResultShown() async {
+    final status = _status;
+    final id = await _donorId();
+    var celebrate = false;
+    if (id != null) {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'check_celebrated_eligible_$id';
+      if (status == 'eligible') {
+        celebrate = prefs.getString(key) != 'true';
+        if (celebrate) await prefs.setString(key, 'true');
+      } else {
+        await prefs.remove(key);
+      }
+    }
+    if (!mounted || _status != status) return;
+    final still = MediaQuery.disableAnimationsOf(context);
+    setState(() => _celebrate = celebrate && !still);
+    if (_celebrate) {
+      HapticFeedback.mediumImpact();
+      // Done after the burst, so a later rebuild never plays it again.
+      _celebrateTimer?.cancel();
+      _celebrateTimer = Timer(const Duration(seconds: 3), () {
+        if (mounted) setState(() => _celebrate = false);
+      });
+    } else if (status != 'eligible') {
+      HapticFeedback.lightImpact();
+    }
+    SemanticsService.sendAnnouncement(
+      View.of(context),
+      EligibilityResultView.titleFor(status),
+      Directionality.of(context),
+    );
+  }
+
   Future<void> _refresh({bool silent = false}) async {
+    _celebrate = false;
     if (!silent && mounted) {
       setState(() {
         _loading = true;
@@ -178,7 +224,10 @@ class _CheckScreenState extends State<CheckScreen>
           _applyStatus(d);
           _checking = false;
         });
-        if (_result && !wasResult) _resultAnimation.forward(from: 0);
+        if (_result && !wasResult) {
+          _resultAnimation.forward(from: 0);
+          _onResultShown();
+        }
       } else {
         setState(() => _checking = false);
       }
@@ -421,12 +470,6 @@ class _CheckScreenState extends State<CheckScreen>
     _canRetake = d['can_retake'] == true || d['can_retake'].toString() == '1';
   }
 
-  String _retakeWhen(int days) {
-    if (days <= 0) return 'today';
-    if (days == 1) return 'tomorrow';
-    return 'in $days days';
-  }
-
   bool get _result => const {
     'eligible',
     'not_eligible',
@@ -556,6 +599,7 @@ class _CheckScreenState extends State<CheckScreen>
           _started = false;
         });
         _resultAnimation.forward(from: 0);
+        _onResultShown();
         _success(
           result['message']?.toString() ?? 'Screening evaluated successfully.',
         );
@@ -632,7 +676,12 @@ class _CheckScreenState extends State<CheckScreen>
 
   @override
   Widget build(BuildContext context) =>
-      StreakScreen(id: 'check', child: _buildScreen(context));
+      // The result stage has its own Dugtong: the floating one steps aside.
+      StreakScreen(
+        id: 'check',
+        hideBubble: _result,
+        child: _buildScreen(context),
+      );
 
   Widget _buildScreen(BuildContext context) {
     if (_loading || _checking) {
@@ -689,9 +738,9 @@ class _CheckScreenState extends State<CheckScreen>
                               padding: EdgeInsets.symmetric(
                                 horizontal: inQuestions ? 48 : 0,
                               ),
-                              child: const Column(
+                              child: Column(
                                 children: [
-                                  Text(
+                                  const Text(
                                     'Eligibility Check',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
@@ -700,11 +749,13 @@ class _CheckScreenState extends State<CheckScreen>
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                  SizedBox(height: 4),
+                                  const SizedBox(height: 4),
                                   Text(
-                                    'Answer all questions honestly',
+                                    _result
+                                        ? 'Your screening result'
+                                        : 'Answer all questions honestly',
                                     textAlign: TextAlign.center,
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       color: AppColors.onPrimary,
                                     ),
                                   ),
@@ -1964,478 +2015,54 @@ class _CheckScreenState extends State<CheckScreen>
     ),
   );
 
-  /// "What happens next" while the screening is under review: a vertical
-  /// three-step stepper joined by a line.
-  Widget _reviewSteps() {
-    Widget step({
-      required Widget marker,
-      required String title,
-      String? subtitle,
-      required String state,
-      required Color lineColor,
-      bool last = false,
-    }) {
-      return Semantics(
-        label: '$title, $state',
-        excludeSemantics: true,
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(
-                width: 28,
-                child: Column(
-                  children: [
-                    SizedBox(
-                      width: 28,
-                      height: 28,
-                      child: Center(child: marker),
-                    ),
-                    if (!last)
-                      Expanded(
-                        child: Container(
-                          width: 2,
-                          margin: const EdgeInsets.symmetric(vertical: 2),
-                          decoration: BoxDecoration(
-                            color: lineColor,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(top: 4, bottom: last ? 0 : 18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: state == 'upcoming'
-                              ? context.palette.muted
-                              : context.palette.foreground,
-                        ),
-                      ),
-                      if (subtitle != null) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          subtitle,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: context.palette.muted,
-                            height: 1.4,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+  Widget _resultView() => EligibilityResultView(
+    data: EligibilityResultData(
+      status: _status,
+      reason: _reason,
+      recommendation: _recommendation,
+      nextDate: _nextDate,
+      retakeDate: _retakeDate,
+      retakeDaysRemaining: _retakeDaysRemaining,
+      canBook: _canBook,
+      canRetake: _canRetake,
+    ),
+    entrance: _resultAnimation,
+    celebrate: _celebrate,
+    onBook: () => Navigator.of(context, rootNavigator: true).push(
+      MaterialPageRoute(builder: (_) => const BookScreen(showBackButton: true)),
+    ),
+    onRetake: _retake,
+    onRefresh: _refresh,
+    onPullRefresh: () => _refresh(silent: true),
+  );
+}
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: context.palette.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: context.palette.border),
-        boxShadow: context.palette.shadow,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'What happens next',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: context.palette.foreground,
-            ),
-          ),
-          const SizedBox(height: 16),
-          step(
-            marker: Container(
-              width: 24,
-              height: 24,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.success,
-              ),
-              child: const Icon(
-                Icons.check_rounded,
-                size: 16,
-                color: Colors.white,
-              ),
-            ),
-            title: 'Answers submitted',
-            state: 'done',
-            lineColor: context.palette.success,
-          ),
-          step(
-            marker: _PulsingDot(
-              color: context.palette.warning,
-              animate: !MediaQuery.disableAnimationsOf(context),
-            ),
-            title: 'Team review',
-            state: 'current',
-            lineColor: context.palette.border,
-          ),
-          step(
-            marker: Container(
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: context.palette.surfaceAlt,
-                border: Border.all(color: context.palette.hint, width: 2),
-              ),
-            ),
-            title: 'You get the result',
-            subtitle: "We'll notify you in the app",
-            state: 'upcoming',
-            lineColor: context.palette.border,
-            last: true,
-          ),
-        ],
-      ),
-    );
-  }
+/// "today", "tomorrow" or "in N days".
+String retakeWhenText(int days) {
+  if (days <= 0) return 'today';
+  if (days == 1) return 'tomorrow';
+  return 'in $days days';
+}
 
-  Widget _resultView() {
-    final eligible = _status == 'eligible',
-        deferred = _status == 'temporary_deferred',
-        review = _status == 'for_review' || _status == 'pending';
-    final showRetakeCountdown =
-        !eligible && !_canRetake && !review && _retakeDate != null;
-    final color = eligible
-        ? context.palette.success
-        : deferred || review
-        ? context.palette.warning
-        : context.palette.primaryText;
-    final title = eligible
-        ? "You're Eligible to Donate!"
-        : deferred
-        ? 'Temporarily Deferred'
-        : review
-        ? 'Under Review'
-        : "You're Not Eligible Right Now";
-    final icon = eligible
-        ? Icons.verified_rounded
-        : deferred
-        ? Icons.schedule_rounded
-        : review
-        ? Icons.fact_check_rounded
-        : Icons.block_rounded;
-    final fallback = eligible
-        ? 'Your automated eligibility screening indicates that you may proceed to schedule a blood donation appointment. Final donor clearance will still take place at the donation center.'
-        : deferred
-        ? 'Your eligibility has been temporarily deferred.'
-        : review
-        ? 'Some of your answers need a closer look. Our team will review your '
-              'screening and notify you of the result.'
-        : 'You are not eligible to book at this time.';
-    final bottomPad = FloatingNavMetrics.bottomPadding(context);
-    return RefreshIndicator(
-      onRefresh: () => _refresh(silent: true),
-      child: ListView(
-        padding: EdgeInsets.fromLTRB(24, 24, 24, bottomPad),
-        children: [
-          ScaleTransition(
-            scale: CurvedAnimation(
-              parent: _resultAnimation,
-              curve: Curves.easeOutBack,
-            ),
-            child: FadeTransition(
-              opacity: _resultAnimation,
-              child: Column(
-                children: [
-                  SizedBox(
-                    width: 120,
-                    height: 120,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Container(
-                          width: 120,
-                          height: 120,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: RadialGradient(
-                              colors: [
-                                color.withValues(alpha: .22),
-                                color.withValues(alpha: 0),
-                              ],
-                            ),
-                          ),
-                        ),
-                        CircleAvatar(
-                          radius: 48,
-                          backgroundColor: color.withValues(alpha: .12),
-                          child: Icon(icon, size: 54, color: color),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    title,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 23,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: context.palette.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: color.withValues(alpha: .18)),
-                      boxShadow: context.palette.shadow,
-                    ),
-                    child: Column(
-                      children: [
-                        if (!review && _reason?.isNotEmpty == true)
-                          Text(
-                            _reason!,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                        if (!review && _reason?.isNotEmpty == true)
-                          const SizedBox(height: 8),
-                        Text(
-                          _recommendation?.isNotEmpty == true
-                              ? _recommendation!
-                              : fallback,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: context.palette.muted,
-                            height: 1.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (review) ...[const SizedBox(height: 16), _reviewSteps()],
-                  if (!review &&
-                      _nextDate?.isNotEmpty == true &&
-                      !(showRetakeCountdown && _nextDate == _retakeDate))
-                    Padding(
-                      padding: const EdgeInsets.only(top: 16),
-                      child: Text(
-                        'Next Eligible Date: ${_formatDate(_nextDate!)}',
-                        style: TextStyle(
-                          color: color,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 28),
-                  if (eligible && _canBook)
-                    Container(
-                      width: double.infinity,
-                      height: 54,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: [
-                          BoxShadow(
-                            color: color.withValues(alpha: .35),
-                            blurRadius: 14,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: ElevatedButton.icon(
-                        onPressed: () =>
-                            Navigator.of(context, rootNavigator: true).push(
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    const BookScreen(showBackButton: true),
-                              ),
-                            ),
-                        icon: const Icon(
-                          Icons.calendar_month_rounded,
-                          size: 20,
-                        ),
-                        label: const Text(
-                          'Book an Appointment',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: color,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (!eligible && !review && _canRetake)
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _retake,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: color,
-                          foregroundColor: Colors.white,
-                        ),
-                        child: const Text('Take Eligibility Check Again'),
-                      ),
-                    ),
-                  if (showRetakeCountdown) ...[
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: context.palette.surface,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: color.withValues(alpha: .18)),
-                        boxShadow: context.palette.shadow,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 36,
-                                height: 36,
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: color.withValues(alpha: .12),
-                                ),
-                                child: Icon(
-                                  Icons.event_repeat_rounded,
-                                  size: 20,
-                                  color: color,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                'Retake Available',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: context.palette.foreground,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            _formatDate(_retakeDate!),
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: context.palette.foreground,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'You can take the check again '
-                            '${_retakeWhen(_retakeDaysRemaining)}.',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: color,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            deferred
-                                ? 'You can take the check again once your deferral period ends.'
-                                : 'This short waiting period lets your health settle before '
-                                      "you're screened again.",
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: context.palette.muted,
-                              height: 1.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton.icon(
-                        onPressed: null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: context.palette.border,
-                          foregroundColor: context.palette.muted,
-                          disabledBackgroundColor: context.palette.border,
-                          disabledForegroundColor: context.palette.muted,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        icon: const Icon(Icons.lock_clock_rounded, size: 18),
-                        label: Text(
-                          'Available ${_retakeWhen(_retakeDaysRemaining)}',
-                        ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  TextButton.icon(
-                    onPressed: _refresh,
-                    icon: const Icon(Icons.refresh_rounded, size: 18),
-                    label: Text(
-                      !eligible &&
-                              !review &&
-                              !_canRetake &&
-                              _retakeDaysRemaining == 0
-                          ? 'Check again'
-                          : 'Refresh status',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatDate(String value) {
-    final date = DateTime.tryParse(value);
-    if (date == null) return value;
-    const months = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ];
-    return '${months[date.month - 1]} ${date.day}, ${date.year}';
-  }
+/// A server date (yyyy-mm-dd) as "October 3, 2026"; anything else as is.
+String formatEligibilityDate(String value) {
+  final date = DateTime.tryParse(value);
+  if (date == null) return value;
+  const months = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+  return '${months[date.month - 1]} ${date.day}, ${date.year}';
 }
 
 /// Reports whether a finger is down, so a button can react while pressed.
@@ -2465,81 +2092,4 @@ class _PressBuilderState extends State<_PressBuilder> {
     onTapCancel: () => _set(false),
     child: widget.builder(context, _pressed),
   );
-}
-
-/// The "current step" dot: a solid dot with a soft halo that pulses. With
-/// [animate] off (reduced motion) the halo stays still.
-class _PulsingDot extends StatefulWidget {
-  final Color color;
-  final bool animate;
-
-  const _PulsingDot({required this.color, required this.animate});
-
-  @override
-  State<_PulsingDot> createState() => _PulsingDotState();
-}
-
-class _PulsingDotState extends State<_PulsingDot>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1400),
-  );
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.animate) _c.repeat(reverse: true);
-  }
-
-  @override
-  void didUpdateWidget(covariant _PulsingDot old) {
-    super.didUpdateWidget(old);
-    if (widget.animate && !_c.isAnimating) {
-      _c.repeat(reverse: true);
-    } else if (!widget.animate && _c.isAnimating) {
-      _c.stop();
-    }
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _c,
-      builder: (context, _) {
-        final t = Curves.easeInOut.transform(_c.value);
-        return SizedBox(
-          width: 28,
-          height: 28,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Container(
-                width: 14 + 14 * t,
-                height: 14 + 14 * t,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: widget.color.withValues(alpha: 0.28 * (1 - t) + 0.06),
-                ),
-              ),
-              Container(
-                width: 14,
-                height: 14,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: widget.color,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
 }

@@ -58,7 +58,7 @@ Future<void> _meetsContrast(
       await expectLater(tester, meetsGuideline(textContrastGuideline));
       await tester.pumpWidget(const SizedBox());
       await tester.pump(const Duration(seconds: 10));
-    }, () => MockClient(pumpableServer));
+    }, () => MockClient(screen.server));
   } finally {
     semantics.dispose();
     FlutterError.onError = previous;

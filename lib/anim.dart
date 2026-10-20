@@ -38,7 +38,20 @@ class _FadeSlideInState extends State<FadeSlideIn>
       begin: const Offset(0, 0.08),
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+  }
 
+  bool _started = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    // With animations removed the content is simply there.
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
+      _controller.value = 1;
+      return;
+    }
     final delay = widget.baseDelay * widget.index;
     if (delay == Duration.zero) {
       _controller.forward();
