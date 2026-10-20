@@ -263,12 +263,7 @@ final List<PumpableScreen> pumpableScreens = [
   PumpableScreen('change password', () => const ChangePasswordScreen()),
   PumpableScreen('edit profile', () => const EditProfileScreen()),
   PumpableScreen('verify', () => const VerifyScreen()),
-  PumpableScreen(
-    'profile',
-    () => const HistoryScreen(),
-    lightGap:
-        'the green "Verified" chip is 3.0:1 (success on its soft green fill)',
-  ),
+  PumpableScreen('profile', () => const HistoryScreen()),
   PumpableScreen('alerts', () => const AlertsScreen(donorId: 7)),
   PumpableScreen('eligibility check', () => const CheckScreen()),
   PumpableScreen('book', () => const BookScreen()),
