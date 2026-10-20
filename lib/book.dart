@@ -121,7 +121,20 @@ class _BookScreenState extends State<BookScreen>
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
-    )..repeat(reverse: true);
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // The Confirm button's breathing stops with animations removed.
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _pulseController
+        ..stop()
+        ..value = 0;
+    } else if (!_pulseController.isAnimating) {
+      _pulseController.repeat(reverse: true);
+    }
   }
 
   @override
