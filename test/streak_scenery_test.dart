@@ -57,4 +57,61 @@ void main() {
     await tester.pump(const Duration(seconds: 3));
     expect(tester.binding.transientCallbackCount, 0);
   });
+
+  Widget fullScreen({required bool dark, Offset drag = Offset.zero}) =>
+      MaterialApp(
+        theme: dark ? AppTheme.dark : AppTheme.light,
+        home: Scaffold(
+          body: SizedBox(
+            width: 360,
+            height: 780,
+            child: StreakScenery(
+              groundFraction: 0.7,
+              litWindows: 12,
+              drag: drag,
+              celestial: const Offset(306, 98),
+              captionAt: const Offset(16, 54),
+              onSunMoonTap: () {},
+            ),
+          ),
+        ),
+      );
+
+  for (final dark in [false, true]) {
+    testWidgets('full screen: sizes from its box (${dark ? 'night' : 'day'})', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(360, 780);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(fullScreen(dark: dark));
+      await tester.pump(const Duration(seconds: 1));
+      // Dugtong dragged far: the layers shift, nothing breaks.
+      await tester.pumpWidget(
+        fullScreen(dark: dark, drag: const Offset(-400, 300)),
+      );
+      await tester.pump(const Duration(seconds: 1));
+      expect(tester.takeException(), isNull);
+      final caption = find.text(dark ? 'Clear night' : 'Sunny day');
+      expect(tester.getTopLeft(caption).dy, lessThan(80));
+      final label = dark ? 'Switch to light mode' : 'Switch to dark mode';
+      expect(
+        tester.getCenter(find.bySemanticsLabel(label)),
+        const Offset(306, 98),
+      );
+      handle.dispose();
+    });
+  }
+
+  testWidgets('full screen: one static frame with animations removed', (
+    tester,
+  ) async {
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAllTestValues);
+    await tester.pumpWidget(fullScreen(dark: false));
+    await tester.pump(const Duration(seconds: 2));
+    expect(tester.binding.transientCallbackCount, 0);
+  });
 }
