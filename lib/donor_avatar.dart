@@ -36,7 +36,12 @@ class DonorAvatar extends StatelessWidget {
     this.decodeAtSize = false,
     this.heroTag,
     this.onTap,
+    this.hiddenBadge = false,
   });
+
+  /// A small eye-off badge on the circle's bottom right: the donor's own
+  /// avatar when their photo is hidden from other people in comments.
+  final bool hiddenBadge;
 
   /// A Hero around the round photo only (never the frame ring), so the photo
   /// can fly into a full-screen viewer while the ring stays where it is.
@@ -108,10 +113,23 @@ class DonorAvatar extends StatelessWidget {
       ),
     );
 
+    final photo = heroTag == null ? circle : Hero(tag: heroTag!, child: circle);
     Widget avatar = StreakAvatarFrame(
       frameKey: frame,
       radius: radius,
-      child: heroTag == null ? circle : Hero(tag: heroTag!, child: circle),
+      child: hiddenBadge
+          ? Stack(
+              clipBehavior: Clip.none,
+              children: [
+                photo,
+                Positioned(
+                  right: -3,
+                  bottom: -3,
+                  child: ExcludeSemantics(child: _HiddenBadge(radius: radius)),
+                ),
+              ],
+            )
+          : photo,
     );
     if (reserveFrameSpace) {
       final extent = streakFrameExtent(radius);
@@ -129,7 +147,9 @@ class DonorAvatar extends StatelessWidget {
       );
     }
     return Semantics(
-      label: '$name, profile picture',
+      label: hiddenBadge
+          ? '$name, profile picture. Your photo is hidden'
+          : '$name, profile picture',
       image: true,
       excludeSemantics: true,
       child: avatar,
@@ -137,8 +157,37 @@ class DonorAvatar extends StatelessWidget {
   }
 }
 
+/// The eye-off badge: a 14 px disc with a 10 px icon (smaller on tiny
+/// avatars).
+class _HiddenBadge extends StatelessWidget {
+  final double radius;
+  const _HiddenBadge({required this.radius});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final size = radius < 12 ? 11.0 : 14.0;
+    return Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: p.surface,
+        shape: BoxShape.circle,
+        border: Border.all(color: p.border),
+      ),
+      child: Icon(
+        Icons.visibility_off_outlined,
+        size: size - 4,
+        color: p.muted,
+      ),
+    );
+  }
+}
+
 /// [DonorAvatar] of the signed-in donor. It follows [MyAvatarController] and the
-/// streak's equipped frame.
+/// streak's equipped frame. With the photo hidden in comments it shows the
+/// initials and the eye-off badge, as other people see it.
 class ViewerAvatar extends StatelessWidget {
   final double radius;
   final bool reserveFrameSpace;
@@ -158,12 +207,14 @@ class ViewerAvatar extends StatelessWidget {
       ]),
       builder: (context, _) {
         final me = MyAvatarController.instance;
+        final hidden = me.hidePhotoInComments;
         return DonorAvatar(
-          photoUrl: me.avatarPath,
+          photoUrl: hidden ? null : me.avatarPath,
           name: me.name,
           frame: me.viewerFrame,
           radius: radius,
           reserveFrameSpace: reserveFrameSpace,
+          hiddenBadge: hidden,
         );
       },
     );

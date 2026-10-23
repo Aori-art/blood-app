@@ -88,7 +88,9 @@ const List<_PrivacySection> _kSections = [
     'Firebase (push notifications) and Gmail (email delivery) are used to '
         'deliver messages to you.',
     'If you comment on a post, your first name, last initial, profile photo '
-        'and frame are visible to other users.',
+        'and frame are visible to other users. You can hide your profile '
+        'photo in comments at any time from the comment box or in Privacy & '
+        'Security.',
   ]),
   _PrivacySection(Icons.lock_outline_rounded, '4. How we protect it', [
     'Your password is stored in encrypted (hashed) form and is never kept '

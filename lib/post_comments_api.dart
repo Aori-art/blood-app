@@ -18,6 +18,10 @@ class PostComment {
   final String createdAt;
   final bool isMine;
 
+  /// The author hides their photo in comments: [avatar] is empty and initials
+  /// are shown.
+  final bool photoHidden;
+
   const PostComment({
     required this.id,
     required this.authorName,
@@ -27,6 +31,7 @@ class PostComment {
     required this.timeAgo,
     required this.createdAt,
     required this.isMine,
+    this.photoHidden = false,
   });
 
   factory PostComment.fromJson(Map<String, dynamic> json) => PostComment(
@@ -38,6 +43,7 @@ class PostComment {
     timeAgo: json['timeAgo']?.toString() ?? '',
     createdAt: json['createdAt']?.toString() ?? '',
     isMine: json['isMine'] == true,
+    photoHidden: json['photoHidden'] == true,
   );
 }
 
@@ -57,12 +63,16 @@ class CommenterProfile {
   final bool verified;
   final String? memberSince;
 
+  /// The donor hides their photo in comments: [avatar] is empty.
+  final bool photoHidden;
+
   const CommenterProfile({
     required this.displayName,
     required this.avatar,
     required this.frame,
     required this.verified,
     required this.memberSince,
+    this.photoHidden = false,
   });
 
   factory CommenterProfile.fromJson(Map<String, dynamic> json) {
@@ -75,6 +85,7 @@ class CommenterProfile {
       memberSince: (since == null || since.isEmpty || since == 'null')
           ? null
           : since,
+      photoHidden: json['photoHidden'] == true,
     );
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -31,6 +32,25 @@ class PrivacySecurityScreen extends StatefulWidget {
 
 class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
   bool _deleteFlowActive = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // The comment-photo switch shows what the server has.
+    unawaited(MyAvatarController.instance.load());
+  }
+
+  Future<void> _setHidePhoto(bool hide) async {
+    final ok = await MyAvatarController.instance.setHidePhotoInComments(hide);
+    if (ok || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text("Couldn't save your choice. Please try again."),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
 
   // PIN: opens the PIN screen in "change" mode (current → new → confirm).
   Future<void> _changePin() async {
@@ -166,6 +186,42 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
               context,
               MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
             ),
+          ),
+          const Divider(),
+          ListenableBuilder(
+            listenable: MyAvatarController.instance,
+            builder: (context, _) {
+              final p = context.palette;
+              final hidden = MyAvatarController.instance.hidePhotoInComments;
+              WidgetStateProperty<Color> track() =>
+                  WidgetStateProperty.resolveWith(
+                    (states) => states.contains(WidgetState.selected)
+                        ? AppColors.primary
+                        : p.border,
+                  );
+              return Semantics(
+                container: true,
+                label: 'Hide my photo in comments',
+                toggled: hidden,
+                onTap: () => _setHidePhoto(!hidden),
+                excludeSemantics: true,
+                child: SettingsRow(
+                  icon: Icons.visibility_off_outlined,
+                  title: 'Hide my photo in comments',
+                  subtitle: 'Others will see your initials in comments',
+                  onTap: () => _setHidePhoto(!hidden),
+                  // Styled like the Dark mode row: a white thumb on the
+                  // brand track (the border color when off).
+                  trailing: Switch(
+                    value: hidden,
+                    onChanged: _setHidePhoto,
+                    thumbColor: WidgetStateProperty.all(Colors.white),
+                    trackColor: track(),
+                    trackOutlineColor: track(),
+                  ),
+                ),
+              );
+            },
           ),
           const Divider(),
           _DeleteAccountRow(onTap: _deleteAccount),
