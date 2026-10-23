@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Referenced only from the manifest (FCM) and by name from Dart
+     (flutter_local_notifications) or the adaptive icon: never let resource
+     shrinking remove them. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_edonate,@drawable/ic_launcher_monochrome" />

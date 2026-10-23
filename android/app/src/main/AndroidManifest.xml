@@ -17,6 +17,12 @@
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="edonate_notifications" />
 
+        <!-- Status-bar icon of push notifications: the white Dugtong
+             silhouette. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_edonate" />
+
         <!-- Accent color of push notifications: the brand red. -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_color"
