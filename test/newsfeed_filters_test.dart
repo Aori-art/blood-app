@@ -1,7 +1,6 @@
 import 'package:blood/app_theme.dart';
 import 'package:blood/newsfeed.dart';
 import 'package:blood/newsfeed/category_nav_bar.dart';
-import 'package:blood/newsfeed/feed_chrome.dart';
 import 'package:blood/privacy_statement.dart';
 import 'package:blood/streak/streak_controller.dart';
 import 'package:flutter/material.dart';
@@ -12,7 +11,6 @@ import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/pumpable_screens.dart';
-import 'support/sample_posts.dart';
 
 /// The feed around the posts: filter chips, the footer, empty and error.
 
@@ -70,8 +68,6 @@ Future<void> _with(Object postsResponse, Future<void> Function() body) =>
         return pumpableServer(r);
       }),
     );
-
-int _cards(WidgetTester tester) => find.byType(PostCard).evaluate().length;
 
 void main() {
   test('filter groups follow the post types', () {

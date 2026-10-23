@@ -259,7 +259,10 @@ void main() {
       // tapped it); Go to Home comes back only by scrolling up.
       await tester.tap(_item('All'));
       await _frames(tester, 20);
-      expect(_cards(tester), 6);
+      // Cards build lazily, so look for posts of several kinds, not a count.
+      expect(find.text('City Blood Bank'), findsOneWidget);
+      expect(find.text('Capstone'), findsWidgets);
+      expect(_cards(tester), greaterThan(1));
       await _close(tester);
     });
   });
