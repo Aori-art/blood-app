@@ -31,7 +31,21 @@ class DonorAvatar extends StatelessWidget {
     this.frame,
     required this.radius,
     this.reserveFrameSpace = false,
+    this.fallback,
+    this.placeholderColor,
+    this.decodeAtSize = false,
   });
+
+  /// Shown instead of the crimson-tinted letter when there is no photo (or it
+  /// fails to load). Sized by the avatar's circle.
+  final Widget? fallback;
+
+  /// While the photo loads: a plain circle of this color. Null shows the
+  /// fallback, as before.
+  final Color? placeholderColor;
+
+  /// Decode the photo at the size it is shown (radius x 2 x pixel ratio).
+  final bool decodeAtSize;
 
   /// The letter shown when there is no photo.
   static String initialOf(String name) {
@@ -43,21 +57,26 @@ class DonorAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final url = resolveMediaUrl(photoUrl);
     final size = radius * 2;
-    final fallback = Container(
-      width: size,
-      height: size,
-      color: kCrimson.withValues(alpha: 0.12),
-      alignment: Alignment.center,
-      child: Text(
-        initialOf(name),
-        style: TextStyle(
-          color: context.palette.primaryText,
-          fontSize: radius * 0.9,
-          fontWeight: FontWeight.w700,
-          height: 1,
-        ),
-      ),
-    );
+    final fallback =
+        this.fallback ??
+        Container(
+          width: size,
+          height: size,
+          color: kCrimson.withValues(alpha: 0.12),
+          alignment: Alignment.center,
+          child: Text(
+            initialOf(name),
+            style: TextStyle(
+              color: context.palette.primaryText,
+              fontSize: radius * 0.9,
+              fontWeight: FontWeight.w700,
+              height: 1,
+            ),
+          ),
+        );
+    final placeholder = placeholderColor == null
+        ? fallback
+        : ColoredBox(color: placeholderColor!);
     final circle = SizedBox(
       width: size,
       height: size,
@@ -70,9 +89,13 @@ class DonorAvatar extends StatelessWidget {
                 height: size,
                 fit: BoxFit.cover,
                 gaplessPlayback: true,
+                cacheWidth: decodeAtSize
+                    ? (size * MediaQuery.devicePixelRatioOf(context)).round()
+                    : null,
+                // A broken or blocked link never leaves a blank circle.
                 errorBuilder: (_, _, _) => fallback,
                 loadingBuilder: (context, child, progress) =>
-                    progress == null ? child : fallback,
+                    progress == null ? child : placeholder,
               ),
       ),
     );
