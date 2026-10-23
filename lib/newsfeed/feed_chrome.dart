@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../app_palette.dart';
 import '../skeleton.dart';
+import 'category_nav_bar.dart' show postsLabel;
 import '../streak/dugtong.dart';
 import '../streak/streak_controller.dart';
 
@@ -246,6 +247,65 @@ class CaughtUpFooter extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Active category ─────────────────────────────────────────────────────────
+
+/// "Showing Events - 4 posts" with a "Show all" button: a slim row at the
+/// start of the posts while a category other than All is selected.
+class CategoryReminder extends StatelessWidget {
+  const CategoryReminder({
+    super.key,
+    required this.label,
+    required this.count,
+    required this.onShowAll,
+  });
+
+  final String label;
+  final int count;
+  final VoidCallback onShowAll;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Container(
+        padding: const EdgeInsets.only(left: 14, right: 4),
+        decoration: BoxDecoration(
+          color: p.surfaceAlt,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Showing $label - ${postsLabel(count)}',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: p.foreground,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: onShowAll,
+              style: TextButton.styleFrom(
+                foregroundColor: p.primaryText,
+                minimumSize: const Size(64, 48),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                textStyle: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              child: const Text('Show all'),
+            ),
+          ],
+        ),
       ),
     );
   }

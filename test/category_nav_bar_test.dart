@@ -345,4 +345,33 @@ void main() {
       await _close(tester);
     });
   });
+
+  testWidgets(
+    'the reminder row shows the category and Show all returns to All',
+    (tester) async {
+      final run = _Run(samplePostsJson());
+      await _with(run, () async {
+        await _pumpFeed(tester, run);
+        expect(find.textContaining('Showing'), findsNothing);
+        await _scrollDown(tester);
+
+        await tester.tap(_item('Events'));
+        await _frames(tester, 20);
+        expect(find.text('Showing Events - 2 posts'), findsOneWidget);
+        expect(find.text('Show all'), findsOneWidget);
+
+        await tester.tap(_item('Updates'));
+        await _frames(tester, 20);
+        expect(find.text('Showing Updates - 1 post'), findsOneWidget);
+
+        await tester.tap(find.text('Show all'));
+        await _frames(tester, 20);
+        expect(find.textContaining('Showing'), findsNothing);
+        expect(find.text('City Blood Bank'), findsOneWidget);
+        // The bar stays, as after any category tap.
+        expect(_barShown(tester), isTrue);
+        await _close(tester);
+      });
+    },
+  );
 }
