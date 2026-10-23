@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -24,7 +25,7 @@ import 'streak/avatar_frame.dart';
 import 'streak/frame_picker.dart';
 import 'streak/streak_controller.dart';
 import 'unread_notifications.dart';
-import 'donor_avatar.dart';
+import 'my_avatar_controller.dart';
 import 'streak/streak_routes.dart';
 import 'theme_controller.dart';
 import 'theme_transition.dart';
@@ -205,7 +206,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     UnreadNotifications.instance
       ..stop()
       ..clear();
-    MyAvatar.instance.clear();
+    MyAvatarController.instance.reset();
     AppSession.homeInStack = false; // PIN: next Home visit asks for the PIN
     if (mounted)
       Navigator.pushAndRemoveUntil(
@@ -292,7 +293,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
         child: RefreshIndicator(
           color: context.palette.primaryText,
           backgroundColor: context.palette.surface,
-          onRefresh: () => _load(progress: false),
+          onRefresh: () => Future.wait([
+            _load(progress: false),
+            MyAvatarController.instance.refresh(),
+          ]),
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.only(bottom: 24),
@@ -392,6 +396,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               ),
                             );
                             if (changed == true) _load(progress: false);
+                            // A new photo may have been chosen there.
+                            unawaited(MyAvatarController.instance.refresh());
                           },
                           subtitle: 'Update your personal details',
                           tint: context.palette.info,

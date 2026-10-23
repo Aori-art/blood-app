@@ -14,7 +14,7 @@ import 'login.dart';
 import 'privacy_statement.dart';
 import 'streak/streak_controller.dart';
 import 'unread_notifications.dart';
-import 'donor_avatar.dart';
+import 'my_avatar_controller.dart';
 import 'app_palette.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -633,7 +633,7 @@ class _PinScreenState extends State<PinScreen> with TickerProviderStateMixin {
     UnreadNotifications.instance
       ..stop()
       ..clear();
-    MyAvatar.instance.clear();
+    MyAvatarController.instance.reset();
     AppSession.homeInStack = false;
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(

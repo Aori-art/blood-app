@@ -35,6 +35,7 @@ import 'streak/streak_controller.dart';
 import 'unread_notifications.dart';
 import 'verify.dart';
 import 'app_palette.dart';
+import 'my_avatar_controller.dart';
 import 'skeleton.dart';
 import 'widgets/count_up_text.dart';
 import 'widgets/glow_pulse.dart';
@@ -1364,6 +1365,7 @@ class _HomeContentState extends State<HomeContent> {
 
     await Future.wait([
       loadUserName(),
+      MyAvatarController.instance.refresh(),
       loadProfileData(),
       loadEligibilityData(),
       loadAppointments(),

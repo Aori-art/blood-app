@@ -16,7 +16,7 @@ import 'profile_page_widgets.dart';
 import 'shared_design.dart';
 import 'streak/streak_controller.dart';
 import 'unread_notifications.dart';
-import 'donor_avatar.dart';
+import 'my_avatar_controller.dart';
 import 'streak/streak_screen.dart';
 import 'app_palette.dart';
 
@@ -131,7 +131,7 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
     UnreadNotifications.instance
       ..stop()
       ..clear();
-    MyAvatar.instance.clear();
+    MyAvatarController.instance.reset();
     AppSession.homeInStack = false;
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

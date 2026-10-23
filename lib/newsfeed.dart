@@ -18,6 +18,11 @@ import 'config.dart';
 import 'donor_avatar.dart';
 import 'verify.dart';
 import 'app_palette.dart';
+import 'media_url.dart';
+import 'my_avatar_controller.dart';
+
+// Other files import resolveMediaUrl from here.
+export 'media_url.dart' show resolveMediaUrl;
 import 'widgets/edonate_logo.dart';
 // The palette lives in app_colors.dart; it is re-exported so files that took
 // AppColors from here keep working.
@@ -217,18 +222,6 @@ class UrgencyBadge extends StatelessWidget {
 }
 
 // ── Network Image Helper (graceful fallback) ────────────────────────────────
-
-// Builds a full URL for a server-relative media path (e.g. a profile
-// picture path like "uploads/profile/741.jpg"), leaving already-absolute
-// URLs untouched — same convention as the ready-made image/avatar URLs
-// this file already gets from get_posts.php.
-String? resolveMediaUrl(String? path) {
-  if (path == null || path.isEmpty) return null;
-  if (path.startsWith('http://') || path.startsWith('https://')) return path;
-  final origin = AppConfig.baseUrl.replaceAll(RegExp(r'/api/?$'), '');
-  final cleanPath = path.startsWith('/') ? path.substring(1) : path;
-  return '$origin/$cleanPath';
-}
 
 Widget netImage(String url, {BoxFit fit = BoxFit.cover}) {
   return Image.network(
@@ -1942,14 +1935,14 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     final signedIn = loggedIn && donorId != null && donorId.isNotEmpty;
     // The cached photo path first, so the header has the picture straight
     // away; the server's answer follows.
-    if (signedIn) await MyAvatar.instance.load();
+    if (signedIn) await MyAvatarController.instance.loadCached();
     if (!mounted) return;
     setState(() {
       _isLoggedIn = signedIn;
       _userName = prefs.getString('userName');
       _checkedLogin = true;
     });
-    if (signedIn) unawaited(MyAvatar.instance.refresh());
+    if (signedIn) unawaited(MyAvatarController.instance.refresh());
   }
 
   Future<void> _fetchVerificationStatus() async {
@@ -2081,7 +2074,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       _postsError = null;
     });
     // The newsfeed loading is also when the header photo gets refreshed.
-    unawaited(MyAvatar.instance.refresh());
+    unawaited(MyAvatarController.instance.refresh());
     try {
       final prefs = await SharedPreferences.getInstance();
       final donorId = prefs.getString('donorId');
@@ -2400,7 +2393,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       context,
     ).push(MaterialPageRoute(builder: (_) => const HistoryScreen()));
     // The photo or frame may have changed over there.
-    if (mounted) unawaited(MyAvatar.instance.refresh());
+    if (mounted) unawaited(MyAvatarController.instance.refresh());
   }
 
   Widget _buildHeaderProfileButton() {
@@ -2429,11 +2422,11 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     // a frame may poke a little past the 36 px box, which is only paint.
     return ListenableBuilder(
       listenable: Listenable.merge([
-        MyAvatar.instance,
+        MyAvatarController.instance,
         StreakController.instance,
       ]),
       builder: (context, _) {
-        final me = MyAvatar.instance;
+        final me = MyAvatarController.instance;
         final frame = me.viewerFrame;
         return SizedBox(
           width: 36,
@@ -2452,7 +2445,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
                 maxHeight: 48,
                 child: Center(
                   child: DonorAvatar(
-                    photoUrl: me.path,
+                    photoUrl: me.avatarPath,
                     name: me.name.isNotEmpty ? me.name : (_userName ?? ''),
                     frame: frame,
                     radius: frame != null ? 15 : 17,

@@ -11,6 +11,7 @@ import 'comment_options.dart';
 import 'commenter_profile_sheet.dart';
 import 'config.dart';
 import 'donor_avatar.dart';
+import 'my_avatar_controller.dart';
 import 'login.dart';
 import 'post_comments_api.dart';
 import 'shared_design.dart' show kCrimson;
@@ -120,8 +121,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
     if (_loggedIn) {
       unawaited(_refreshStatus());
       // The composer shows the donor's own photo and frame.
-      unawaited(MyAvatar.instance.load());
-      unawaited(MyAvatar.instance.refresh());
+      unawaited(MyAvatarController.instance.load());
     }
     await _load();
   }
@@ -689,7 +689,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
           ? streak.equippedFrame
           : c.frame;
       final photo = (c.isMine && c.avatar.isEmpty)
-          ? MyAvatar.instance.path
+          ? MyAvatarController.instance.avatarPath
           : c.avatar;
       return DonorAvatar(
         photoUrl: photo,
@@ -704,7 +704,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
     return ListenableBuilder(
       listenable: Listenable.merge([
         StreakController.instance,
-        MyAvatar.instance,
+        MyAvatarController.instance,
       ]),
       builder: (context, _) => avatar(context),
     );

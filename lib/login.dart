@@ -14,6 +14,7 @@ import 'streak/streak_controller.dart';
 import 'unread_notifications.dart';
 import 'streak/streak_screen.dart';
 import 'app_palette.dart';
+import 'my_avatar_controller.dart';
 
 // Design tokens now come from shared_design.dart (kCrimson) and context.palette
 // so this screen matches the rest of the app instead of its own palette.
@@ -101,6 +102,8 @@ class _LoginScreenState extends State<LoginScreen>
         // Tell the streak the donor is signed in, before leaving this screen:
         // it loads the cache and counts today (the server is idempotent).
         unawaited(StreakController.instance.onLoggedIn());
+        // The new donor's own photo (the previous one was reset at logout).
+        unawaited(MyAvatarController.instance.load());
         // Start counting unread notifications for the Alerts badge.
         UnreadNotifications.instance.start();
         Navigator.pushAndRemoveUntil(
