@@ -15,6 +15,7 @@ import 'home.dart' show FloatingNavMetrics, kBottomNavBarHeight;
 import 'shared_design.dart';
 import 'app_palette.dart';
 import 'widgets/glow_pulse.dart';
+import 'cancel_appointment_sheet.dart';
 
 // Sticky bottom bar's own content height (12 top pad + 50 confirm button
 // height + 12 bottom pad) — used so the scroll content ends exactly one
@@ -73,6 +74,11 @@ class _BookScreenState extends State<BookScreen>
 
   bool _isRescheduling = false;
   bool _isSubmitting = false;
+
+  // Cancellation allowance (get_cancel_policy.php). A failed call counts as
+  // "not restricted".
+  CancelPolicy? _cancelPolicy;
+  bool get _bookingPaused => _cancelPolicy?.restricted == true;
 
   // Post-donation success screen (get_donation_status.php) — the backend
   // decides when to show it via show_donation_success, we don't re-derive it.
@@ -154,6 +160,8 @@ class _BookScreenState extends State<BookScreen>
     if ((_eligibilityStatus ?? 'not_checked') != 'eligible') return false;
     if (_checkingAppointment || _appointmentError) return false;
     if (_currentAppointment != null && !_isRescheduling) return false;
+    // "Booking is paused" replaces the form (and its sticky bar).
+    if (_currentAppointment == null && _bookingPaused) return false;
     return true;
   }
 
@@ -164,7 +172,19 @@ class _BookScreenState extends State<BookScreen>
       _fetchDonationStatus(),
       _fetchFacilities(),
       _fetchTimeSlots(),
+      _fetchCancelPolicy(),
     ]);
+  }
+
+  Future<void> _fetchCancelPolicy() async {
+    final prefs = await SharedPreferences.getInstance();
+    final donorId = prefs.getString('donorId');
+    CancelPolicy? policy;
+    if (donorId != null && donorId.isNotEmpty) {
+      policy = await CancelAppointmentApi.fetchPolicy(donorId);
+    }
+    if (!mounted) return;
+    setState(() => _cancelPolicy = policy);
   }
 
   Future<void> _fetchEligibilityStatus() async {
@@ -877,6 +897,104 @@ class _BookScreenState extends State<BookScreen>
     }
   }
 
+  // ── Cancel the appointment ────────────────────────────────────────────────
+
+  Future<void> _showCancelSheet() async {
+    final appointment = _currentAppointment;
+    if (appointment == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    final donorId = prefs.getString('donorId');
+    if (!mounted) return;
+    if (donorId == null || donorId.isEmpty) {
+      _showSnack("Unable to find your account. Please sign in again.");
+      return;
+    }
+    final result = await showCancelAppointmentSheet(
+      context,
+      appointment: appointment,
+      donorId: donorId,
+      formatDate: _formatDateString,
+      formatTime: _formatAppointmentTime,
+      showMessage: _showSnack,
+    );
+    if (!mounted || result == null) return;
+
+    if (!result.success) {
+      // The appointment changed (already cancelled, done, in the past or
+      // gone): show why and reload what is true now.
+      _showSnack(result.message ?? 'This appointment can no longer be cancelled.');
+      await _refreshStatuses();
+      return;
+    }
+
+    setState(() {
+      _currentAppointment = null;
+      _isRescheduling = false;
+      selectedDate = null;
+      selectedFacilityId = null;
+      selectedTime = null;
+    });
+    await _refreshStatuses();
+    if (!mounted) return;
+    _showSnack(
+      'Appointment cancelled.',
+      color: AppColors.success,
+      icon: Icons.check_circle_outline,
+    );
+    if (result.restricted) await _showBookingPausedDialog(result);
+  }
+
+  Future<void> _showBookingPausedDialog(CancelResult result) {
+    final n = result.consecutiveCount ?? _cancelPolicy?.consecutiveCount;
+    // The server's explanation (from the policy it just reloaded), else the
+    // numbers it sent.
+    final explanation =
+        _cancelPolicy?.restrictionReason ??
+        (n != null && n > 0
+            ? "You've cancelled $n appointment${n == 1 ? '' : 's'} in a row, "
+                  'so booking is paused until our team reviews your account.'
+            : 'Booking is paused until our team reviews your account.');
+    return showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: context.palette.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        icon: Icon(
+          Icons.pause_circle_rounded,
+          size: 36,
+          color: context.palette.warning,
+        ),
+        title: Text(
+          'Booking paused',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 17,
+            color: context.palette.foreground,
+          ),
+        ),
+        content: Text(
+          explanation,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 13,
+            color: context.palette.muted,
+            height: 1.5,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: TextButton.styleFrom(
+              foregroundColor: context.palette.primaryText,
+            ),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _startReschedule() async {
     final appointment = _currentAppointment;
     if (appointment == null) return;
@@ -1587,6 +1705,7 @@ class _BookScreenState extends State<BookScreen>
         statusColor: _appointmentStatusColor,
         supportingText: _appointmentStatusSupportingText,
         onReschedule: _startReschedule,
+        onCancel: _showCancelSheet,
       );
     }
 
@@ -1594,6 +1713,13 @@ class _BookScreenState extends State<BookScreen>
       return _buildBookingForm(
         key: const ValueKey('reschedule_form'),
         isReschedule: true,
+      );
+    }
+
+    if (_bookingPaused) {
+      return _BookingPausedCard(
+        key: const ValueKey('booking_paused'),
+        reason: _cancelPolicy?.restrictionReason,
       );
     }
 
@@ -2824,6 +2950,7 @@ class _AppointmentManagementView extends StatelessWidget {
   final Color Function(String?) statusColor;
   final String Function(String?) supportingText;
   final VoidCallback onReschedule;
+  final VoidCallback onCancel;
 
   const _AppointmentManagementView({
     super.key,
@@ -2834,6 +2961,7 @@ class _AppointmentManagementView extends StatelessWidget {
     required this.statusColor,
     required this.supportingText,
     required this.onReschedule,
+    required this.onCancel,
   });
 
   @override
@@ -2844,6 +2972,14 @@ class _AppointmentManagementView extends StatelessWidget {
     final isConfirmed = const [
       'approved',
       'confirmed',
+    ].contains((status ?? '').toLowerCase());
+    // Only an appointment that is still ahead can be cancelled.
+    final canCancel = const [
+      'pending',
+      'scheduled',
+      'confirmed',
+      'approved',
+      'rescheduled',
     ].contains((status ?? '').toLowerCase());
 
     return Column(
@@ -3058,6 +3194,31 @@ class _AppointmentManagementView extends StatelessWidget {
           ),
           ),
         ),
+        if (canCancel) ...[
+          const SizedBox(height: 14),
+          FadeSlideIn(
+            index: 3,
+            child: SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: OutlinedButton.icon(
+                onPressed: onCancel,
+                icon: const Icon(Icons.event_busy_rounded, size: 19),
+                label: const Text(
+                  'Cancel Appointment',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: context.palette.primaryText,
+                  side: BorderSide(color: context.palette.primaryBorder),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         Text(
           "You can only manage one active appointment at a time. Pull down to refresh once your appointment status changes.",
@@ -3065,6 +3226,67 @@ class _AppointmentManagementView extends StatelessWidget {
           textAlign: TextAlign.center,
         ),
       ],
+    );
+  }
+}
+
+// ── BOOKING PAUSED ───────────────────────────────────────────────────────────
+
+/// Shown instead of the booking form while the donor's bookings are paused
+/// (too many cancellations in a row).
+class _BookingPausedCard extends StatelessWidget {
+  final String? reason;
+  const _BookingPausedCard({super.key, this.reason});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return FadeSlideIn(
+      child: MergeSemantics(
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: p.warningBg,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: p.warningBorder),
+          ),
+          child: Column(
+            children: [
+              Icon(Icons.pause_circle_rounded, size: 44, color: p.warning),
+              const SizedBox(height: 12),
+              Text(
+                'Booking is paused',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: p.warningText,
+                ),
+              ),
+              if (reason != null && reason!.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  reason!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: p.warningText,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 8),
+              Text(
+                'Our team will review your account. Please contact the '
+                'donation center if you need help.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12.5, color: p.muted, height: 1.5),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
