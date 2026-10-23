@@ -142,6 +142,7 @@ void main() {
               MaterialApp(theme: AppTheme.dark, home: screen.build()),
             );
             await tester.pump(const Duration(milliseconds: 1600));
+            await screen.act?.call(tester);
             found = _whiteSurfaces(tester);
             await tester.pumpWidget(const SizedBox());
             await tester.pump(const Duration(seconds: 10));

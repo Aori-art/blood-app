@@ -55,6 +55,7 @@ Future<void> _meetsContrast(
         ),
       );
       await tester.pump(const Duration(milliseconds: 1600));
+      await screen.act?.call(tester);
       await expectLater(tester, meetsGuideline(textContrastGuideline));
       await tester.pumpWidget(const SizedBox());
       await tester.pump(const Duration(seconds: 10));

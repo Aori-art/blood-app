@@ -440,4 +440,36 @@ void main() {
     });
     handle.dispose();
   });
+
+  for (final dark in [false, true]) {
+    for (final scale in [1.0, 1.3]) {
+      testWidgets(
+        'the bar meets the guidelines (${dark ? 'dark' : 'light'}, text x$scale)',
+        (tester) async {
+          final handle = tester.ensureSemantics();
+          final run = _Run(samplePostsJson());
+          await _with(run, () async {
+            await _pumpFeed(tester, run, dark: dark, scale: scale);
+            // Far enough that the welcome cards (the verified card's small close
+            // button is an existing 18 px target) are off screen.
+            await _scrollDown(tester, 700);
+            expect(_barShown(tester), isTrue);
+            expect(run.overflows, isEmpty, reason: run.overflows.join(' | '));
+            expect(tester.takeException(), isNull);
+            await expectLater(tester, meetsGuideline(textContrastGuideline));
+            await expectLater(
+              tester,
+              meetsGuideline(androidTapTargetGuideline),
+            );
+            await expectLater(
+              tester,
+              meetsGuideline(labeledTapTargetGuideline),
+            );
+            await _close(tester);
+          });
+          handle.dispose();
+        },
+      );
+    }
+  }
 }

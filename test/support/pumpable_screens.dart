@@ -31,10 +31,22 @@ import 'package:blood/streak/streak_home_screen.dart';
 import 'package:blood/streak/streak_ladder_screen.dart';
 import 'package:blood/verify.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart'
+    show WidgetTester, expect, find, findsOneWidget;
 import 'package:http/http.dart' as http;
 
 import 'fake_streak.dart';
 import 'sample_posts.dart';
+
+/// Scrolls the newsfeed down, so "Go to Home" gives way to the category bar.
+Future<void> _scrollFeedDown(WidgetTester tester) async {
+  await tester.drag(find.byType(CustomScrollView), const Offset(0, -700));
+  for (var i = 0; i < 10; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+  // The audits must see the bar (the one blur on this screen).
+  expect(find.byType(BackdropFilter), findsOneWidget);
+}
 
 // UTF-8, like the real server, so posts can carry emoji.
 http.Response okJson(Map<String, dynamic> m) => http.Response.bytes(
@@ -168,12 +180,17 @@ class PumpableScreen {
   /// run is still asserted) and the gap is reported instead.
   final String? lightGap;
 
+  /// Run after the screen has settled, to put it in the state to measure
+  /// (scrolled, a sheet open, ...). Must be a top-level function.
+  final Future<void> Function(WidgetTester tester)? act;
+
   const PumpableScreen(
     this.name,
     this.build, {
     this.prefs = const {},
     this.responses = const {},
     this.lightGap,
+    this.act,
   });
 
   /// The mock server for this screen.
@@ -276,6 +293,14 @@ final List<PumpableScreen> pumpableScreens = [
   PumpableScreen('eligibility check', () => const CheckScreen()),
   PumpableScreen('book', () => const BookScreen()),
   PumpableScreen('newsfeed', () => const NewsfeedPage()),
+  PumpableScreen(
+    'newsfeed (category bar visible)',
+    () => const NewsfeedPage(),
+    responses: {
+      'get_posts.php': {'success': true, 'posts': samplePostsJson()},
+    },
+    act: _scrollFeedDown,
+  ),
   PumpableScreen(
     'newsfeed (every kind of post)',
     () => const NewsfeedPage(),
