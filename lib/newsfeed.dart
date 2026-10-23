@@ -21,6 +21,7 @@ import 'app_palette.dart';
 import 'media_url.dart';
 import 'my_avatar_controller.dart';
 import 'widgets/image_viewer.dart';
+import 'newsfeed/feed_chrome.dart';
 
 // Other files import resolveMediaUrl from here.
 export 'media_url.dart' show resolveMediaUrl;
@@ -582,10 +583,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
                 const SizedBox(height: 2),
                 Text(
                   subParts.join(', '),
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: context.palette.muted,
-                  ),
+                  style: TextStyle(fontSize: 11, color: context.palette.muted),
                 ),
               ],
             ],
@@ -739,10 +737,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: context.palette.muted,
-                  ),
+                  style: TextStyle(fontSize: 11, color: context.palette.muted),
                 ),
               ],
             ],
@@ -808,7 +803,10 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
                 Expanded(
                   child: Text(
                     "This facility isn't accepting donations right now.",
-                    style: TextStyle(fontSize: 11, color: context.palette.warningText),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: context.palette.warningText,
+                    ),
                   ),
                 ),
               ],
@@ -980,10 +978,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
                 const SizedBox(height: 8),
                 Text(
                   "On eDonate since $memberSince",
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: context.palette.muted,
-                  ),
+                  style: TextStyle(fontSize: 12, color: context.palette.muted),
                 ),
               ],
               const SizedBox(height: 16),
@@ -1092,7 +1087,8 @@ class _PostCardState extends State<PostCard> {
   // person sharing it.
   String _shareText() {
     final post = widget.post;
-    String? field(String? v) => (v == null || v.trim().isEmpty) ? null : v.trim();
+    String? field(String? v) =>
+        (v == null || v.trim().isEmpty) ? null : v.trim();
     final lines = <String>[
       '${post.author} on eDonate:',
       post.content,
@@ -1150,11 +1146,7 @@ class _PostCardState extends State<PostCard> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 iconWidget ??
-                    Icon(
-                      icon,
-                      size: 17,
-                      color: color ?? context.palette.muted,
-                    ),
+                    Icon(icon, size: 17, color: color ?? context.palette.muted),
                 const SizedBox(width: 8),
                 Flexible(
                   child: Text(
@@ -1473,7 +1465,9 @@ class _PostCardState extends State<PostCard> {
                   onTap: (_) => _handleLike(),
                   icon: liked ? Icons.favorite : Icons.favorite_border,
                   label: liked ? "Liked" : "Like",
-                  color: liked ? context.palette.primaryText : context.palette.muted,
+                  color: liked
+                      ? context.palette.primaryText
+                      : context.palette.muted,
                   iconWidget: AnimatedScale(
                     scale: _likeIconScale,
                     duration: const Duration(milliseconds: 140),
@@ -1481,7 +1475,9 @@ class _PostCardState extends State<PostCard> {
                     child: Icon(
                       liked ? Icons.favorite : Icons.favorite_border,
                       size: 17,
-                      color: liked ? context.palette.primaryText : context.palette.muted,
+                      color: liked
+                          ? context.palette.primaryText
+                          : context.palette.muted,
                     ),
                   ),
                 ),
@@ -1641,6 +1637,18 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
   final ScrollController _scrollController = ScrollController();
   bool _fabVisible = true;
   double _lastScrollOffset = 0;
+  // The header gets its shadow once the feed has moved under it.
+  bool _scrolled = false;
+
+  // The chip that is selected, and the filter the list shows. The list
+  // fades out, switches, then fades back in.
+  FeedFilter _filter = FeedFilter.all;
+  FeedFilter _shownFilter = FeedFilter.all;
+  bool _listVisible = true;
+  Timer? _filterTimer;
+
+  // Posts that have already played their entrance.
+  final Set<int> _entered = {};
 
   @override
   void initState() {
@@ -1653,6 +1661,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
 
   @override
   void dispose() {
+    _filterTimer?.cancel();
     _scrollController.removeListener(_handleScroll);
     _scrollController.dispose();
     super.dispose();
@@ -1662,6 +1671,9 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     final offset = _scrollController.offset;
     final delta = offset - _lastScrollOffset;
     _lastScrollOffset = offset;
+
+    final scrolled = offset > 2;
+    if (scrolled != _scrolled) setState(() => _scrolled = scrolled);
 
     if (offset <= 0) {
       if (!_fabVisible) setState(() => _fabVisible = true);
@@ -1806,9 +1818,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       return;
     }
     HapticFeedback.selectionClick();
-    await navigator.push(
-      MaterialPageRoute(builder: (_) => const PinScreen()),
-    );
+    await navigator.push(MaterialPageRoute(builder: (_) => const PinScreen()));
     // Back here without unlocking (the user pressed back) — refresh in case
     // anything changed while the PIN screen was open.
     if (mounted) _fetchVerificationStatus();
@@ -1829,11 +1839,18 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       setState(() {
         _posts = posts;
         _loadingPosts = false;
+        // A group that is gone after a refresh falls back to "All".
+        final groups = FeedFilter.available(posts.map((p) => p.type.name));
+        if (!groups.contains(_filter)) {
+          _filterTimer?.cancel();
+          _filter = _shownFilter = FeedFilter.all;
+          _listVisible = true;
+        }
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _postsError = 'Could not load the newsfeed. Pull down to try again.';
+        _postsError = "Couldn't load the feed.";
         _loadingPosts = false;
       });
     }
@@ -1854,20 +1871,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
               child: RefreshIndicator(
                 onRefresh: () =>
                     Future.wait([_loadPosts(), _fetchVerificationStatus()]),
-                child: ListView(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.only(bottom: 110),
-                  children: [
-                    FadeSlideIn(index: 0, child: _buildSignInCta(context)),
-                    if (_isLoggedIn)
-                      FadeSlideIn(index: 1, child: _buildVerifyIdCta(context)),
-                    const SizedBox(height: 16),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: _buildPostsList(),
-                    ),
-                  ],
-                ),
+                child: _buildFeed(context),
               ),
             ),
           ],
@@ -1888,8 +1892,12 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
 
   Widget _buildVerificationBanner(BuildContext context) {
     final isPending = _verificationStatus == 'pending';
-    final bg = isPending ? context.palette.warningBg : context.palette.surfaceAlt;
-    final border = isPending ? context.palette.warningBorder : context.palette.border;
+    final bg = isPending
+        ? context.palette.warningBg
+        : context.palette.surfaceAlt;
+    final border = isPending
+        ? context.palette.warningBorder
+        : context.palette.border;
     final fg = isPending ? context.palette.warningText : context.palette.muted;
     final icon = isPending
         ? Icons.hourglass_top_rounded
@@ -2013,79 +2021,125 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       !_checkingVerification &&
       _verificationStatus == 'verified';
 
-  Widget _buildPostsList() {
+  void _selectFilter(FeedFilter f) {
+    if (f == _filter) return;
+    HapticFeedback.selectionClick();
+    _filterTimer?.cancel();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      setState(() => _filter = _shownFilter = f);
+      return;
+    }
+    setState(() {
+      _filter = f;
+      _listVisible = false;
+    });
+    _filterTimer = Timer(const Duration(milliseconds: 150), () {
+      if (!mounted) return;
+      setState(() {
+        _shownFilter = _filter;
+        _listVisible = true;
+      });
+    });
+  }
+
+  /// The feed: the welcome cards and filter chips, then one row per post,
+  /// built as it scrolls into view.
+  Widget _buildFeed(BuildContext context) {
+    final filters = FeedFilter.available(_posts.map((p) => p.type.name));
+    final top = <Widget>[
+      FadeSlideIn(index: 0, child: _buildSignInCta(context)),
+      if (_isLoggedIn) FadeSlideIn(index: 1, child: _buildVerifyIdCta(context)),
+      const SizedBox(height: 8),
+      if (!_loadingPosts && _postsError == null && filters.isNotEmpty)
+        FeedFilterBar(
+          filters: filters,
+          selected: _filter,
+          onSelected: _selectFilter,
+        ),
+      const SizedBox(height: 8),
+    ];
+
+    Widget? message;
     if (_loadingPosts) {
-      return Padding(
-        padding: EdgeInsets.symmetric(vertical: 40),
-        child: Center(
-          child: CircularProgressIndicator(color: context.palette.primaryText),
-        ),
-      );
+      message = const FeedSkeleton();
+    } else if (_postsError != null) {
+      message = FeedMessage(message: _postsError!, onRetry: _loadPosts);
+    } else if (_posts.isEmpty) {
+      message = const FeedMessage(message: 'No posts yet. Check back soon!');
     }
+    final shown = message != null
+        ? const <Post>[]
+        : _posts.where((p) => _shownFilter.matches(p.type.name)).toList();
+    final count = top.length + (message != null ? 1 : shown.length + 1);
 
-    if (_postsError != null) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 40),
-        child: Column(
-          children: [
-            Icon(Icons.wifi_off, color: context.palette.muted, size: 32),
-            const SizedBox(height: 8),
-            Text(
-              _postsError!,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: context.palette.muted),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton(onPressed: _loadPosts, child: const Text("Retry")),
-          ],
-        ),
-      );
-    }
-
-    if (_posts.isEmpty) {
-      return Padding(
-        padding: EdgeInsets.symmetric(vertical: 40),
-        child: Center(
-          child: Text(
-            "No posts yet. Check back soon!",
-            style: TextStyle(fontSize: 13, color: context.palette.muted),
-          ),
-        ),
-      );
-    }
-
-    return Column(
-      children: [
-        for (int i = 0; i < _posts.length; i++) ...[
-          FadeSlideIn(
-            index: i,
-            child: PostCard(
-              key: ValueKey(_posts[i].id),
-              post: _posts[i],
-              canDonate: _canDonate,
-              isLoggedIn: _isLoggedIn,
-              verificationStatus: _verificationStatus,
-              onVerificationChanged: _fetchVerificationStatus,
+    return ListView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.only(bottom: 110),
+      itemCount: count,
+      itemBuilder: (context, index) {
+        if (index < top.length) return top[index];
+        final i = index - top.length;
+        if (message != null) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: message,
+          );
+        }
+        if (i == shown.length) {
+          return AnimatedOpacity(
+            opacity: _listVisible ? 1 : 0,
+            duration: const Duration(milliseconds: 150),
+            child: const CaughtUpFooter(),
+          );
+        }
+        return KeyedSubtree(
+          key: ValueKey('post-${shown[i].id}'),
+          child: AnimatedOpacity(
+            opacity: _listVisible ? 1 : 0,
+            duration: const Duration(milliseconds: 150),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: _entrance(i, shown[i]),
             ),
           ),
-          const SizedBox(height: 12),
-        ],
-      ],
+        );
+      },
     );
   }
 
+  /// The first cards slide in one after another; cards further down fade in
+  /// the first time they are built. A card plays its entrance only once.
+  Widget _entrance(int i, Post post) {
+    final card = PostCard(
+      key: ValueKey(post.id),
+      post: post,
+      canDonate: _canDonate,
+      isLoggedIn: _isLoggedIn,
+      verificationStatus: _verificationStatus,
+      onVerificationChanged: _fetchVerificationStatus,
+    );
+    if (!_entered.add(post.id)) return card;
+    if (i < 6) return FadeSlideIn(index: i, child: card);
+    return FadeSlideIn(child: card);
+  }
+
   Widget _buildHeader(BuildContext context) {
-    return Container(
+    final p = context.palette;
+    // Flat at the top; a soft shadow (a hairline in dark) fades in once the
+    // feed scrolls under it.
+    return AnimatedContainer(
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 200),
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
       decoration: BoxDecoration(
-        color: context.palette.surface,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+        color: p.surface,
+        border: Border(
+          bottom: BorderSide(
+            color: _scrolled && p.isDark ? p.border : p.border.withAlpha(0),
           ),
-        ],
+        ),
+        boxShadow: _scrolled ? p.shadow : const [],
       ),
       child: Row(
         children: [
@@ -2210,10 +2264,10 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     if (!_checkedLogin) return const SizedBox.shrink();
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -2247,7 +2301,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
                           : "Become a Donor Today",
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 18,
+                        fontSize: 17,
                         fontWeight: FontWeight.w900,
                         height: 1.2,
                       ),
@@ -2268,12 +2322,12 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
               ),
               Icon(
                 Icons.water_drop,
-                size: 40,
+                size: 34,
                 color: Colors.white.withOpacity(0.3),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Row(
@@ -2433,7 +2487,8 @@ class _VerificationCard extends StatelessWidget {
     ),
   );
 
-  Widget _card(BuildContext context, {
+  Widget _card(
+    BuildContext context, {
     required IconData icon,
     required Color iconBg,
     required Color accent,

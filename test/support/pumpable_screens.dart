@@ -35,8 +35,12 @@ import 'package:http/http.dart' as http;
 
 import 'fake_streak.dart';
 
-http.Response okJson(Map<String, dynamic> m) =>
-    http.Response(jsonEncode(m), 200);
+// UTF-8, like the real server, so posts can carry emoji.
+http.Response okJson(Map<String, dynamic> m) => http.Response.bytes(
+  utf8.encode(jsonEncode(m)),
+  200,
+  headers: {'content-type': 'application/json; charset=utf-8'},
+);
 
 Future<http.Response> pumpableServer(http.Request r) async {
   switch (r.url.path.split('/').last) {
