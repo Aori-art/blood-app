@@ -25,7 +25,7 @@ import 'streak/frame_picker.dart';
 import 'streak/streak_controller.dart';
 import 'unread_notifications.dart';
 import 'donor_avatar.dart';
-import 'streak/streak_ladder_screen.dart';
+import 'streak/streak_routes.dart';
 import 'theme_controller.dart';
 import 'theme_transition.dart';
 import 'verify.dart';
@@ -785,7 +785,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   );
 
   /// The current streak (from what StreakController already has); opens the
-  /// Streak Ladder.
+  /// streak home.
   Widget _streakChip() => ListenableBuilder(
     listenable: StreakController.instance,
     builder: (context, _) {
@@ -795,10 +795,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         type: MaterialType.transparency,
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const StreakLadderScreen()),
-          ),
+          onTap: () => Navigator.push(context, streakHomeRoute()),
           child: Ink(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
             decoration: BoxDecoration(

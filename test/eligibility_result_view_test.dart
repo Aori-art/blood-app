@@ -254,7 +254,11 @@ void main() {
     final state = tester.state<ResultStageState>(find.byType(ResultStage));
     final first = state.currentLine;
     expect(kResultLines.values.expand((l) => l), contains(first));
-    await tester.tap(find.byType(InteractiveDugtong), warnIfMissed: false);
+    // Its tap test uses the wall clock, so a slow run could read a tap as a
+    // hold: trigger the tap directly.
+    tester
+        .state<InteractiveDugtongState>(find.byType(InteractiveDugtong))
+        .tapNow();
     await tester.pump(const Duration(seconds: 2));
     expect(state.currentLine, isNot(first));
     await _tearDown(tester);

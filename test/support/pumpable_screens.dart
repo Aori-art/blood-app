@@ -27,10 +27,13 @@ import 'package:blood/screens/register/register1.dart';
 import 'package:blood/screens/register/register2.dart';
 import 'package:blood/screens/register/register3.dart';
 import 'package:blood/splash_screen/splash_screen.dart';
+import 'package:blood/streak/streak_home_screen.dart';
 import 'package:blood/streak/streak_ladder_screen.dart';
 import 'package:blood/verify.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+
+import 'fake_streak.dart';
 
 http.Response okJson(Map<String, dynamic> m) =>
     http.Response(jsonEncode(m), 200);
@@ -279,6 +282,21 @@ final List<PumpableScreen> pumpableScreens = [
   PumpableScreen('digital ID', () => const DigitalIdScreen()),
   PumpableScreen('blood requests', () => const BloodRequestsScreen()),
   PumpableScreen('streak ladder', () => const StreakLadderScreen()),
+  PumpableScreen(
+    'streak ladder (with data)',
+    () => const StreakLadderScreen(),
+    responses: {'get_streak.php': fakeStreak(equipped: 'bronze').toJson()},
+  ),
+  PumpableScreen(
+    'streak home',
+    () => const StreakHomeScreen(),
+    responses: {'get_streak.php': fakeStreak().toJson()},
+  ),
+  PumpableScreen(
+    'streak home (no streak yet)',
+    () => const StreakHomeScreen(),
+    responses: {'get_streak.php': fakeStreak(current: 0).toJson()},
+  ),
   PumpableScreen(
     'home',
     () => HomeContent(onNavigateToTab: (_) {}),

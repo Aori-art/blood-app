@@ -54,7 +54,9 @@ class NotificationService {
     if (_initialized) return;
     _initialized = true;
 
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    // The status-bar icon: the white Dugtong silhouette (a drawable), not the
+    // colored launcher icon.
+    const androidInit = AndroidInitializationSettings('ic_stat_edonate');
     const initSettings = InitializationSettings(android: androidInit);
 
     await _localNotifications.initialize(

@@ -61,13 +61,21 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 
 
-  flutter_launcher_icons: ^0.13.1
+  flutter_launcher_icons: ^0.14.4
 
 
 flutter_launcher_icons:
-  android: true
-  ios: true
-  image_path: "assets/images/eDonateIcon.png"
+  android: "ic_launcher"
+  ios: false
+  image_path: "assets/branding/edonate_icon_1024.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "assets/branding/ic_launcher_background.png"
+  adaptive_icon_foreground: "assets/branding/ic_launcher_foreground.png"
+  adaptive_icon_monochrome: "assets/branding/ic_launcher_monochrome.png"
+  # The adaptive layers already include the safe-zone padding (and the bag
+  # runs off the bottom edge on purpose): no extra inset.
+  adaptive_icon_foreground_inset: 0
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
@@ -81,6 +89,7 @@ flutter:
 
   assets:
     - assets/images/1.png
+    - assets/branding/
 
 
   # To add assets to your application, add an assets section, like this:

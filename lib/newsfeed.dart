@@ -18,6 +18,7 @@ import 'config.dart';
 import 'donor_avatar.dart';
 import 'verify.dart';
 import 'app_palette.dart';
+import 'widgets/edonate_logo.dart';
 // The palette lives in app_colors.dart; it is re-exported so files that took
 // AppColors from here keep working.
 export 'app_colors.dart';
@@ -2349,20 +2350,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       ),
       child: Row(
         children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: AppColors.primaryGradient,
-              ),
-            ),
-            alignment: Alignment.center,
-            child: const Icon(Icons.water_drop, color: Colors.white, size: 18),
-          ),
+          const EdonateLogo(),
           const SizedBox(width: 8),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,

@@ -25,7 +25,7 @@ const Map<DugtongReaction, List<String>> _reactionLines = {
 
 const String _dizzyLine = 'Dizzy... too many taps!';
 
-/// A big, playful Dugtong for the Streak Ladder.
+/// A big, playful Dugtong for the streak home (and the Check results).
 ///
 /// * Hold and drag: it is picked up (a little bigger, with a soft shadow) and
 ///   follows the finger anywhere inside [limitKey]'s box and a little beyond,
@@ -59,6 +59,10 @@ class InteractiveDugtong extends StatefulWidget {
   /// the idle drift.
   final Offset? restingLook;
 
+  /// Called whenever it moves away from (or back to) its home spot, with the
+  /// offset from home. Optional: other screens leave it out.
+  final ValueChanged<Offset>? onDragOffset;
+
   /// Test hooks.
   final math.Random? random;
   final DateTime Function()? clock;
@@ -73,6 +77,7 @@ class InteractiveDugtong extends StatefulWidget {
     this.speaks = true,
     this.onTapped,
     this.restingLook,
+    this.onDragOffset,
     this.random,
     this.clock,
   });
@@ -242,6 +247,7 @@ class InteractiveDugtongState extends State<InteractiveDugtong>
       _resist(raw.dx, range.left, range.right),
       _resist(raw.dy, range.top, range.bottom),
     );
+    widget.onDragOffset?.call(_offset);
     final v = _tracker?.getVelocity().pixelsPerSecond ?? Offset.zero;
     // Eyes look where it is going; the body leans into the movement.
     final aim = Offset(
@@ -290,6 +296,7 @@ class InteractiveDugtongState extends State<InteractiveDugtong>
     }
     if (_reduce) {
       // No bounce, no spin: just put it back.
+      widget.onDragOffset?.call(Offset.zero);
       setState(() {
         _offset = Offset.zero;
         _tilt = 0;
@@ -323,6 +330,7 @@ class InteractiveDugtongState extends State<InteractiveDugtong>
     final t = (elapsed - _springStart).inMicroseconds / 1e6;
     if (sx.isDone(t) && sy.isDone(t)) {
       _stopSpring();
+      widget.onDragOffset?.call(Offset.zero);
       setState(() {
         _offset = Offset.zero;
         _tilt = 0;
@@ -330,6 +338,7 @@ class InteractiveDugtongState extends State<InteractiveDugtong>
       });
       return;
     }
+    widget.onDragOffset?.call(Offset(sx.x(t), sy.x(t)));
     setState(() {
       _offset = Offset(sx.x(t), sy.x(t));
       _velocity = Offset(sx.dx(t), sy.dx(t));
