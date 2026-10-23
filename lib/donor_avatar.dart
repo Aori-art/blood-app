@@ -34,7 +34,15 @@ class DonorAvatar extends StatelessWidget {
     this.fallback,
     this.placeholderColor,
     this.decodeAtSize = false,
+    this.heroTag,
+    this.onTap,
   });
+
+  /// A Hero around the round photo only (never the frame ring), so the photo
+  /// can fly into a full-screen viewer while the ring stays where it is.
+  final Object? heroTag;
+
+  final VoidCallback? onTap;
 
   /// Shown instead of the crimson-tinted letter when there is no photo (or it
   /// fails to load). Sized by the avatar's circle.
@@ -103,7 +111,7 @@ class DonorAvatar extends StatelessWidget {
     Widget avatar = StreakAvatarFrame(
       frameKey: frame,
       radius: radius,
-      child: circle,
+      child: heroTag == null ? circle : Hero(tag: heroTag!, child: circle),
     );
     if (reserveFrameSpace) {
       final extent = streakFrameExtent(radius);
@@ -111,6 +119,13 @@ class DonorAvatar extends StatelessWidget {
         width: extent,
         height: extent,
         child: Center(child: avatar),
+      );
+    }
+    if (onTap != null) {
+      avatar = GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: avatar,
       );
     }
     return Semantics(

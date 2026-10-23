@@ -27,6 +27,10 @@ class MyAvatar extends StatelessWidget {
   /// frame on the donor's own photo).
   final String? frameOverride;
 
+  /// A Hero around the round photo only (see DonorAvatar.heroTag).
+  final Object? heroTag;
+  final VoidCallback? onTap;
+
   const MyAvatar({
     super.key,
     required this.radius,
@@ -34,6 +38,8 @@ class MyAvatar extends StatelessWidget {
     this.onGradient = false,
     this.ringColor,
     this.frameOverride,
+    this.heroTag,
+    this.onTap,
   });
 
   @override
@@ -72,6 +78,8 @@ class MyAvatar extends StatelessWidget {
         fallback: fallback,
         placeholderColor: context.palette.surfaceAlt,
         decodeAtSize: true,
+        heroTag: heroTag,
+        onTap: onTap,
       );
       final ring = ringColor;
       // A frame draws its own ring; the plain outline is for no frame.
