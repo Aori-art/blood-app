@@ -21,10 +21,10 @@ import 'privacy_security.dart';
 import 'privacy_statement.dart';
 import 'shared_design.dart';
 import 'skeleton.dart';
-import 'streak/avatar_frame.dart';
 import 'streak/frame_picker.dart';
 import 'streak/streak_controller.dart';
 import 'unread_notifications.dart';
+import 'my_avatar.dart';
 import 'my_avatar_controller.dart';
 import 'streak/streak_routes.dart';
 import 'theme_controller.dart';
@@ -661,25 +661,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ),
                 ],
               ),
-              child: ListenableBuilder(
-                listenable: StreakController.instance,
-                builder: (context, _) => StreakAvatarFrame(
-                  frameKey: StreakController.instance.equippedFrame,
-                  radius: _avatarRadius,
-                  child: CircleAvatar(
-                    radius: _avatarRadius,
-                    backgroundColor: kCrimson,
-                    child: Text(
-                      initials(name),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+              // The donor's own photo and frame (initials without a photo).
+              child: const MyAvatar(radius: _avatarRadius),
             ),
           ),
         ),

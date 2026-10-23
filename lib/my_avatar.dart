@@ -4,6 +4,7 @@ import 'app_palette.dart';
 import 'donor_avatar.dart';
 import 'my_avatar_controller.dart';
 import 'shared_design.dart' show kCrimson;
+import 'streak/avatar_frame.dart';
 import 'streak/streak_controller.dart';
 
 /// The signed-in donor's own avatar: their photo (from [MyAvatarController])
@@ -73,7 +74,9 @@ class MyAvatar extends StatelessWidget {
         decodeAtSize: true,
       );
       final ring = ringColor;
-      if (frame == null && ring != null) {
+      // A frame draws its own ring; the plain outline is for no frame.
+      final framed = frame != null && kStreakFrameKeys.contains(frame);
+      if (!framed && ring != null) {
         avatar = Container(
           padding: const EdgeInsets.all(3),
           decoration: BoxDecoration(

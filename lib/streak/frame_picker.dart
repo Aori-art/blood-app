@@ -7,6 +7,7 @@ import '../verify.dart';
 import 'avatar_frame.dart';
 import 'streak_controller.dart';
 import '../app_palette.dart';
+import '../my_avatar.dart';
 
 const ColorFilter _kGray = ColorFilter.matrix(<double>[
   0.2126,
@@ -250,18 +251,8 @@ class _FrameCatalogSheetState extends State<_FrameCatalogSheet> {
     );
   }
 
-  Widget _avatar(double radius) => CircleAvatar(
-    radius: radius,
-    backgroundColor: kCrimson,
-    child: Text(
-      widget.initials,
-      style: TextStyle(
-        color: Colors.white,
-        fontWeight: FontWeight.bold,
-        fontSize: radius * 0.72,
-      ),
-    ),
-  );
+  // The donor's own photo (initials without one); each tile adds its frame.
+  Widget _avatar(double radius) => MyAvatar(radius: radius, showFrame: false);
 
   Widget _tile({
     required Widget avatar,
@@ -554,18 +545,7 @@ class _RequirementDialogState extends State<_RequirementDialog> {
               child: StreakAvatarFrame(
                 frameKey: f.key,
                 radius: 30,
-                child: CircleAvatar(
-                  radius: 30,
-                  backgroundColor: kCrimson,
-                  child: Text(
-                    widget.initials,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 21,
-                    ),
-                  ),
-                ),
+                child: const MyAvatar(radius: 30, showFrame: false),
               ),
             ),
           ),

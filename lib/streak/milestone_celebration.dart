@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:blood/app_colors.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../main.dart' show appNavigatorKey;
 import '../shared_design.dart';
@@ -15,6 +14,7 @@ import 'streak_particles.dart';
 import 'streak_ladder_screen.dart' show badgeVisualFor;
 import 'streak_share.dart';
 import '../app_palette.dart';
+import '../my_avatar.dart';
 
 const Color _kGold = Color(0xFFFFD54F);
 
@@ -178,7 +178,6 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
   bool _hapticCharge = false;
   bool _hapticBurst = false;
   bool _hapticReveal = false;
-  String _initials = '?';
   bool _equipBusy = false;
   bool _shareBusy = false;
   String? _error;
@@ -325,7 +324,6 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
       // a few milliseconds): this is the tap guard.
       animationBehavior: AnimationBehavior.preserve,
     )..forward();
-    _loadName();
   }
 
   @override
@@ -340,11 +338,6 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
     }
   }
 
-  Future<void> _loadName() async {
-    final prefs = await SharedPreferences.getInstance();
-    final name = prefs.getString('userName') ?? '';
-    if (mounted) setState(() => _initials = streakInitials(name));
-  }
 
   void _onTick() {
     final ms = _clock.value * _t.total;
@@ -953,18 +946,9 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
   // Reduced motion: just fade the card in.
   double _fadeIn(double ms) => (_guard.value * 1500 / 400).clamp(0.0, 1.0);
 
-  Widget _avatar(double radius) => CircleAvatar(
-    radius: radius,
-    backgroundColor: kCrimson,
-    child: Text(
-      _initials,
-      style: TextStyle(
-        color: Colors.white,
-        fontWeight: FontWeight.bold,
-        fontSize: radius * 0.7,
-      ),
-    ),
-  );
+  // The donor's own photo (initials without one); the frame is drawn around
+  // it by the reveal.
+  Widget _avatar(double radius) => MyAvatar(radius: radius, showFrame: false);
 
   Widget _rewardVisual(double r) {
     const box = 96.0;
