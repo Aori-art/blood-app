@@ -34,6 +34,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import 'fake_streak.dart';
+import 'sample_posts.dart';
 
 // UTF-8, like the real server, so posts can carry emoji.
 http.Response okJson(Map<String, dynamic> m) => http.Response.bytes(
@@ -275,6 +276,13 @@ final List<PumpableScreen> pumpableScreens = [
   PumpableScreen('eligibility check', () => const CheckScreen()),
   PumpableScreen('book', () => const BookScreen()),
   PumpableScreen('newsfeed', () => const NewsfeedPage()),
+  PumpableScreen(
+    'newsfeed (every kind of post)',
+    () => const NewsfeedPage(),
+    responses: {
+      'get_posts.php': {'success': true, 'posts': samplePostsJson()},
+    },
+  ),
   PumpableScreen('donation history', () => const DonationHistoryScreen()),
   PumpableScreen(
     'donation history (with donations)',

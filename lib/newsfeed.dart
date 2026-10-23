@@ -1233,6 +1233,12 @@ class _PostCardState extends State<PostCard> {
   String? get _status {
     final post = widget.post;
     final written = _parsed.row(InfoKind.status)?.value;
+    // The server's flag wins over text that still says "Open".
+    if (post.isDonation &&
+        !post.donationOpen &&
+        (written == null || written.toLowerCase().contains('open'))) {
+      return 'Closed';
+    }
     if (written != null) return written;
     if (post.type == PostType.event && post.isDonation) {
       return post.donationOpen ? 'Open' : 'Closed';
