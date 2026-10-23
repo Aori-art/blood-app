@@ -22,6 +22,8 @@ import 'media_url.dart';
 import 'my_avatar_controller.dart';
 import 'widgets/image_viewer.dart';
 import 'newsfeed/feed_chrome.dart';
+import 'newsfeed/post_content_parser.dart';
+import 'newsfeed/post_parts.dart';
 
 // Other files import resolveMediaUrl from here.
 export 'media_url.dart' show resolveMediaUrl;
@@ -242,37 +244,6 @@ Widget netImage(String url, {BoxFit fit = BoxFit.cover}) {
       return Container(color: context.palette.surfaceAlt);
     },
   );
-}
-
-// ── Pressable post image (press-in scale + full-screen viewer) ─────────────
-
-class _PressableImage extends StatefulWidget {
-  final Widget child;
-  final VoidCallback onTap;
-  const _PressableImage({required this.child, required this.onTap});
-
-  @override
-  State<_PressableImage> createState() => _PressableImageState();
-}
-
-class _PressableImageState extends State<_PressableImage> {
-  double _scale = 1.0;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _scale = 1.03),
-      onTapUp: (_) => setState(() => _scale = 1.0),
-      onTapCancel: () => setState(() => _scale = 1.0),
-      onTap: widget.onTap,
-      child: AnimatedScale(
-        scale: _scale,
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOut,
-        child: widget.child,
-      ),
-    );
-  }
 }
 
 // ── Poster (admin/facility) profile preview sheet ───────────────────────────
@@ -1043,6 +1014,9 @@ class _PostCardState extends State<PostCard> {
   late int commentCount;
   double _likeIconScale = 1.0;
 
+  // The text split into title, info rows and body, read once per text.
+  late ParsedPost _parsed = parsePostContent(widget.post.content);
+
   @override
   void initState() {
     super.initState();
@@ -1054,6 +1028,9 @@ class _PostCardState extends State<PostCard> {
   @override
   void didUpdateWidget(covariant PostCard oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.post.content != widget.post.content) {
+      _parsed = parsePostContent(widget.post.content);
+    }
     if (oldWidget.post.liked != widget.post.liked ||
         oldWidget.post.likes != widget.post.likes) {
       setState(() {
@@ -1126,48 +1103,6 @@ class _PostCardState extends State<PostCard> {
     }
   }
 
-  // One of the three equal-width buttons under a post.
-  Widget _actionButton({
-    required void Function(BuildContext buttonContext) onTap,
-    required IconData icon,
-    required String label,
-    Color? color,
-    Widget? iconWidget,
-  }) {
-    return Expanded(
-      child: Builder(
-        builder: (buttonContext) => InkWell(
-          onTap: () => onTap(buttonContext),
-          borderRadius: BorderRadius.circular(999),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                iconWidget ??
-                    Icon(icon, size: 17, color: color ?? context.palette.muted),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: color ?? context.palette.muted,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   String _countLabel(int n, String one, String many) =>
       '${formatCount(n)} ${n == 1 ? one : many}';
 
@@ -1175,13 +1110,15 @@ class _PostCardState extends State<PostCard> {
     final wasLiked = liked;
     final previousCount = likeCount;
 
+    HapticFeedback.lightImpact();
     setState(() {
       liked = !liked;
       likeCount += liked ? 1 : -1;
     });
     if (liked) {
-      setState(() => _likeIconScale = 1.4);
-      Future.delayed(const Duration(milliseconds: 140), () {
+      // A quick pop: 1 → 1.3 → 1 in about 250 ms.
+      setState(() => _likeIconScale = 1.3);
+      Future.delayed(const Duration(milliseconds: 125), () {
         if (mounted) setState(() => _likeIconScale = 1.0);
       });
     }
@@ -1241,372 +1178,542 @@ class _PostCardState extends State<PostCard> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final post = widget.post;
+  // A double tap on the photo only ever likes; it never takes a like back.
+  void _likeFromImage() {
+    if (!liked) _handleLike();
+  }
 
-    return Container(
-      decoration: BoxDecoration(
-        color: context.palette.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: context.palette.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+  void _copyText() {
+    Clipboard.setData(ClipboardData(text: widget.post.content));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Copied'),
+        behavior: SnackBarBehavior.floating,
       ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    );
+  }
+
+  void _openDonate() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BookScreen(
+          showBackButton: true,
+          preselectedFacilityId: widget.post.donationFacilityId,
+        ),
+      ),
+    );
+  }
+
+  // ── Reading the post ───────────────────────────────────────────────────
+
+  bool get _isOfficial =>
+      widget.post.authorType == 'admin' || widget.post.authorType == 'facility';
+
+  static String? _field(String? v) =>
+      (v == null || v.trim().isEmpty) ? null : v.trim();
+
+  /// The rows for the info panel: what the text lists, plus the post's own
+  /// date and place when the text leaves them out. Status gets a chip.
+  List<InfoRow> _infoRows() {
+    final post = widget.post;
+    final rows = _parsed.rows.where((r) => r.kind != InfoKind.status).toList();
+    final date = _field(post.eventDate);
+    if (date != null && _parsed.row(InfoKind.date) == null) {
+      rows.insert(0, InfoRow(kind: InfoKind.date, label: 'Date', value: date));
+    }
+    final place = _field(post.eventLocation);
+    if (place != null && _parsed.row(InfoKind.location) == null) {
+      rows.add(
+        InfoRow(kind: InfoKind.location, label: 'Location', value: place),
+      );
+    }
+    return rows;
+  }
+
+  String? get _status {
+    final post = widget.post;
+    final written = _parsed.row(InfoKind.status)?.value;
+    if (written != null) return written;
+    if (post.type == PostType.event && post.isDonation) {
+      return post.donationOpen ? 'Open' : 'Closed';
+    }
+    return null;
+  }
+
+  /// What a screen reader hears for the header, e.g. "Official event by
+  /// eDonate, 1 week ago, Capstone, Mon, October 12, 2026, Open".
+  String _summary(List<InfoRow> rows) {
+    final post = widget.post;
+    final kind = switch (post.type) {
+      PostType.event => 'event',
+      PostType.urgent => 'urgent request',
+      PostType.milestone => 'milestone',
+      PostType.story => 'post',
+    };
+    final who = '${_isOfficial ? 'Official ' : ''}$kind by ${post.author}';
+    final date = rows.where((r) => r.kind == InfoKind.date).firstOrNull;
+    return [
+      who[0].toUpperCase() + who.substring(1),
+      post.timeAgo,
+      _parsed.title,
+      date?.value,
+      _status,
+    ].whereType<String>().where((s) => s.trim().isNotEmpty).join(', ');
+  }
+
+  // ── Look ───────────────────────────────────────────────────────────────
+
+  Widget _avatar(BuildContext context) {
+    final p = context.palette;
+    final post = widget.post;
+    final url = post.authorAvatar.trim();
+    final Widget face;
+    if (url.isNotEmpty) {
+      face = netImage(url);
+    } else if (post.authorType == 'admin') {
+      face = ColoredBox(
+        color: p.surface,
+        child: const Padding(
+          padding: EdgeInsets.all(3),
+          child: EdonateLogo(size: 34),
+        ),
+      );
+    } else {
+      final name = post.author.trim();
+      face = ColoredBox(
+        color: p.accentBg,
+        child: Center(
+          child: Text(
+            name.isEmpty ? '?' : name.characters.first.toUpperCase(),
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: p.primaryText,
+            ),
+          ),
+        ),
+      );
+    }
+
+    final photo = Hero(
+      tag: 'author_avatar_${post.id}',
+      child: ClipOval(child: face),
+    );
+    if (!_isOfficial) {
+      return Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: p.border),
+        ),
+        child: photo,
+      );
+    }
+    // Official posters: a brand ring and a check.
+    return SizedBox(
+      width: 44,
+      height: 44,
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          // Header
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-            child: InkWell(
-              onTap: () => _showPosterPreview(context, post: post),
-              borderRadius: BorderRadius.circular(10),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Hero(
-                        tag: 'author_avatar_${post.id}',
-                        child: Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: AppColors.primary.withOpacity(0.2),
-                              width: 2,
-                            ),
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: netImage(post.authorAvatar),
-                        ),
-                      ),
-                      if (post.type == PostType.urgent)
-                        Positioned(
-                          bottom: -2,
-                          right: -2,
-                          child: Container(
-                            width: 16,
-                            height: 16,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
-                            ),
-                            child: const Icon(
-                              Icons.water_drop,
-                              size: 8,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Wrap(
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          spacing: 8,
-                          runSpacing: 4,
-                          children: [
-                            Text(
-                              post.author,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: context.palette.foreground,
-                              ),
-                            ),
-                            if (post.urgency != null)
-                              UrgencyBadge(urgency: post.urgency!),
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        Row(
-                          children: [
-                            if (post.authorBadge != null) ...[
-                              Icon(
-                                Icons.emoji_events,
-                                size: 10,
-                                color: context.palette.primaryText,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                post.authorBadge!,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
-                                  color: context.palette.primaryText,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                "·",
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: context.palette.muted,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                            ],
-                            Text(
-                              post.timeAgo,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: context.palette.muted,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Post text
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: Text(
-              post.content,
-              style: TextStyle(
-                fontSize: 13.5,
-                height: 1.5,
-                color: context.palette.foreground,
-              ),
-            ),
-          ),
-
-          // Post image
-          if (post.image != null)
-            _PressableImage(
-              onTap: () => openImageViewer(
-                context,
-                imageUrls: [post.image!],
-                initialIndex: 0,
-                heroTagPrefix: 'post_image_${post.id}',
-              ),
-              child: Hero(
-                tag: 'post_image_${post.id}_0',
-                child: Container(
-                  color: context.palette.surfaceAlt,
-                  constraints: const BoxConstraints(maxHeight: 240),
-                  width: double.infinity,
-                  child: netImage(post.image!),
-                ),
-              ),
-            ),
-
-          // Donate block — only for open donation posts, and only when the
-          // viewer is a verified, logged-in donor.
-          if (post.isDonation && post.donationOpen && widget.canDonate)
-            _DonateBlock(post: post),
-
-          // Counts row — only when there is something to count.
-          if (likeCount > 0 || commentCount > 0)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-              child: Row(
-                children: [
-                  if (likeCount > 0)
-                    Text(
-                      _countLabel(likeCount, 'like', 'likes'),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: context.palette.muted,
-                      ),
-                    ),
-                  const Spacer(),
-                  if (commentCount > 0)
-                    InkWell(
-                      onTap: _openComments,
-                      borderRadius: BorderRadius.circular(6),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 2,
-                        ),
-                        child: Text(
-                          _countLabel(commentCount, 'comment', 'comments'),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: context.palette.muted,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-
-          // Action bar: Like, Comment, Share
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: context.palette.border)),
+            padding: const EdgeInsets.all(2),
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: AppColors.primaryGradient,
+              ),
             ),
-            child: Row(
-              children: [
-                _actionButton(
-                  onTap: (_) => _handleLike(),
-                  icon: liked ? Icons.favorite : Icons.favorite_border,
-                  label: liked ? "Liked" : "Like",
-                  color: liked
-                      ? context.palette.primaryText
-                      : context.palette.muted,
-                  iconWidget: AnimatedScale(
-                    scale: _likeIconScale,
-                    duration: const Duration(milliseconds: 140),
-                    curve: Curves.easeOut,
-                    child: Icon(
-                      liked ? Icons.favorite : Icons.favorite_border,
-                      size: 17,
-                      color: liked
-                          ? context.palette.primaryText
-                          : context.palette.muted,
-                    ),
-                  ),
-                ),
-                _actionButton(
-                  onTap: (_) => _openComments(),
-                  icon: Icons.mode_comment_outlined,
-                  label: "Comment",
-                ),
-                _actionButton(
-                  onTap: _handleShare,
-                  icon: Icons.ios_share_rounded,
-                  label: "Share",
-                ),
-              ],
+            child: Container(
+              padding: const EdgeInsets.all(1.5),
+              decoration: BoxDecoration(
+                color: p.surface,
+                shape: BoxShape.circle,
+              ),
+              child: photo,
+            ),
+          ),
+          Positioned(
+            right: -3,
+            bottom: -3,
+            child: Container(
+              width: 18,
+              height: 18,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                shape: BoxShape.circle,
+                border: Border.all(color: p.surface, width: 2),
+              ),
+              child: const Icon(
+                Icons.check_rounded,
+                size: 10,
+                color: Colors.white,
+              ),
             ),
           ),
         ],
       ),
     );
   }
-}
 
-// ── Donate block (shown on open donation posts to verified donors) ────────
-
-class _DonateBlock extends StatefulWidget {
-  final Post post;
-  const _DonateBlock({required this.post});
-
-  @override
-  State<_DonateBlock> createState() => _DonateBlockState();
-}
-
-class _DonateBlockState extends State<_DonateBlock> {
-  double _scale = 1.0;
-
-  Widget _detailRow(IconData icon, String text) => Row(
-    children: [
-      Icon(icon, size: 14, color: context.palette.primaryText),
-      const SizedBox(width: 6),
-      Expanded(
-        child: Text(
-          text,
-          style: TextStyle(fontSize: 12, color: context.palette.foreground),
+  ({String label, Color bg, Color fg}) _typeStyle(AppPalette p) =>
+      switch (widget.post.type) {
+        PostType.event => (label: 'EVENT', bg: p.accentBg, fg: p.primaryText),
+        PostType.urgent => (
+          label: 'URGENT',
+          bg: AppColors.critical.withValues(alpha: p.isDark ? 0.18 : 0.08),
+          fg: p.criticalText,
         ),
-      ),
-    ],
-  );
+        PostType.milestone => (
+          label: 'MILESTONE',
+          bg: p.warningBg,
+          fg: p.warningText,
+        ),
+        PostType.story => (label: 'STORY', bg: p.infoBg, fg: p.infoText),
+      };
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _header(BuildContext context, List<InfoRow> rows) {
+    final p = context.palette;
     final post = widget.post;
-    final hasDate = post.eventDate != null && post.eventDate!.isNotEmpty;
-    final hasLocation =
-        post.eventLocation != null && post.eventLocation!.isNotEmpty;
-
-    final detailRows = <Widget>[];
-    if (hasDate)
-      detailRows.add(_detailRow(Icons.event_rounded, post.eventDate!));
-    if (hasLocation) {
-      if (detailRows.isNotEmpty) detailRows.add(const SizedBox(height: 6));
-      detailRows.add(
-        _detailRow(Icons.location_on_rounded, post.eventLocation!),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ...detailRows,
-          if (detailRows.isNotEmpty) const SizedBox(height: 10),
-          GestureDetector(
-            onTapDown: (_) => setState(() => _scale = 0.97),
-            onTapUp: (_) => setState(() => _scale = 1.0),
-            onTapCancel: () => setState(() => _scale = 1.0),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => BookScreen(
-                    showBackButton: true,
-                    preselectedFacilityId: post.donationFacilityId,
-                  ),
-                ),
-              );
-            },
-            child: AnimatedScale(
-              scale: _scale,
-              duration: const Duration(milliseconds: 120),
-              curve: Curves.easeOut,
-              child: Container(
-                width: double.infinity,
-                height: 46,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: AppColors.primaryGradient,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.25),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+    final type = _typeStyle(p);
+    final badge = _field(post.authorBadge) ?? (_isOfficial ? 'Official' : null);
+    return Row(
+      children: [
+        Expanded(
+          child: Semantics(
+            button: true,
+            label: _summary(rows),
+            excludeSemantics: true,
+            child: InkWell(
+              onTap: () => _showPosterPreview(context, post: post),
+              borderRadius: BorderRadius.circular(14),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 48),
+                child: Row(
                   children: [
-                    Icon(Icons.water_drop, size: 16, color: Colors.white),
-                    SizedBox(width: 8),
-                    Text(
-                      "Donate Now",
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
+                    _avatar(context),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  post.author,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: p.foreground,
+                                  ),
+                                ),
+                              ),
+                              if (_isOfficial) ...[
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.verified_rounded,
+                                  size: 16,
+                                  color: p.primaryText,
+                                ),
+                              ],
+                              if (post.type != PostType.urgent &&
+                                  post.urgency != null) ...[
+                                const SizedBox(width: 6),
+                                UrgencyBadge(urgency: post.urgency!),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              if (badge != null) ...[
+                                Text(
+                                  badge,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: p.primaryText,
+                                  ),
+                                ),
+                                Text(
+                                  '·',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: p.muted,
+                                  ),
+                                ),
+                              ],
+                              Text(
+                                post.timeAgo,
+                                style: TextStyle(fontSize: 12, color: p.muted),
+                              ),
+                              Text(
+                                '·',
+                                style: TextStyle(fontSize: 12, color: p.muted),
+                              ),
+                              PostTypeChip(
+                                label: type.label,
+                                background: type.bg,
+                                foreground: type.fg,
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
-                    SizedBox(width: 2),
-                    Icon(Icons.chevron_right, size: 18, color: Colors.white),
                   ],
                 ),
               ),
             ),
           ),
+        ),
+        _moreButton(context),
+      ],
+    );
+  }
+
+  Widget _moreButton(BuildContext context) {
+    final p = context.palette;
+    Widget item(IconData icon, String label) => Row(
+      children: [
+        Icon(icon, size: 20, color: p.muted),
+        const SizedBox(width: 12),
+        Text(label, style: TextStyle(fontSize: 14, color: p.foreground)),
+      ],
+    );
+    return Builder(
+      builder: (buttonContext) => PopupMenuButton<String>(
+        tooltip: 'More options',
+        icon: Icon(Icons.more_horiz_rounded, color: p.muted),
+        color: p.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: p.border),
+        ),
+        onSelected: (value) {
+          if (value == 'share') {
+            _handleShare(buttonContext);
+          } else {
+            _copyText();
+          }
+        },
+        itemBuilder: (_) => [
+          PopupMenuItem(
+            value: 'share',
+            child: item(Icons.ios_share_rounded, 'Share post'),
+          ),
+          PopupMenuItem(
+            value: 'copy',
+            child: item(Icons.copy_rounded, 'Copy text'),
+          ),
         ],
+      ),
+    );
+  }
+
+  /// The post's words, laid out for its kind.
+  List<Widget> _content(BuildContext context, List<InfoRow> rows) {
+    final p = context.palette;
+    final post = widget.post;
+    final bodyStyle = TextStyle(
+      fontSize: 14.5,
+      height: 1.5,
+      color: p.foreground,
+    );
+    final out = <Widget>[];
+
+    if (rows.isNotEmpty) {
+      // Event: date tile and title, the details, then the note.
+      final date = rows.where((r) => r.kind == InfoKind.date).firstOrNull;
+      final status = _status;
+      out.add(
+        Row(
+          children: [
+            EventDateTile(date: date?.value),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _parsed.title ??
+                        (post.type == PostType.event
+                            ? 'Blood donation event'
+                            : post.author),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 17,
+                      height: 1.25,
+                      fontWeight: FontWeight.w700,
+                      color: p.foreground,
+                    ),
+                  ),
+                  if (status != null) ...[
+                    const SizedBox(height: 6),
+                    EventStatusChip(status: status),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+      out.add(EventInfoPanel(rows: rows));
+      if (_parsed.body.isNotEmpty) out.add(PostNote(text: _parsed.body));
+    } else if (post.type == PostType.milestone) {
+      // Milestone: the first line in the gold band, the rest below.
+      final lines = post.content.trim().split('\n');
+      final headline = stripLeadingEmoji(lines.first);
+      final rest = lines.skip(1).join('\n').trim();
+      if (headline.isNotEmpty) out.add(MilestoneBand(headline: headline));
+      if (rest.isNotEmpty) out.add(ExpandableText(rest, style: bodyStyle));
+    } else if (post.content.trim().isNotEmpty) {
+      out.add(
+        ExpandableText(
+          post.content.trim(),
+          style: post.type == PostType.story
+              ? TextStyle(fontSize: 15, height: 1.55, color: p.foreground)
+              : bodyStyle,
+        ),
+      );
+    }
+
+    if (post.type == PostType.urgent &&
+        (_field(post.bloodType) != null || _field(post.hospital) != null)) {
+      out.add(
+        UrgentNeedRow(
+          bloodType: _field(post.bloodType),
+          hospital: _field(post.hospital),
+        ),
+      );
+    }
+    return out;
+  }
+
+  Widget _actions() {
+    return Row(
+      children: [
+        Expanded(
+          flex: 5,
+          child: ActionPill(
+            icon: liked
+                ? Icons.favorite_rounded
+                : Icons.favorite_border_rounded,
+            label: likeCount > 0 ? 'Like ${formatCount(likeCount)}' : 'Like',
+            semanticLabel: 'Like, ${_countLabel(likeCount, 'like', 'likes')}',
+            toggled: liked,
+            active: liked,
+            iconScale: _likeIconScale,
+            onTap: (_) => _handleLike(),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          // A little wider: "Comment 12" is the longest label.
+          flex: 6,
+          child: ActionPill(
+            icon: Icons.mode_comment_outlined,
+            label: commentCount > 0
+                ? 'Comment ${formatCount(commentCount)}'
+                : 'Comment',
+            semanticLabel:
+                'Comment, ${_countLabel(commentCount, 'comment', 'comments')}',
+            onTap: (_) => _openComments(),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          flex: 5,
+          child: ActionPill(
+            icon: Icons.ios_share_rounded,
+            label: 'Share',
+            semanticLabel: 'Share',
+            onTap: _handleShare,
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final post = widget.post;
+    final rows = _infoRows();
+    final image = post.image;
+
+    final sections = <Widget>[
+      _header(context, rows),
+      ..._content(context, rows),
+      if (image != null)
+        PostImage(
+          url: image,
+          heroTag: 'post_image_${post.id}_0',
+          onOpen: () => openImageViewer(
+            context,
+            imageUrls: [image],
+            initialIndex: 0,
+            heroTagPrefix: 'post_image_${post.id}',
+          ),
+          onDoubleTap: _likeFromImage,
+        ),
+      // Donate Now — only for open donation posts, and only when the viewer
+      // is a verified, logged-in donor. It glows on urgent posts.
+      if (post.isDonation && post.donationOpen && widget.canDonate)
+        DonateNowButton(
+          onPressed: _openDonate,
+          glow: post.type == PostType.urgent,
+        ),
+    ];
+
+    return RepaintBoundary(
+      child: Container(
+        decoration: BoxDecoration(
+          color: p.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: p.border),
+          boxShadow: p.shadow,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (post.type == PostType.urgent)
+              UrgentBand(
+                level: switch (post.urgency) {
+                  Urgency.critical => 'CRITICAL',
+                  Urgency.high => 'HIGH',
+                  _ => null,
+                },
+              ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < sections.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 16),
+                    sections[i],
+                  ],
+                  const SizedBox(height: 12),
+                  Divider(height: 1, thickness: 1, color: p.border),
+                  const SizedBox(height: 4),
+                  _actions(),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1649,6 +1756,9 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
 
   // Posts that have already played their entrance.
   final Set<int> _entered = {};
+  // Only the cards on screen when the feed first shows slide in one after
+  // another; any card built after that frame just fades in.
+  bool _staggerDone = false;
 
   @override
   void initState() {
@@ -2119,7 +2229,10 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       onVerificationChanged: _fetchVerificationStatus,
     );
     if (!_entered.add(post.id)) return card;
-    if (i < 6) return FadeSlideIn(index: i, child: card);
+    if (i < 6 && !_staggerDone) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _staggerDone = true);
+      return FadeSlideIn(index: i, child: card);
+    }
     return FadeSlideIn(child: card);
   }
 
