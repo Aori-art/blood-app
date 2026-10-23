@@ -1748,17 +1748,37 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
   String? _postsError;
 
   final ScrollController _scrollController = ScrollController();
-  bool _fabVisible = true;
   double _lastScrollOffset = 0;
-  // The header gets its shadow once the feed has moved under it.
-  bool _scrolled = false;
 
-  // The chip that is selected, and the filter the list shows. The list
+  // Scrolling only moves these two notifiers; nothing rebuilds the feed.
+  /// "Go to Home" shows at the top and when scrolling back up, and hides
+  /// while scrolling down.
+  final ValueNotifier<bool> goHomeVisible = ValueNotifier(true);
+
+  /// The header gets its shadow once the feed has moved under it.
+  final ValueNotifier<bool> _scrolled = ValueNotifier(false);
+
+  // The category that is selected, and the one the list shows. The list
   // fades out, switches, then fades back in.
   FeedFilter _filter = FeedFilter.all;
   FeedFilter _shownFilter = FeedFilter.all;
   bool _listVisible = true;
   Timer? _filterTimer;
+
+  // Posts per category and the categories that exist, worked out once per
+  // load of the feed.
+  // ignore: unused_field
+  Map<FeedFilter, int> _counts = const {};
+  List<FeedFilter> _categories = const [];
+
+  // Where the list of posts starts (just below the welcome cards).
+  final GlobalKey _postsKey = GlobalKey();
+
+  // True while the feed scrolls itself after a category is tapped: those
+  // moves must not flip "Go to Home" back. [_scrollSeq] tells the latest
+  // such scroll from an earlier one that was replaced.
+  bool _programmaticScroll = false;
+  int _scrollSeq = 0;
 
   // Posts that have already played their entrance.
   final Set<int> _entered = {};
@@ -1780,26 +1800,58 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     _filterTimer?.cancel();
     _scrollController.removeListener(_handleScroll);
     _scrollController.dispose();
+    goHomeVisible.dispose();
+    _scrolled.dispose();
     super.dispose();
   }
+
+  /// There is a category bar to show: the feed has loaded and has more than
+  /// one kind of post.
+  bool get _barAvailable =>
+      !_loadingPosts && _postsError == null && _categories.isNotEmpty;
 
   void _handleScroll() {
     final offset = _scrollController.offset;
     final delta = offset - _lastScrollOffset;
     _lastScrollOffset = offset;
 
-    final scrolled = offset > 2;
-    if (scrolled != _scrolled) setState(() => _scrolled = scrolled);
+    _scrolled.value = offset > 2;
 
-    if (offset <= 0) {
-      if (!_fabVisible) setState(() => _fabVisible = true);
+    // The feed scrolling itself says nothing about which way the donor goes.
+    if (_programmaticScroll) return;
+
+    // A list too short to scroll (a bounce on iOS still reports offsets):
+    // inside a category the bar stays, so the donor is never stuck in a
+    // filter; with All selected it is the top of the feed again.
+    if (_barAvailable && _scrollController.position.maxScrollExtent <= 0) {
+      goHomeVisible.value = _filter == FeedFilter.all;
       return;
     }
-    if (delta > 6 && _fabVisible) {
-      setState(() => _fabVisible = false);
-    } else if (delta < -6 && !_fabVisible) {
-      setState(() => _fabVisible = true);
+
+    if (offset <= 0) {
+      goHomeVisible.value = true;
+      return;
     }
+    if (delta > 6 && goHomeVisible.value) {
+      goHomeVisible.value = false;
+    } else if (delta < -6 && !goHomeVisible.value) {
+      goHomeVisible.value = true;
+    }
+  }
+
+  /// After the list changed: when it is too short to scroll there are no
+  /// scroll events to go by, so decide here (see [_handleScroll]).
+  void _settleBar() {
+    if (!mounted || !_scrollController.hasClients) return;
+    if (_barAvailable && _scrollController.position.maxScrollExtent <= 0) {
+      goHomeVisible.value = _filter == FeedFilter.all;
+    }
+  }
+
+  /// A scroll the feed makes itself is over (or was given up).
+  void _endProgrammatic() {
+    _scrollSeq++;
+    _programmaticScroll = false;
   }
 
   Future<void> _checkLoginStatus() async {
@@ -1955,19 +2007,28 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       setState(() {
         _posts = posts;
         _loadingPosts = false;
+        final counts = <FeedFilter, int>{FeedFilter.all: posts.length};
+        for (final p in posts) {
+          final group = FeedFilter.of(p.type.name);
+          counts[group] = (counts[group] ?? 0) + 1;
+        }
+        _counts = counts;
+        _categories = FeedFilter.available(posts.map((p) => p.type.name));
         // A group that is gone after a refresh falls back to "All".
-        final groups = FeedFilter.available(posts.map((p) => p.type.name));
-        if (!groups.contains(_filter)) {
+        if (_filter != FeedFilter.all && !_categories.contains(_filter)) {
           _filterTimer?.cancel();
+          _endProgrammatic();
           _filter = _shownFilter = FeedFilter.all;
           _listVisible = true;
         }
       });
+      WidgetsBinding.instance.addPostFrameCallback((_) => _settleBar());
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _postsError = "Couldn't load the feed.";
         _loadingPosts = false;
+        _categories = const [];
       });
     }
   }
@@ -2000,13 +2061,24 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
 
   // ── FAB slot: "Go to Home"/"Sign In" button, or a quiet status banner ───
   Widget? _buildFabArea(BuildContext context) {
-    if (!_isLoggedIn) return _buildHomeFab(context);
-    if (_checkingVerification) return null;
-    if (_verificationStatus == 'verified') return _buildHomeFab(context);
-    return _buildVerificationBanner(context);
+    final Widget Function(BuildContext, bool) build;
+    if (!_isLoggedIn) {
+      build = _buildHomeFab;
+    } else if (_checkingVerification) {
+      return null;
+    } else if (_verificationStatus == 'verified') {
+      build = _buildHomeFab;
+    } else {
+      build = _buildVerificationBanner;
+    }
+    // Only this button follows the scroll; the rest of the screen stays put.
+    return ValueListenableBuilder<bool>(
+      valueListenable: goHomeVisible,
+      builder: (context, visible, _) => build(context, visible),
+    );
   }
 
-  Widget _buildVerificationBanner(BuildContext context) {
+  Widget _buildVerificationBanner(BuildContext context, bool fabVisible) {
     final isPending = _verificationStatus == 'pending';
     final bg = isPending
         ? context.palette.warningBg
@@ -2025,13 +2097,13 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     return AnimatedSlide(
       duration: const Duration(milliseconds: 280),
       curve: Curves.easeOutCubic,
-      offset: _fabVisible ? Offset.zero : const Offset(0, 2),
+      offset: fabVisible ? Offset.zero : const Offset(0, 2),
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOut,
-        opacity: _fabVisible ? 1 : 0,
+        opacity: fabVisible ? 1 : 0,
         child: IgnorePointer(
-          ignoring: !_fabVisible,
+          ignoring: !fabVisible,
           child: GestureDetector(
             onTap: isPending ? null : _scrollToVerifyCta,
             child: Container(
@@ -2064,19 +2136,19 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
   }
 
   // ── Floating "Go to Home" / "Sign In" button ────────────────────────────
-  Widget _buildHomeFab(BuildContext context) {
+  Widget _buildHomeFab(BuildContext context, bool fabVisible) {
     final label = _isLoggedIn ? "Go to Home" : "Sign In to Donate";
 
     return AnimatedSlide(
       duration: const Duration(milliseconds: 280),
       curve: Curves.easeOutCubic,
-      offset: _fabVisible ? Offset.zero : const Offset(0, 2),
+      offset: fabVisible ? Offset.zero : const Offset(0, 2),
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOut,
-        opacity: _fabVisible ? 1 : 0,
+        opacity: fabVisible ? 1 : 0,
         child: IgnorePointer(
-          ignoring: !_fabVisible,
+          ignoring: !fabVisible,
           child: GestureDetector(
             onTap: () {
               if (_isLoggedIn) {
@@ -2137,12 +2209,24 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       !_checkingVerification &&
       _verificationStatus == 'verified';
 
-  void _selectFilter(FeedFilter f) {
-    if (f == _filter) return;
+  /// A category was tapped: the list switches to it, the feed scrolls so its
+  /// first post sits under the header, and the category bar stays on screen
+  /// (it is "Go to Home" that gives way).
+  void _selectCategory(FeedFilter f) {
     HapticFeedback.selectionClick();
     _filterTimer?.cancel();
+    // Set before anything moves, so none of it reads as the donor scrolling.
+    final seq = ++_scrollSeq;
+    _programmaticScroll = true;
+    goHomeVisible.value = false;
+
+    if (f == _filter && f == _shownFilter) {
+      _scrollToPosts(seq);
+      return;
+    }
     if (MediaQuery.disableAnimationsOf(context)) {
       setState(() => _filter = _shownFilter = f);
+      _scrollToPosts(seq);
       return;
     }
     setState(() {
@@ -2155,7 +2239,32 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
         _shownFilter = _filter;
         _listVisible = true;
       });
+      _scrollToPosts(seq);
     });
+  }
+
+  Future<void> _scrollToPosts(int seq) async {
+    try {
+      // Let the new list lay out first.
+      await WidgetsBinding.instance.endOfFrame;
+      final anchor = _postsKey.currentContext;
+      if (!mounted || anchor == null || !anchor.mounted) return;
+      if (!_scrollController.hasClients) return;
+      await Scrollable.ensureVisible(
+        anchor,
+        alignment: 0,
+        duration: MediaQuery.disableAnimationsOf(anchor)
+            ? Duration.zero
+            : const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    } finally {
+      // Only the latest scroll gives the buttons back to the donor.
+      if (seq == _scrollSeq) {
+        _programmaticScroll = false;
+        _settleBar();
+      }
+    }
   }
 
   /// The feed: the welcome cards and filter chips, then one row per post,
@@ -2170,9 +2279,8 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
         FeedFilterBar(
           filters: filters,
           selected: _filter,
-          onSelected: _selectFilter,
+          onSelected: _selectCategory,
         ),
-      const SizedBox(height: 8),
     ];
 
     Widget? message;
@@ -2186,46 +2294,54 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     final shown = message != null
         ? const <Post>[]
         : _posts.where((p) => _shownFilter.matches(p.type.name)).toList();
-    final count = top.length + (message != null ? 1 : shown.length + 1);
-
-    return ListView.builder(
+    return CustomScrollView(
       controller: _scrollController,
-      padding: const EdgeInsets.only(bottom: 110),
-      itemCount: count,
-      // Cards keep their state (likes, Read more) when a filter moves them.
-      findChildIndexCallback: (key) {
-        if (key is! ValueKey<String>) return null;
-        final i = shown.indexWhere((p) => 'post-${p.id}' == key.value);
-        return i < 0 ? null : top.length + i;
-      },
-      itemBuilder: (context, index) {
-        if (index < top.length) return top[index];
-        final i = index - top.length;
-        if (message != null) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: message,
-          );
-        }
-        if (i == shown.length) {
-          return AnimatedOpacity(
-            opacity: _listVisible ? 1 : 0,
-            duration: const Duration(milliseconds: 150),
-            child: const CaughtUpFooter(),
-          );
-        }
-        return KeyedSubtree(
-          key: ValueKey('post-${shown[i].id}'),
-          child: AnimatedOpacity(
-            opacity: _listVisible ? 1 : 0,
-            duration: const Duration(milliseconds: 150),
+      slivers: [
+        SliverToBoxAdapter(child: Column(children: top)),
+        // Where the posts start: a category tap scrolls here.
+        SliverToBoxAdapter(
+          child: Column(key: _postsKey, children: const [SizedBox(height: 8)]),
+        ),
+        if (message != null)
+          SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: _entrance(i, shown[i]),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: message,
             ),
+          )
+        else
+          SliverList.builder(
+            itemCount: shown.length + 1,
+            // Cards keep their state (likes, Read more) when a filter moves
+            // them.
+            findChildIndexCallback: (key) {
+              if (key is! ValueKey<String>) return null;
+              final i = shown.indexWhere((p) => 'post-${p.id}' == key.value);
+              return i < 0 ? null : i;
+            },
+            itemBuilder: (context, i) {
+              if (i == shown.length) {
+                return AnimatedOpacity(
+                  opacity: _listVisible ? 1 : 0,
+                  duration: const Duration(milliseconds: 150),
+                  child: const CaughtUpFooter(),
+                );
+              }
+              return KeyedSubtree(
+                key: ValueKey('post-${shown[i].id}'),
+                child: AnimatedOpacity(
+                  opacity: _listVisible ? 1 : 0,
+                  duration: const Duration(milliseconds: 150),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    child: _entrance(i, shown[i]),
+                  ),
+                ),
+              );
+            },
           ),
-        );
-      },
+        const SliverToBoxAdapter(child: SizedBox(height: 110)),
+      ],
     );
   }
 
@@ -2252,19 +2368,23 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     final p = context.palette;
     // Flat at the top; a soft shadow (a hairline in dark) fades in once the
     // feed scrolls under it.
-    return AnimatedContainer(
-      duration: MediaQuery.disableAnimationsOf(context)
-          ? Duration.zero
-          : const Duration(milliseconds: 200),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-      decoration: BoxDecoration(
-        color: p.surface,
-        border: Border(
-          bottom: BorderSide(
-            color: _scrolled && p.isDark ? p.border : p.border.withAlpha(0),
+    return ValueListenableBuilder<bool>(
+      valueListenable: _scrolled,
+      builder: (context, scrolled, child) => AnimatedContainer(
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 200),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+        decoration: BoxDecoration(
+          color: p.surface,
+          border: Border(
+            bottom: BorderSide(
+              color: scrolled && p.isDark ? p.border : p.border.withAlpha(0),
+            ),
           ),
+          boxShadow: scrolled ? p.shadow : const [],
         ),
-        boxShadow: _scrolled ? p.shadow : const [],
+        child: child,
       ),
       child: Row(
         children: [
@@ -2413,7 +2533,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
                           ? "WELCOME BACK${_userName != null ? ', ${_userName!.split(' ').first.toUpperCase()}' : ''}"
                           : "YOUR BLOOD CAN SAVE 3 LIVES",
                       style: const TextStyle(
-                        color: Colors.white70,
+                        color: AppColors.onPrimarySoft,
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 1,
@@ -2500,11 +2620,14 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 11, color: Colors.white70),
+        Icon(icon, size: 11, color: AppColors.onPrimarySoft),
         const SizedBox(width: 4),
         Text(
           label,
-          style: const TextStyle(fontSize: 11, color: Colors.white70),
+          style: const TextStyle(
+            fontSize: 11,
+            color: AppColors.onPrimarySoft,
+          ),
         ),
       ],
     );
