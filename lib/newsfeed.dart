@@ -1115,7 +1115,7 @@ class _PostCardState extends State<PostCard> {
       liked = !liked;
       likeCount += liked ? 1 : -1;
     });
-    if (liked) {
+    if (liked && !MediaQuery.disableAnimationsOf(context)) {
       // A quick pop: 1 → 1.3 → 1 in about 250 ms.
       setState(() => _likeIconScale = 1.3);
       Future.delayed(const Duration(milliseconds: 125), () {
@@ -2186,6 +2186,12 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       controller: _scrollController,
       padding: const EdgeInsets.only(bottom: 110),
       itemCount: count,
+      // Cards keep their state (likes, Read more) when a filter moves them.
+      findChildIndexCallback: (key) {
+        if (key is! ValueKey<String>) return null;
+        final i = shown.indexWhere((p) => 'post-${p.id}' == key.value);
+        return i < 0 ? null : top.length + i;
+      },
       itemBuilder: (context, index) {
         if (index < top.length) return top[index];
         final i = index - top.length;

@@ -786,7 +786,9 @@ class _DonateNowButtonState extends State<DonateNowButton> {
     const radius = BorderRadius.all(Radius.circular(16));
     final button = AnimatedScale(
       scale: _pressed ? 0.97 : 1,
-      duration: const Duration(milliseconds: 120),
+      duration: _reduceMotion(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 120),
       curve: Curves.easeOut,
       child: Material(
         type: MaterialType.transparency,
@@ -904,7 +906,9 @@ class _ActionPillState extends State<ActionPill> {
           child: Center(
             child: AnimatedScale(
               scale: _pressed ? 0.97 : 1,
-              duration: const Duration(milliseconds: 100),
+              duration: reduce
+                  ? Duration.zero
+                  : const Duration(milliseconds: 100),
               child: AnimatedContainer(
                 duration: reduce
                     ? Duration.zero
