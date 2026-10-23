@@ -21,6 +21,8 @@ import 'app_palette.dart';
 import 'media_url.dart';
 import 'my_avatar_controller.dart';
 import 'widgets/image_viewer.dart';
+import 'home.dart' show FloatingNavMetrics;
+import 'newsfeed/category_nav_bar.dart';
 import 'newsfeed/feed_chrome.dart';
 import 'newsfeed/post_content_parser.dart';
 import 'newsfeed/post_parts.dart';
@@ -1760,16 +1762,15 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
 
   // The category that is selected, and the one the list shows. The list
   // fades out, switches, then fades back in.
-  FeedFilter _filter = FeedFilter.all;
-  FeedFilter _shownFilter = FeedFilter.all;
+  FeedCategory _filter = FeedCategory.all;
+  FeedCategory _shownFilter = FeedCategory.all;
   bool _listVisible = true;
   Timer? _filterTimer;
 
   // Posts per category and the categories that exist, worked out once per
   // load of the feed.
-  // ignore: unused_field
-  Map<FeedFilter, int> _counts = const {};
-  List<FeedFilter> _categories = const [];
+  Map<FeedCategory, int> _counts = const {};
+  List<FeedCategory> _categories = const [];
 
   // Where the list of posts starts (just below the welcome cards).
   final GlobalKey _postsKey = GlobalKey();
@@ -1824,7 +1825,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     // inside a category the bar stays, so the donor is never stuck in a
     // filter; with All selected it is the top of the feed again.
     if (_barAvailable && _scrollController.position.maxScrollExtent <= 0) {
-      goHomeVisible.value = _filter == FeedFilter.all;
+      goHomeVisible.value = _filter == FeedCategory.all;
       return;
     }
 
@@ -1844,7 +1845,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
   void _settleBar() {
     if (!mounted || !_scrollController.hasClients) return;
     if (_barAvailable && _scrollController.position.maxScrollExtent <= 0) {
-      goHomeVisible.value = _filter == FeedFilter.all;
+      goHomeVisible.value = _filter == FeedCategory.all;
     }
   }
 
@@ -2007,18 +2008,18 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       setState(() {
         _posts = posts;
         _loadingPosts = false;
-        final counts = <FeedFilter, int>{FeedFilter.all: posts.length};
+        final counts = <FeedCategory, int>{FeedCategory.all: posts.length};
         for (final p in posts) {
-          final group = FeedFilter.of(p.type.name);
+          final group = FeedCategory.of(p.type.name);
           counts[group] = (counts[group] ?? 0) + 1;
         }
         _counts = counts;
-        _categories = FeedFilter.available(posts.map((p) => p.type.name));
+        _categories = FeedCategory.available(posts.map((p) => p.type.name));
         // A group that is gone after a refresh falls back to "All".
-        if (_filter != FeedFilter.all && !_categories.contains(_filter)) {
+        if (_filter != FeedCategory.all && !_categories.contains(_filter)) {
           _filterTimer?.cancel();
           _endProgrammatic();
-          _filter = _shownFilter = FeedFilter.all;
+          _filter = _shownFilter = FeedCategory.all;
           _listVisible = true;
         }
       });
@@ -2038,21 +2039,56 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       StreakScreen(id: 'newsfeed', child: _buildScreen(context));
 
   Widget _buildScreen(BuildContext context) {
+    // The bar floats over the feed (like Home's nav), so the feed ends with
+    // room for it: the bar, its margins and a little air.
+    final barRoom =
+        CategoryNavBar.largeTextHeight +
+        FloatingNavMetrics.bottomMargin +
+        MediaQuery.paddingOf(context).bottom +
+        16;
     return Scaffold(
       backgroundColor: context.palette.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(context),
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: () =>
-                    Future.wait([_loadPosts(), _fetchVerificationStatus()]),
-                child: _buildFeed(context),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: SafeArea(
+              child: Column(
+                children: [
+                  _buildHeader(context),
+                  Expanded(
+                    child: RefreshIndicator(
+                      onRefresh: () => Future.wait([
+                        _loadPosts(),
+                        _fetchVerificationStatus(),
+                      ]),
+                      child: _buildFeed(
+                        context,
+                        bottomSpace: _barAvailable ? barRoom : 0,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+          // The category bar and "Go to Home" take turns: the bar is on
+          // screen exactly when "Go to Home" is away.
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: ValueListenableBuilder<bool>(
+              valueListenable: goHomeVisible,
+              builder: (context, goHome, _) => CategoryNavBar(
+                items: _categories,
+                selected: _filter,
+                counts: _counts,
+                onSelected: _selectCategory,
+                visible: _barAvailable && !goHome,
+              ),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: _buildFabArea(context),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
@@ -2212,7 +2248,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
   /// A category was tapped: the list switches to it, the feed scrolls so its
   /// first post sits under the header, and the category bar stays on screen
   /// (it is "Go to Home" that gives way).
-  void _selectCategory(FeedFilter f) {
+  void _selectCategory(FeedCategory f) {
     HapticFeedback.selectionClick();
     _filterTimer?.cancel();
     // Set before anything moves, so none of it reads as the donor scrolling.
@@ -2269,18 +2305,11 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
 
   /// The feed: the welcome cards and filter chips, then one row per post,
   /// built as it scrolls into view.
-  Widget _buildFeed(BuildContext context) {
-    final filters = FeedFilter.available(_posts.map((p) => p.type.name));
+  Widget _buildFeed(BuildContext context, {required double bottomSpace}) {
     final top = <Widget>[
       FadeSlideIn(index: 0, child: _buildSignInCta(context)),
       if (_isLoggedIn) FadeSlideIn(index: 1, child: _buildVerifyIdCta(context)),
       const SizedBox(height: 8),
-      if (!_loadingPosts && _postsError == null && filters.isNotEmpty)
-        FeedFilterBar(
-          filters: filters,
-          selected: _filter,
-          onSelected: _selectCategory,
-        ),
     ];
 
     Widget? message;
@@ -2340,7 +2369,9 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
               );
             },
           ),
-        const SliverToBoxAdapter(child: SizedBox(height: 110)),
+        SliverToBoxAdapter(
+          child: SizedBox(height: bottomSpace > 110 ? bottomSpace : 110),
+        ),
       ],
     );
   }
@@ -2624,10 +2655,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
         const SizedBox(width: 4),
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 11,
-            color: AppColors.onPrimarySoft,
-          ),
+          style: const TextStyle(fontSize: 11, color: AppColors.onPrimarySoft),
         ),
       ],
     );
