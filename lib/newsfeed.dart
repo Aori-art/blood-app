@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'streak/streak_controller.dart';
 import 'streak/streak_screen.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -2250,6 +2251,13 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
   /// (it is "Go to Home" that gives way).
   void _selectCategory(FeedCategory f) {
     HapticFeedback.selectionClick();
+    if (f != _filter) {
+      SemanticsService.sendAnnouncement(
+        View.of(context),
+        'Showing ${f.label}, ${postsLabel(_counts[f] ?? 0)}',
+        Directionality.of(context),
+      );
+    }
     _filterTimer?.cancel();
     // Set before anything moves, so none of it reads as the donor scrolling.
     final seq = ++_scrollSeq;

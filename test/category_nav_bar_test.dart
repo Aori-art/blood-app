@@ -374,4 +374,70 @@ void main() {
       });
     },
   );
+
+  testWidgets('a category change is announced', (tester) async {
+    final handle = tester.ensureSemantics();
+    final run = _Run(samplePostsJson());
+    await _with(run, () async {
+      await _pumpFeed(tester, run);
+      final announced = <String>[];
+      tester.binding.defaultBinaryMessenger
+          .setMockDecodedMessageHandler<dynamic>(SystemChannels.accessibility, (
+            message,
+          ) async {
+            final m = message as Map;
+            if (m['type'] == 'announce') {
+              announced.add((m['data'] as Map)['message'] as String);
+            }
+            return null;
+          });
+      await _scrollDown(tester);
+      await tester.tap(_item('Events'));
+      await _frames(tester, 20);
+      expect(announced, ['Showing Events, 2 posts']);
+      await tester.tap(_item('Events'));
+      await _frames(tester, 20);
+      // The same category again says nothing new.
+      expect(announced, hasLength(1));
+      await _close(tester);
+    });
+    handle.dispose();
+  });
+
+  testWidgets('the bar is a labelled group of selectable buttons', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    final run = _Run(samplePostsJson());
+    await _with(run, () async {
+      await _pumpFeed(tester, run);
+      // Away: nothing of it is exposed.
+      expect(find.bySemanticsLabel('Post categories'), findsNothing);
+      await _scrollDown(tester);
+      expect(find.bySemanticsLabel('Post categories'), findsOneWidget);
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('All, 6 posts')),
+        containsSemantics(
+          isButton: true,
+          hasSelectedState: true,
+          isSelected: true,
+          hasTapAction: true,
+        ),
+      );
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Events, 2 posts')),
+        containsSemantics(
+          isButton: true,
+          hasSelectedState: true,
+          isSelected: false,
+          hasTapAction: true,
+        ),
+      );
+      expect(find.bySemanticsLabel('Urgent, 1 post'), findsOneWidget);
+      expect(find.bySemanticsLabel('Stories, 2 posts'), findsOneWidget);
+      expect(find.bySemanticsLabel('Updates, 1 post'), findsOneWidget);
+      await _close(tester);
+    });
+    handle.dispose();
+  });
 }
