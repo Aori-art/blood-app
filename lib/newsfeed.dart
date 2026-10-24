@@ -27,6 +27,7 @@ import 'home.dart' show FloatingNavMetrics;
 import 'newsfeed/category_nav_bar.dart';
 import 'newsfeed/feed_chrome.dart';
 import 'newsfeed/like_store.dart';
+import 'widgets/dugtong_wordmark.dart';
 import 'newsfeed/post_content_parser.dart';
 import 'newsfeed/post_parts.dart';
 
@@ -2450,44 +2451,8 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       ),
       child: Row(
         children: [
-          const EdonateLogo(),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              RichText(
-                text: TextSpan(
-                  children: [
-                    TextSpan(
-                      text: "e",
-                      style: TextStyle(
-                        color: context.palette.primaryText,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 18,
-                      ),
-                    ),
-                    TextSpan(
-                      text: "Donate",
-                      style: TextStyle(
-                        color: context.palette.foreground,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 18,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Text(
-                "BLOOD DONATION NETWORK",
-                style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w600,
-                  color: context.palette.muted,
-                  letterSpacing: 1.2,
-                ),
-              ),
-            ],
-          ),
+          // The name, the icon and the tagline: one lockup.
+          const Flexible(child: DugtongLockup(iconSize: 36, tagline: true)),
           const Spacer(),
           _buildHeaderProfileButton(),
         ],
