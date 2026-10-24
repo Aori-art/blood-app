@@ -29,7 +29,7 @@ Map<String, dynamic> eventPostJson({
 }) => {
   'id': id,
   'type': 'event',
-  'author': 'eDonate',
+  'author': 'Dugtong',
   'authorAvatar': '',
   'authorBadge': 'Official',
   'authorType': 'admin',
@@ -66,7 +66,7 @@ Map<String, dynamic> urgentPostJson({int id = 102}) => {
 Map<String, dynamic> milestonePostJson({int id = 103}) => {
   'id': id,
   'type': 'milestone',
-  'author': 'eDonate',
+  'author': 'Dugtong',
   'authorAvatar': '',
   'authorType': 'admin',
   'timeAgo': '3 days ago',

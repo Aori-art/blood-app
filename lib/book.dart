@@ -3672,7 +3672,7 @@ class _DonationSuccessView extends StatelessWidget {
   Widget _impactBanner(BuildContext context) {
     final text = totalDonations > 1
         ? "This was your ${_ordinal(totalDonations)} donation — together they could help save up to ${totalDonations * 3} lives."
-        : "This was your first donation — welcome to the eDonate donor community!";
+        : "This was your first donation — welcome to the Dugtong donor community!";
 
     return Container(
       width: double.infinity,

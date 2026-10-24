@@ -157,7 +157,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       navigatorKey: appNavigatorKey,
       debugShowCheckedModeBanner: false,
-      title: 'eDonate',
+      title: 'Dugtong',
 
       // Dugtong's floating bubble sits above every route. Each screen reports
       // itself with StreakScreen, and this observer follows the navigation.

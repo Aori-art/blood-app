@@ -185,7 +185,7 @@ class _LoginScreenState extends State<LoginScreen>
                     ),
                     const SizedBox(height: 14),
                     const Text(
-                      'eDonate',
+                      'Dugtong',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 30,
@@ -390,7 +390,7 @@ class _LoginScreenState extends State<LoginScreen>
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                'New to eDonate? ',
+                                'New to Dugtong? ',
                                 style: TextStyle(
                                   color: context.palette.muted,
                                   fontSize: 13,

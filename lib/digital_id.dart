@@ -360,8 +360,8 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
       }
 
       final doc = pw.Document(
-        title: 'eDonate Digital Donor ID',
-        author: 'eDonate',
+        title: 'Dugtong Digital Donor ID',
+        author: 'Dugtong',
       );
       const format = PdfPageFormat(
         85.6 * PdfPageFormat.mm,
@@ -399,7 +399,7 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
       final bytes = await doc.save();
       await Printing.sharePdf(
         bytes: bytes,
-        filename: 'eDonate-Digital-Donor-ID-${data.card.code}.pdf',
+        filename: 'Dugtong-Digital-Donor-ID-${data.card.code}.pdf',
       );
       HapticFeedback.mediumImpact();
     } catch (_) {
@@ -503,7 +503,7 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
               ),
               SizedBox(height: 2),
               Text(
-                'Your official eDonate donor card',
+                'Your official Dugtong donor card',
                 style: TextStyle(color: AppColors.onPrimary, fontSize: 12),
               ),
             ],
@@ -667,7 +667,7 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
             bg: context.palette.accentBg,
             border: context.palette.primaryBorder,
             text:
-                'This Digital Donor ID is no longer valid. Please contact eDonate support.',
+                'This Digital Donor ID is no longer valid. Please contact Dugtong support.',
           ),
         ],
         if (!data.donor.isActive) ...[
@@ -1578,7 +1578,7 @@ class _IdCardFront extends StatelessWidget {
                               const _MiniDrop(size: 16),
                               const SizedBox(width: 6),
                               const Text(
-                                'eDonate',
+                                'Dugtong',
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w900,
@@ -1893,7 +1893,7 @@ class _IdCardBack extends StatelessWidget {
                       color: kCrimson,
                       padding: const EdgeInsets.symmetric(vertical: 6),
                       child: const Text(
-                        'eDonate · Lipa City Blood Donation Network',
+                        'Dugtong · Lipa City Blood Donation Network',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 9,

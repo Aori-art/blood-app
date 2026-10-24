@@ -1315,7 +1315,7 @@ class _BloodRequestDetailScreenState extends State<BloodRequestDetailScreen> {
           context.palette.warning,
           context.palette.warningBg,
           context.palette.warningBorder,
-          'Waiting for review — donors will see your request once the eDonate team approves it.',
+          'Waiting for review — donors will see your request once the Dugtong team approves it.',
         );
       case 'rejected':
         return _statusBanner(
@@ -1657,7 +1657,7 @@ class _BloodRequestDetailScreenState extends State<BloodRequestDetailScreen> {
         Padding(
           padding: EdgeInsets.only(left: 24, top: 2),
           child: Text(
-            'Only you and eDonate staff can see this',
+            'Only you and Dugtong staff can see this',
             style: TextStyle(fontSize: 11, color: context.palette.muted),
           ),
         ),

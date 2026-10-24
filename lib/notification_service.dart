@@ -20,7 +20,7 @@ class NotificationService {
   static const AndroidNotificationChannel _androidChannel =
       AndroidNotificationChannel(
     'edonate_notifications',
-    'eDonate Notifications',
+    'Dugtong Notifications',
     description:
         'Notifications about your appointments, eligibility, and donations.',
     importance: Importance.high,

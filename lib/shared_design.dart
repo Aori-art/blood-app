@@ -236,7 +236,7 @@ class RegisterHeader extends StatelessWidget {
               Icon(Icons.bloodtype_rounded, color: Colors.white, size: 22),
               SizedBox(width: 8),
               Text(
-                'eDonate',
+                'Dugtong',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 22,

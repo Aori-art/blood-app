@@ -19,7 +19,7 @@ class EdonateLogo extends StatelessWidget {
       height: size,
       fit: BoxFit.contain,
       filterQuality: FilterQuality.high,
-      semanticLabel: 'eDonate logo',
+      semanticLabel: 'Dugtong logo',
       // Decode at the size it is shown, not at 512 px.
       cacheWidth: (size * dpr).round(),
       // If the asset is missing, the previous mark: a water drop on the

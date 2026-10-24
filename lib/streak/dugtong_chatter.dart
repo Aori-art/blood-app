@@ -84,7 +84,7 @@ final List<_Pool> _pools = [
     _Line('My Streak Freeze has your back if you miss a day.', (c) => c.freeze),
     _Line('Right now I am {stage}. Keep climbing!', (c) => c.n > 0),
     _Line('Every day you open the app, I get stronger.', (c) => c.n > 0),
-    _Line('Open eDonate every day and watch me evolve!'),
+    _Line('Open the app every day and watch me evolve!'),
     _Line(
       "I'm a little sleepy... let's start a new streak today!",
       (c) => c.n == 0,
@@ -202,7 +202,7 @@ const Map<String, List<_Line>> _screenPools = {
     _Line('Your information is only used to help you donate.'),
   ],
   'help_support': [
-    _Line('Need a hand? The eDonate team is here for you.'),
+    _Line('Need a hand? The Dugtong team is here for you.'),
     _Line("Can't find an answer? Reach out to the team."),
     _Line('No question is too small. Just ask!'),
     _Line('We read every message. Thanks for helping us improve!'),

@@ -5,7 +5,7 @@ import 'package:blood/main.dart';
 
 void main() {
   testWidgets(
-    'eDonate app starts successfully',
+    'Dugtong app starts successfully',
     (WidgetTester tester) async {
       SharedPreferences.setMockInitialValues({});
       await tester.pumpWidget(

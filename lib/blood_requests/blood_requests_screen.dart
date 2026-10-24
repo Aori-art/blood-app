@@ -718,7 +718,7 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
                   SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Requests are reviewed by the eDonate team before donors can see them.',
+                      'Requests are reviewed by the Dugtong team before donors can see them.',
                       style: TextStyle(
                         fontSize: 12,
                         color: context.palette.infoText,

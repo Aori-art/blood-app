@@ -308,7 +308,7 @@ class _SplashScreenState extends State<SplashScreen>
                     child: SlideTransition(
                       position: _titleSlide,
                       child: const Text(
-                        'eDonate',
+                        'Dugtong',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 38,

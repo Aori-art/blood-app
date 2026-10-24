@@ -60,7 +60,7 @@ class _DataPrivacyScreenState extends State<DataPrivacyScreen> {
 
   Widget _buildScreen(BuildContext context) => ProfilePage(
     title: 'Data Privacy',
-    subtitle: 'How eDonate handles your information',
+    subtitle: 'How Dugtong handles your information',
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

@@ -14,7 +14,7 @@ const String kAboutDugtong =
     "connects to the day before it. In Filipino, 'dugtong-buhay' even "
     "describes something that extends a life. Dugtong is the link, and you "
     'keep the connection going. Each day of your streak lights a window in '
-    'the eDonate Hospital.';
+    'the Dugtong Hospital.';
 
 /// "About Dugtong": the story of the name, then his eight forms.
 Future<void> showStreakAboutSheet(BuildContext context) {

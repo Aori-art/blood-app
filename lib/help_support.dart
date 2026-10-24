@@ -18,7 +18,7 @@ class HelpSupportScreen extends StatelessWidget {
     final donorId = prefs.getString('donorId')?.trim();
     final formattedDonorId = _formatDonorId(donorId);
     final messageBody =
-        '''Hello eDonate Support,
+        '''Hello Dugtong Support,
 
 I need help regarding:
 
@@ -31,7 +31,7 @@ Thank you.''';
       scheme: 'mailto',
       path: 'oedonate@gmail.com',
       queryParameters: {
-        'subject': 'eDonate Support Request',
+        'subject': 'Dugtong Support Request',
         'body': messageBody,
       },
     );
@@ -58,7 +58,7 @@ Thank you.''';
       title: const Text('Unable to Open Email App'),
       content: const Text(
         "We couldn't open an email application on this device. You can "
-        'contact eDonate directly at:\n\noedonate@gmail.com',
+        'contact Dugtong directly at:\n\noedonate@gmail.com',
       ),
       actions: [
         TextButton(
@@ -107,7 +107,7 @@ Thank you.''';
               _faq(
                 context,
                 "Why didn't I receive a push notification?",
-                'Check Notification Settings in eDonate, check phone notification permission, ensure internet is available, and reopen the application if necessary.',
+                'Check Notification Settings in Dugtong, check phone notification permission, ensure internet is available, and reopen the application if necessary.',
               ),
               _faq(
                 context,
@@ -122,7 +122,7 @@ Thank you.''';
               _faq(
                 context,
                 'My eligibility status looks incorrect. What should I do?',
-                'Review your screening information and contact eDonate support if assistance is required.',
+                'Review your screening information and contact Dugtong support if assistance is required.',
               ),
             ],
           ),
@@ -194,7 +194,7 @@ Thank you.''';
               ),
               SizedBox(height: 8),
               Text(
-                'eDonate Donor App',
+                'Dugtong Donor App',
                 style: TextStyle(color: context.palette.muted),
               ),
               Text(

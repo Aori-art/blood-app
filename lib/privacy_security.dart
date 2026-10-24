@@ -231,7 +231,7 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
             SettingsRow(
               icon: Icons.password_rounded,
               title: 'Change PIN',
-              subtitle: 'Update the 4-digit PIN you use to open eDonate.',
+              subtitle: 'Update the 4-digit PIN you use to open Dugtong.',
               onTap: _changePin,
             ),
           ],
@@ -239,7 +239,7 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
           SettingsRow(
             icon: Icons.privacy_tip_outlined,
             title: 'Data Privacy',
-            subtitle: 'Learn how eDonate handles your information.',
+            subtitle: 'Learn how Dugtong handles your information.',
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const DataPrivacyScreen()),

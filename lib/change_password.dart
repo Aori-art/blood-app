@@ -107,7 +107,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
   Widget _buildScreen(BuildContext context) => ProfilePage(
     title: 'Change Password',
-    subtitle: 'Keep your eDonate account secure',
+    subtitle: 'Keep your Dugtong account secure',
     child: Form(
       key: key,
       child: Column(

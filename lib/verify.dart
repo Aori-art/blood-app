@@ -760,7 +760,7 @@ class _VerifyScreenState extends State<VerifyScreen>
         SizedBox(width: 12),
         Expanded(
           child: Text(
-            "To keep eDonate safe for both donors and recipients, please "
+            "To keep Dugtong safe for both donors and recipients, please "
             "upload a clear photo of a valid government-issued ID (e.g. "
             "National ID, Driver's License, SSS ID, or Passport).",
             style: TextStyle(

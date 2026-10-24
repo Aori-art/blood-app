@@ -166,7 +166,7 @@ void main() {
       expect(find.textContaining('📅'), findsNothing);
       expect(
         find.bySemanticsLabel(
-          'Official event by eDonate, 1 week ago, Capstone, '
+          'Official event by Dugtong, 1 week ago, Capstone, '
           'Mon, October 12, 2026, Open',
         ),
         findsOneWidget,

@@ -498,7 +498,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
     }
     if (profile != null && authorType == 'admin') {
       final label =
-          profile['role_label']?.toString() ?? 'Official eDonate Account';
+          profile['role_label']?.toString() ?? 'Official Dugtong Account';
       return _pill(
         icon: Icons.verified_rounded,
         label: label,
@@ -823,7 +823,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
         SizedBox(width: 8),
         Expanded(
           child: Text(
-            "Posts from this account are official announcements from the eDonate team.",
+            "Posts from this account are official announcements from the Dugtong team.",
             style: TextStyle(
               fontSize: 12,
               color: context.palette.infoText,
@@ -964,7 +964,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
               if (memberSince != null) ...[
                 const SizedBox(height: 8),
                 Text(
-                  "On eDonate since $memberSince",
+                  "On Dugtong since $memberSince",
                   style: TextStyle(fontSize: 12, color: context.palette.muted),
                 ),
               ],
@@ -1121,7 +1121,7 @@ class _PostCardState extends State<PostCard> {
     String? field(String? v) =>
         (v == null || v.trim().isEmpty) ? null : v.trim();
     final lines = <String>[
-      '${post.author} on eDonate:',
+      '${post.author} on Dugtong:',
       post.content,
       if (field(post.eventDate) != null) 'Date: ${field(post.eventDate)}',
       if (field(post.eventLocation) != null)
@@ -1130,7 +1130,7 @@ class _PostCardState extends State<PostCard> {
         'Blood type needed: ${field(post.bloodType)}',
       if (field(post.hospital) != null) 'Hospital: ${field(post.hospital)}',
       if (resolveMediaUrl(post.image) != null) resolveMediaUrl(post.image)!,
-      'Every drop counts. Every life matters. #eDonate',
+      'Every drop counts. Every life matters. #Dugtong',
     ];
     return lines.join('\n');
   }
@@ -2920,7 +2920,7 @@ class _VerificationCard extends StatelessWidget {
                 ),
               ),
               Text(
-                "Your account has full access to eDonate",
+                "Your account has full access to Dugtong",
                 style: TextStyle(fontSize: 12, color: context.palette.muted),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,

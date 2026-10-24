@@ -204,7 +204,7 @@ class _CommenterProfileSheetState extends State<CommenterProfileSheet> {
             if (since != null)
               _chip(
                 icon: Icons.calendar_month_rounded,
-                text: 'On eDonate since $since',
+                text: 'On Dugtong since $since',
                 color: context.palette.muted,
                 bg: context.palette.surfaceAlt,
               ),
