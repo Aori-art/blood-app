@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'app_colors.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -165,9 +166,28 @@ class _BookScreenState extends State<BookScreen>
     );
   }
 
+  // The Book tab stays alive between visits, so it freshens up each time it
+  // becomes the tab on screen (a tap or a swipe): a silent reload that keeps
+  // what is shown until the new data is in. At most once per 5 seconds.
+  bool? _wasActiveTab;
+  // Frame time (it advances with the app, and with a test's clock).
+  Duration _lastLoad = SchedulerBinding.instance.currentSystemFrameTimeStamp;
+
+  void _freshenIfActivated() {
+    final active = StreakTabScope.isActive(context);
+    final was = _wasActiveTab;
+    _wasActiveTab = active;
+    if (was != false || !active) return;
+    final now = SchedulerBinding.instance.currentSystemFrameTimeStamp;
+    if (now - _lastLoad < const Duration(seconds: 5)) return;
+    _lastLoad = now;
+    _loadStatuses();
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _freshenIfActivated();
     // The Confirm button's breathing stops with animations removed.
     if (MediaQuery.disableAnimationsOf(context)) {
       _pulseController

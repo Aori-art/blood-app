@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'app_colors.dart';
 import 'streak/streak_screen.dart';
 import 'package:http/http.dart' as http;
@@ -47,6 +48,27 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
     fetchDonationHistory();
     _fetchAppointmentStatus();
     _loadDigitalId();
+  }
+
+  // The History tab stays alive between visits, so it freshens up each time
+  // it becomes the tab on screen: a silent reload (what is shown stays until
+  // the new data is in). At most once per 5 seconds.
+  bool? _wasActiveTab;
+  // Frame time (it advances with the app, and with a test's clock).
+  Duration _lastLoad = SchedulerBinding.instance.currentSystemFrameTimeStamp;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final active = StreakTabScope.isActive(context);
+    final was = _wasActiveTab;
+    _wasActiveTab = active;
+    if (was != false || !active) return;
+    final now = SchedulerBinding.instance.currentSystemFrameTimeStamp;
+    if (now - _lastLoad < const Duration(seconds: 5)) return;
+    _lastLoad = now;
+    fetchDonationHistory();
+    _fetchAppointmentStatus();
   }
 
   Future<void> _loadDigitalId() async {
