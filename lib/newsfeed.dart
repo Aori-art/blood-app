@@ -1752,8 +1752,13 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
   bool _loadingPosts = true;
   String? _postsError;
 
-  final ScrollController _scrollController = ScrollController();
-  double _lastScrollOffset = 0;
+  // One scrolling page per category, side by side in a PageView; a swipe
+  // moves between them. Each page keeps its own scroll position.
+  final PageController _pages = PageController();
+  final Map<FeedCategory, ScrollController> _scrollControllers = {};
+
+  ScrollController _scrollFor(FeedCategory c) =>
+      _scrollControllers.putIfAbsent(c, ScrollController.new);
 
   // Scrolling only moves these two notifiers; nothing rebuilds the feed.
   /// "Go to Home" shows at the top and when scrolling back up, and hides
@@ -1763,24 +1768,23 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
   /// The header gets its shadow once the feed has moved under it.
   final ValueNotifier<bool> _scrolled = ValueNotifier(false);
 
-  // The category that is selected, and the one the list shows. The list
-  // fades out, switches, then fades back in.
-  FeedCategory _filter = FeedCategory.all;
-  FeedCategory _shownFilter = FeedCategory.all;
-  bool _listVisible = true;
-  Timer? _filterTimer;
+  // The selected category: the page that is showing.
+  FeedCategory _selected = FeedCategory.all;
 
   // Posts per category and the categories that exist, worked out once per
   // load of the feed.
   Map<FeedCategory, int> _counts = const {};
+  Map<FeedCategory, List<Post>> _byCategory = const {};
   List<FeedCategory> _categories = const [];
 
-  // Where the list of posts starts (just below the welcome cards).
-  final GlobalKey _postsKey = GlobalKey();
+  // True while the code (a tap, a reload) moves the pages: those page changes
+  // are not the donor's swipes. [_pageSeq] tells the latest move from an
+  // earlier one that was replaced.
+  bool _pagingByCode = false;
+  int _pageSeq = 0;
 
-  // True while the feed scrolls itself after a category is tapped: those
-  // moves must not flip "Go to Home" back. [_scrollSeq] tells the latest
-  // such scroll from an earlier one that was replaced.
+  // True while a page scrolls itself to the top after a tap on its own
+  // category: that move must not flip "Go to Home" back.
   bool _programmaticScroll = false;
   int _scrollSeq = 0;
 
@@ -1800,14 +1804,14 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     _checkLoginStatus();
     _fetchVerificationStatus();
     _loadPosts();
-    _scrollController.addListener(_handleScroll);
   }
 
   @override
   void dispose() {
-    _filterTimer?.cancel();
-    _scrollController.removeListener(_handleScroll);
-    _scrollController.dispose();
+    _pages.dispose();
+    for (final c in _scrollControllers.values) {
+      c.dispose();
+    }
     goHomeVisible.dispose();
     _scrolled.dispose();
     super.dispose();
@@ -1818,48 +1822,150 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
   bool get _barAvailable =>
       !_loadingPosts && _postsError == null && _categories.isNotEmpty;
 
-  void _handleScroll() {
-    final offset = _scrollController.offset;
-    final delta = offset - _lastScrollOffset;
-    _lastScrollOffset = offset;
+  /// The pages, in the bar's order; just All while there is no bar.
+  List<FeedCategory> get _pageCategories =>
+      _categories.isEmpty ? const [FeedCategory.all] : _categories;
+
+  /// The vertical scrolling of the CURRENT page drives the header shadow and
+  /// "Go to Home" (the paging itself is horizontal and ignored here).
+  bool _onScroll(ScrollNotification n) {
+    if (n is! ScrollUpdateNotification || n.metrics.axis != Axis.vertical) {
+      return false;
+    }
+    final scrollContext = n.context;
+    if (scrollContext == null) return false;
+    final scrollable = Scrollable.maybeOf(scrollContext);
+    if (scrollable == null ||
+        scrollable.widget.controller != _scrollControllers[_selected]) {
+      return false;
+    }
+    final offset = n.metrics.pixels;
+    final delta = n.scrollDelta ?? 0;
 
     _scrolled.value = offset > 2;
 
-    // The feed scrolling itself says nothing about which way the donor goes.
-    if (_programmaticScroll) return;
+    // The page scrolling itself says nothing about which way the donor goes.
+    if (_programmaticScroll) return false;
 
     // A list too short to scroll (a bounce on iOS still reports offsets):
     // inside a category the bar stays, so the donor is never stuck in a
     // filter; with All selected it is the top of the feed again.
-    if (_barAvailable && _scrollController.position.maxScrollExtent <= 0) {
-      goHomeVisible.value = _filter == FeedCategory.all;
-      return;
+    if (_barAvailable && n.metrics.maxScrollExtent <= 0) {
+      goHomeVisible.value = _selected == FeedCategory.all;
+      return false;
     }
 
     if (offset <= 0) {
       goHomeVisible.value = true;
-      return;
+      return false;
     }
     if (delta > 6 && goHomeVisible.value) {
       goHomeVisible.value = false;
     } else if (delta < -6 && !goHomeVisible.value) {
       goHomeVisible.value = true;
     }
+    return false;
   }
 
-  /// After the list changed: when it is too short to scroll there are no
-  /// scroll events to go by, so decide here (see [_handleScroll]).
+  /// After the page or its list changed: the header shadow follows the new
+  /// page, and a page too short to scroll has no scroll events to go by, so
+  /// decide here (see [_onScroll]).
   void _settleBar() {
-    if (!mounted || !_scrollController.hasClients) return;
-    if (_barAvailable && _scrollController.position.maxScrollExtent <= 0) {
-      goHomeVisible.value = _filter == FeedCategory.all;
+    if (!mounted) return;
+    final c = _scrollControllers[_selected];
+    if (c == null || !c.hasClients) return;
+    _scrolled.value = c.offset > 2;
+    if (_barAvailable && c.position.maxScrollExtent <= 0) {
+      goHomeVisible.value = _selected == FeedCategory.all;
     }
   }
 
-  /// A scroll the feed makes itself is over (or was given up).
-  void _endProgrammatic() {
-    _scrollSeq++;
-    _programmaticScroll = false;
+  void _announce(FeedCategory c) {
+    SemanticsService.sendAnnouncement(
+      View.of(context),
+      'Showing ${c.label}, ${postsLabel(_counts[c] ?? 0)}',
+      Directionality.of(context),
+    );
+  }
+
+  /// The donor swiped to another page: the bar says where they are.
+  void _onPageChanged(int index) {
+    final pages = _pageCategories;
+    if (_pagingByCode || index < 0 || index >= pages.length) return;
+    final c = pages[index];
+    if (c == _selected) return;
+    setState(() => _selected = c);
+    HapticFeedback.selectionClick();
+    _announce(c);
+    goHomeVisible.value = false;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _settleBar());
+  }
+
+  /// The page index of [_selected] is the controller's page again (after the
+  /// categories changed under it): jump there, without animation.
+  void _syncPage() {
+    if (!mounted || !_pages.hasClients) return;
+    final want = _pageCategories.indexOf(_selected);
+    if (want < 0 || !_pages.position.hasPixels) return;
+    if ((_pages.page ?? want.toDouble()).round() == want) return;
+    _pagingByCode = true;
+    _pages.jumpToPage(want);
+    _pagingByCode = false;
+  }
+
+  /// Moves the pages to [target]: animated (a jump to the page next to it
+  /// first when it is far, so the pages in between are never built), or a
+  /// plain jump when animations are off.
+  Future<void> _goToPage(int target) async {
+    if (!_pages.hasClients || !_pages.position.hasPixels) return;
+    final seq = ++_pageSeq;
+    _pagingByCode = true;
+    try {
+      final current = (_pages.page ?? target.toDouble()).round();
+      if (MediaQuery.disableAnimationsOf(context)) {
+        _pages.jumpToPage(target);
+      } else {
+        if ((target - current).abs() > 1) {
+          _pages.jumpToPage(target > current ? target - 1 : target + 1);
+        }
+        await _pages.animateToPage(
+          target,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    } finally {
+      // Only the latest move hands the pages back to the donor.
+      if (seq == _pageSeq) {
+        _pagingByCode = false;
+        if (mounted) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => _settleBar());
+        }
+      }
+    }
+  }
+
+  /// The selected category was tapped again: its page scrolls to the top
+  /// (like the iOS tab bar); the bar stays.
+  Future<void> _scrollSelectedToTop() async {
+    final c = _scrollControllers[_selected];
+    if (c == null || !c.hasClients) return;
+    final seq = ++_scrollSeq;
+    _programmaticScroll = true;
+    try {
+      await c.animateTo(
+        0,
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    } finally {
+      if (seq == _scrollSeq) {
+        _programmaticScroll = false;
+        _settleBar();
+      }
+    }
   }
 
   Future<void> _checkLoginStatus() async {
@@ -1967,9 +2073,34 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     );
   }
 
-  void _scrollToVerifyCta() {
-    if (!_scrollController.hasClients) return;
-    _scrollController.animateTo(
+  /// "Verify your ID": the card is on the All page, so go there first (a
+  /// jump when it is far), then scroll up to it.
+  Future<void> _scrollToVerifyCta() async {
+    if (_selected != FeedCategory.all && _categories.isNotEmpty) {
+      setState(() => _selected = FeedCategory.all);
+      if (_pages.hasClients && _pages.position.hasPixels) {
+        final seq = ++_pageSeq;
+        _pagingByCode = true;
+        try {
+          final current = (_pages.page ?? 0).round();
+          if (current > 1 || MediaQuery.disableAnimationsOf(context)) {
+            _pages.jumpToPage(0);
+          } else {
+            await _pages.animateToPage(
+              0,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOutCubic,
+            );
+          }
+        } finally {
+          if (seq == _pageSeq) _pagingByCode = false;
+        }
+        await WidgetsBinding.instance.endOfFrame;
+      }
+    }
+    final c = _scrollControllers[FeedCategory.all];
+    if (!mounted || c == null || !c.hasClients) return;
+    c.animateTo(
       0,
       duration: const Duration(milliseconds: 400),
       curve: Curves.easeOutCubic,
@@ -2011,13 +2142,18 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     );
   }
 
-  Future<void> _loadPosts() async {
+  Future<void> _loadPosts({bool refresh = false}) async {
     // Taps after this moment are newer than what the server is about to say.
     final likesMark = _likes.mark;
-    setState(() {
-      _loadingPosts = true;
-      _postsError = null;
-    });
+    // A refresh keeps showing the posts (the pull spinner is enough), so the
+    // pages and their scroll positions are not thrown away while it runs.
+    final keepShowing = refresh && _posts.isNotEmpty;
+    if (!keepShowing) {
+      setState(() {
+        _loadingPosts = true;
+        _postsError = null;
+      });
+    }
     // The newsfeed loading is also when the header photo gets refreshed.
     unawaited(MyAvatarController.instance.refresh());
     try {
@@ -2037,28 +2173,44 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       setState(() {
         _posts = posts;
         _loadingPosts = false;
+        _postsError = null;
         final counts = <FeedCategory, int>{FeedCategory.all: posts.length};
+        final byCategory = <FeedCategory, List<Post>>{FeedCategory.all: posts};
         for (final p in posts) {
           final group = FeedCategory.of(p.type.name);
           counts[group] = (counts[group] ?? 0) + 1;
+          (byCategory[group] ??= []).add(p);
         }
         _counts = counts;
+        _byCategory = byCategory;
         _categories = FeedCategory.available(posts.map((p) => p.type.name));
-        // A group that is gone after a refresh falls back to "All".
-        if (_filter != FeedCategory.all && !_categories.contains(_filter)) {
-          _filterTimer?.cancel();
-          _endProgrammatic();
-          _filter = _shownFilter = FeedCategory.all;
-          _listVisible = true;
+        // A category that is gone after a reload falls back to All.
+        if (_selected != FeedCategory.all && !_categories.contains(_selected)) {
+          _selected = FeedCategory.all;
         }
       });
-      WidgetsBinding.instance.addPostFrameCallback((_) => _settleBar());
+      // The pages may have moved (a category is gone): the PageView follows
+      // the selected page, without animation.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _syncPage();
+        _settleBar();
+      });
     } catch (e) {
       if (!mounted) return;
+      if (keepShowing) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Couldn't refresh the feed."),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
       setState(() {
         _postsError = "Couldn't load the feed.";
         _loadingPosts = false;
         _categories = const [];
+        _selected = FeedCategory.all;
       });
     }
   }
@@ -2075,52 +2227,54 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
         FloatingNavMetrics.bottomMargin +
         MediaQuery.paddingOf(context).bottom +
         16;
-    return Scaffold(
-      backgroundColor: context.palette.background,
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: SafeArea(
-              child: Column(
-                children: [
-                  _buildHeader(context),
-                  Expanded(
-                    child: RefreshIndicator(
-                      onRefresh: () => Future.wait([
-                        _loadPosts(),
-                        _fetchVerificationStatus(),
-                      ]),
-                      child: _buildFeed(
+    return PopScope(
+      // Back from a category goes to All first; from All it leaves as before.
+      canPop: _selected == FeedCategory.all,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _selectCategory(FeedCategory.all);
+      },
+      child: Scaffold(
+        backgroundColor: context.palette.background,
+        body: Stack(
+          children: [
+            Positioned.fill(
+              child: SafeArea(
+                child: Column(
+                  children: [
+                    _buildHeader(context),
+                    Expanded(
+                      child: _buildPages(
                         context,
                         bottomSpace: _barAvailable ? barRoom : 0,
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-          // The category bar and "Go to Home" take turns: the bar is on
-          // screen exactly when "Go to Home" is away.
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: ValueListenableBuilder<bool>(
-              valueListenable: goHomeVisible,
-              builder: (context, goHome, _) => CategoryNavBar(
-                items: _categories,
-                selected: _filter,
-                counts: _counts,
-                onSelected: _selectCategory,
-                visible: _barAvailable && !goHome,
+            // The category bar and "Go to Home" take turns: the bar is on
+            // screen exactly when "Go to Home" is away.
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: ValueListenableBuilder<bool>(
+                valueListenable: goHomeVisible,
+                builder: (context, goHome, _) => CategoryNavBar(
+                  items: _categories,
+                  selected: _selected,
+                  counts: _counts,
+                  onSelected: _selectCategory,
+                  visible: _barAvailable && !goHome,
+                  pageController: _pages,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
+        floatingActionButton: _buildFabArea(context),
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       ),
-      floatingActionButton: _buildFabArea(context),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 
@@ -2274,141 +2428,129 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       !_checkingVerification &&
       _verificationStatus == 'verified';
 
-  /// A category was tapped: the list switches to it, the feed scrolls so its
-  /// first post sits under the header, and the category bar stays on screen
-  /// (it is "Go to Home" that gives way).
+  /// A category was tapped (or the back button asked for All): the pages
+  /// move to it and the category bar stays on screen (it is "Go to Home"
+  /// that gives way). Tapping the selected one scrolls its page to the top.
   void _selectCategory(FeedCategory f) {
     HapticFeedback.selectionClick();
-    if (f != _filter) {
-      SemanticsService.sendAnnouncement(
-        View.of(context),
-        'Showing ${f.label}, ${postsLabel(_counts[f] ?? 0)}',
-        Directionality.of(context),
-      );
-    }
-    _filterTimer?.cancel();
-    // Set before anything moves, so none of it reads as the donor scrolling.
-    final seq = ++_scrollSeq;
-    _programmaticScroll = true;
+    final target = _pageCategories.indexOf(f);
+    if (target < 0) return;
     goHomeVisible.value = false;
-
-    if (f == _filter && f == _shownFilter) {
-      _scrollToPosts(seq);
+    if (f == _selected) {
+      _scrollSelectedToTop();
       return;
     }
-    if (MediaQuery.disableAnimationsOf(context)) {
-      setState(() => _filter = _shownFilter = f);
-      _scrollToPosts(seq);
-      return;
-    }
-    setState(() {
-      _filter = f;
-      _listVisible = false;
-    });
-    _filterTimer = Timer(const Duration(milliseconds: 150), () {
-      if (!mounted) return;
-      setState(() {
-        _shownFilter = _filter;
-        _listVisible = true;
-      });
-      _scrollToPosts(seq);
-    });
+    _announce(f);
+    setState(() => _selected = f);
+    _goToPage(target);
   }
 
-  Future<void> _scrollToPosts(int seq) async {
-    try {
-      // Let the new list lay out first.
-      await WidgetsBinding.instance.endOfFrame;
-      final anchor = _postsKey.currentContext;
-      if (!mounted || anchor == null || !anchor.mounted) return;
-      if (!_scrollController.hasClients) return;
-      await Scrollable.ensureVisible(
-        anchor,
-        alignment: 0,
-        duration: MediaQuery.disableAnimationsOf(anchor)
-            ? Duration.zero
-            : const Duration(milliseconds: 300),
-        curve: Curves.easeOutCubic,
-      );
-    } finally {
-      // Only the latest scroll gives the buttons back to the donor.
-      if (seq == _scrollSeq) {
-        _programmaticScroll = false;
-        _settleBar();
-      }
-    }
+  /// The pages: one scrolling list per category, swiped sideways. Only the
+  /// vertical scrolling of the current page is read ([_onScroll]).
+  Widget _buildPages(BuildContext context, {required double bottomSpace}) {
+    final pages = _pageCategories;
+    final swipeable = _barAvailable && pages.length > 1;
+    return NotificationListener<ScrollNotification>(
+      onNotification: _onScroll,
+      child: PageView.builder(
+        controller: _pages,
+        // iOS feel: pages snap, with the bounce at both ends.
+        physics: swipeable
+            ? const PageScrollPhysics(parent: BouncingScrollPhysics())
+            : const NeverScrollableScrollPhysics(),
+        itemCount: pages.length,
+        onPageChanged: _onPageChanged,
+        findChildIndexCallback: (key) {
+          if (key is! ValueKey<String>) return null;
+          final i = pages.indexWhere((c) => 'page-${c.name}' == key.value);
+          return i < 0 ? null : i;
+        },
+        itemBuilder: (context, i) => _FeedPageShell(
+          key: ValueKey('page-${pages[i].name}'),
+          label: '${pages[i].label} posts, page ${i + 1} of ${pages.length}',
+          child: _buildPage(context, pages[i], bottomSpace: bottomSpace),
+        ),
+      ),
+    );
   }
 
-  /// The feed: the welcome cards, then one row per post,
-  /// built as it scrolls into view.
-  Widget _buildFeed(BuildContext context, {required double bottomSpace}) {
-    final top = <Widget>[
-      FadeSlideIn(index: 0, child: _buildSignInCta(context)),
-      if (_isLoggedIn) FadeSlideIn(index: 1, child: _buildVerifyIdCta(context)),
-      const SizedBox(height: 8),
-    ];
+  /// One page: the welcome cards (All only), then one row per post, built as
+  /// it scrolls into view.
+  Widget _buildPage(
+    BuildContext context,
+    FeedCategory category, {
+    required double bottomSpace,
+  }) {
+    final isAll = category == FeedCategory.all;
 
     Widget? message;
-    if (_loadingPosts) {
-      message = const FeedSkeleton();
-    } else if (_postsError != null) {
-      message = FeedMessage(message: _postsError!, onRetry: _loadPosts);
-    } else if (_posts.isEmpty) {
-      message = const FeedMessage(message: 'No posts yet. Check back soon!');
+    if (isAll) {
+      if (_loadingPosts) {
+        message = const FeedSkeleton();
+      } else if (_postsError != null) {
+        message = FeedMessage(
+          message: _postsError!,
+          onRetry: () => _loadPosts(),
+        );
+      } else if (_posts.isEmpty) {
+        message = const FeedMessage(message: 'No posts yet. Check back soon!');
+      }
     }
-    final shown = message != null
+    final posts = message != null
         ? const <Post>[]
-        : _posts.where((p) => _shownFilter.matches(p.type.name)).toList();
-    return CustomScrollView(
-      controller: _scrollController,
-      slivers: [
-        SliverToBoxAdapter(child: Column(children: top)),
-        // Where the posts start: a category tap scrolls here.
-        SliverToBoxAdapter(
-          child: Column(key: _postsKey, children: const [SizedBox(height: 8)]),
-        ),
-        if (message != null)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: message,
+        : (_byCategory[category] ?? const <Post>[]);
+
+    return RefreshIndicator(
+      onRefresh: () =>
+          Future.wait([_loadPosts(refresh: true), _fetchVerificationStatus()]),
+      child: CustomScrollView(
+        key: ValueKey('feed-scroll-${category.name}'),
+        controller: _scrollFor(category),
+        slivers: [
+          if (isAll)
+            SliverToBoxAdapter(
+              child: Column(
+                children: [
+                  FadeSlideIn(index: 0, child: _buildSignInCta(context)),
+                  if (_isLoggedIn)
+                    FadeSlideIn(index: 1, child: _buildVerifyIdCta(context)),
+                  const SizedBox(height: 8),
+                ],
+              ),
             ),
-          )
-        else
-          SliverList.builder(
-            itemCount: shown.length + 1,
-            // Cards keep their state (likes, Read more) when a filter moves
-            // them.
-            findChildIndexCallback: (key) {
-              if (key is! ValueKey<String>) return null;
-              final i = shown.indexWhere((p) => 'post-${p.id}' == key.value);
-              return i < 0 ? null : i;
-            },
-            itemBuilder: (context, i) {
-              if (i == shown.length) {
-                return AnimatedOpacity(
-                  opacity: _listVisible ? 1 : 0,
-                  duration: const Duration(milliseconds: 150),
-                  child: const CaughtUpFooter(),
-                );
-              }
-              return KeyedSubtree(
-                key: ValueKey('post-${shown[i].id}'),
-                child: AnimatedOpacity(
-                  opacity: _listVisible ? 1 : 0,
-                  duration: const Duration(milliseconds: 150),
+          const SliverToBoxAdapter(child: SizedBox(height: 8)),
+          if (message != null)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: message,
+              ),
+            )
+          else
+            SliverList.builder(
+              itemCount: posts.length + 1,
+              // Cards keep their state (Read more) when the list changes.
+              findChildIndexCallback: (key) {
+                if (key is! ValueKey<String>) return null;
+                final i = posts.indexWhere((p) => 'post-${p.id}' == key.value);
+                return i < 0 ? null : i;
+              },
+              itemBuilder: (context, i) {
+                if (i == posts.length) return const CaughtUpFooter();
+                return KeyedSubtree(
+                  key: ValueKey('post-${posts[i].id}'),
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    child: _entrance(i, shown[i]),
+                    child: _entrance(i, posts[i]),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
+          SliverToBoxAdapter(
+            child: SizedBox(height: bottomSpace > 110 ? bottomSpace : 110),
           ),
-        SliverToBoxAdapter(
-          child: SizedBox(height: bottomSpace > 110 ? bottomSpace : 110),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -2961,6 +3103,36 @@ class _VerificationCard extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// A page of the feed that stays alive while it is swiped away, so its
+/// scroll position and cards are there when the donor comes back. Labelled
+/// for a screen reader ("Events posts, page 2 of 5").
+class _FeedPageShell extends StatefulWidget {
+  const _FeedPageShell({super.key, required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  State<_FeedPageShell> createState() => _FeedPageShellState();
+}
+
+class _FeedPageShellState extends State<_FeedPageShell>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      label: widget.label,
+      child: widget.child,
     );
   }
 }

@@ -143,12 +143,15 @@ void _neverTogether(WidgetTester tester) {
 }
 
 Future<void> _scrollDown(WidgetTester tester, [double by = 300]) async {
-  await tester.drag(find.byType(CustomScrollView), Offset(0, -by));
+  await tester.drag(
+    find.byType(CustomScrollView).hitTestable(),
+    Offset(0, -by),
+  );
   await _frames(tester);
 }
 
 Future<void> _scrollUp(WidgetTester tester, [double by = 120]) async {
-  await tester.drag(find.byType(CustomScrollView), Offset(0, by));
+  await tester.drag(find.byType(CustomScrollView).hitTestable(), Offset(0, by));
   await _frames(tester);
 }
 
@@ -216,18 +219,19 @@ void main() {
       await _scrollDown(tester);
       expect(_barShown(tester), isTrue);
 
-      await tester.tap(_item('Urgent'));
+      await tester.tap(_item('Events'));
       await _frames(tester, 20);
-      // Only the urgent post is left (1 of the 6).
-      expect(find.text('City Blood Bank'), findsOneWidget);
-      expect(find.text('Capstone'), findsNothing);
-      expect(_cards(tester), 1);
+      // The Events page: its posts, not the others.
+      expect(find.text('Capstone'), findsWidgets);
+      expect(find.text('City Blood Bank'), findsNothing);
       // The bar stays, Go to Home stays away.
       expect(_barShown(tester), isTrue);
       expect(_goHomeShown(tester), isFalse);
       _neverTogether(tester);
 
-      // A later scroll up swaps them.
+      // The first vertical scroll on the new page, then up: they swap.
+      await _scrollDown(tester, 200);
+      expect(_barShown(tester), isTrue);
       await _scrollUp(tester);
       expect(_goHomeShown(tester), isTrue);
       expect(_barShown(tester), isFalse);
@@ -249,7 +253,12 @@ void main() {
       await _frames(tester, 20);
       expect(_cards(tester), 1);
       final position = tester
-          .state<ScrollableState>(find.byType(Scrollable).first)
+          .state<ScrollableState>(
+            find.descendant(
+              of: find.byType(CustomScrollView).hitTestable(),
+              matching: find.byType(Scrollable),
+            ),
+          )
           .position;
       expect(position.maxScrollExtent, lessThanOrEqualTo(0));
       expect(_barShown(tester), isTrue);
@@ -318,7 +327,10 @@ void main() {
     final run = _Run(samplePostsJson());
     await _with(run, () async {
       await _pumpFeed(tester, run);
-      await tester.drag(find.byType(CustomScrollView), const Offset(0, -300));
+      await tester.drag(
+        find.byType(CustomScrollView).hitTestable(),
+        const Offset(0, -300),
+      );
       // Part-way in: still below its place.
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pump(const Duration(milliseconds: 100));
@@ -331,7 +343,10 @@ void main() {
     final still = _Run(samplePostsJson());
     await _with(still, () async {
       await _pumpFeed(tester, still, reduceMotion: true);
-      await tester.drag(find.byType(CustomScrollView), const Offset(0, -300));
+      await tester.drag(
+        find.byType(CustomScrollView).hitTestable(),
+        const Offset(0, -300),
+      );
       await tester.pump(const Duration(milliseconds: 40));
       await tester.pump(const Duration(milliseconds: 40));
       // A cross-fade: in place from the first frame.
@@ -355,8 +370,12 @@ void main() {
       await _scrollDown(tester);
       await tester.tap(_item('Events'));
       await _frames(tester, 20);
-      final top = tester.getTopLeft(find.byType(RefreshIndicator)).dy;
-      final first = tester.getTopLeft(find.byType(PostCard).first).dy;
+      final top = tester
+          .getTopLeft(find.byType(RefreshIndicator).hitTestable())
+          .dy;
+      final first = tester
+          .getTopLeft(find.byType(PostCard).hitTestable().first)
+          .dy;
       expect(first - top, closeTo(8, 1));
       expect(_barShown(tester), isTrue);
       expect(_goHomeShown(tester), isFalse);

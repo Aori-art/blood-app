@@ -55,6 +55,7 @@ class CategoryNavBar extends StatefulWidget {
     required this.onSelected,
     required this.visible,
     this.counts = const {},
+    this.pageController,
   });
 
   final List<FeedCategory> items;
@@ -66,6 +67,10 @@ class CategoryNavBar extends StatefulWidget {
 
   /// Posts per category, for the labels read out and the Urgent dot.
   final Map<FeedCategory, int> counts;
+
+  /// The pages of the feed: the bar follows its fractional page while the
+  /// donor swipes. Null: the selected item is the page.
+  final PageController? pageController;
 
   /// The bar's height at normal text size; it grows to [largeTextHeight]
   /// when the system font is large.

@@ -158,19 +158,29 @@ Future<void> _tap(WidgetTester tester, Finder f, [int frames = 8]) async {
 }
 
 Future<void> _scrollDown(WidgetTester tester, [double by = 300]) async {
-  await tester.drag(find.byType(CustomScrollView), Offset(0, -by));
+  await tester.drag(
+    find.byType(CustomScrollView).hitTestable(),
+    Offset(0, -by),
+  );
   await _frames(tester);
 }
 
 Future<void> _scrollToTop(WidgetTester tester) async {
-  await tester.drag(find.byType(CustomScrollView), const Offset(0, 3000));
+  await tester.drag(
+    find.byType(CustomScrollView).hitTestable(),
+    const Offset(0, 3000),
+  );
   await _frames(tester);
 }
 
 /// Pull down at the top of the feed (the screen's pull-to-refresh).
 Future<void> _pullToRefresh(WidgetTester tester) async {
   await _scrollToTop(tester);
-  await tester.fling(find.byType(CustomScrollView), const Offset(0, 400), 1000);
+  await tester.fling(
+    find.byType(CustomScrollView).hitTestable(),
+    const Offset(0, 400),
+    1000,
+  );
   await _frames(tester, 20);
 }
 

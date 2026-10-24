@@ -40,7 +40,10 @@ import 'sample_posts.dart';
 
 /// Scrolls the newsfeed down, so "Go to Home" gives way to the category bar.
 Future<void> _scrollFeedDown(WidgetTester tester) async {
-  await tester.drag(find.byType(CustomScrollView), const Offset(0, -700));
+  await tester.drag(
+    find.byType(CustomScrollView).hitTestable(),
+    const Offset(0, -700),
+  );
   for (var i = 0; i < 10; i++) {
     await tester.pump(const Duration(milliseconds: 100));
   }
