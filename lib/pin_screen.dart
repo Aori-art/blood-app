@@ -16,6 +16,7 @@ import 'streak/streak_controller.dart';
 import 'unread_notifications.dart';
 import 'my_avatar_controller.dart';
 import 'app_palette.dart';
+import 'widgets/dugtong_wordmark.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // eDonate PIN — a 4-digit PIN (like GCash's MPIN) that protects Home.
@@ -82,18 +83,9 @@ const Color _crimson = AppColors.primary;
 const Color _crimsonMid = AppColors.primaryDark;
 const Color _blush = AppColors.onPrimarySoft;
 
-// The eDonate logo at the top of the PIN screen. Both files go in
-// assets/images/ (declared under flutter → assets in pubspec.yaml).
-//   edonate_logo_white.png → white wordmark, globe lines cut out so the
-//                            crimson background shows through them
-//   edonate_logo.png       → original red colors
-const String _kLogoWhiteAsset = 'assets/images/edonate_logo_white.png';
-const String _kLogoColorAsset = 'assets/images/edonate_logo.png';
-const double _kLogoAspect = 4.15; // width ÷ height of both logo files
-
-// false → white logo directly on the crimson background (GCash style).
-// true  → original red logo on a white rounded card.
-const bool _kLogoOnCard = false;
+// The Dugtong logo at the top of the PIN screen: the icon and the name,
+// drawn by DugtongLockup (no image file).
+const double _kLogoAspect = 4.15; // width ÷ height of the logo
 
 class PinScreen extends StatefulWidget {
   final PinPurpose purpose;
@@ -1293,56 +1285,25 @@ class _KeyButtonState extends State<_KeyButton> {
   }
 }
 
-// ── eDonate logo ────────────────────────────────────────────────────────────
+// ── Dugtong logo ────────────────────────────────────────────────────────────
 
+/// The icon and the name, on the crimson background. [width] is the room the
+/// logo has; its height is that over [_kLogoAspect].
 class _EDonateLogo extends StatelessWidget {
   final double width;
   const _EDonateLogo({required this.width});
 
   @override
   Widget build(BuildContext context) {
-    final onCard = _kLogoOnCard;
-    final imageWidth = onCard ? width * 0.84 : width;
-    final image = Image.asset(
-      onCard ? _kLogoColorAsset : _kLogoWhiteAsset,
-      width: imageWidth,
-      height: imageWidth / _kLogoAspect,
-      fit: BoxFit.contain,
-      filterQuality: FilterQuality.high,
-      // If the asset is missing, fall back to the name so the screen still works.
-      errorBuilder: (_, __, ___) => SizedBox(
-        width: imageWidth,
-        height: imageWidth / _kLogoAspect,
-        child: FittedBox(
-          child: Text(
-            'Dugtong',
-            style: TextStyle(
-              color: onCard ? _crimson : Colors.white,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
+    return SizedBox(
+      width: width,
+      child: Center(
+        child: DugtongLockup(
+          iconSize: width / _kLogoAspect,
+          onGradient: true,
+          tagline: false,
         ),
       ),
-    );
-
-    if (!onCard) return image;
-
-    return Container(
-      width: width,
-      padding: EdgeInsets.symmetric(vertical: width * 0.06),
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: Colors.white, // the colored logo sits on white in both modes
-        borderRadius: BorderRadius.circular(width * 0.08),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: .18),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: image,
     );
   }
 }

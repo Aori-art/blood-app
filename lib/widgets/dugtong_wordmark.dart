@@ -74,14 +74,17 @@ class DugtongWordmark extends StatelessWidget {
 
     final Widget name;
     if (reveal == null) {
-      name = RichText(
-        textScaler: scaler,
-        text: TextSpan(
+      // Text.rich, so the name takes the app's font like every other text.
+      name = Text.rich(
+        TextSpan(
           children: [
             TextSpan(text: 'Dug', style: dug),
             TextSpan(text: 'tong', style: tong),
           ],
         ),
+        // The size and weight, for tools that read the text's own style.
+        style: base,
+        textScaler: scaler,
       );
     } else {
       Widget half(

@@ -8,7 +8,7 @@ import 'package:blood/newsfeed.dart';
 import 'package:blood/privacy_consent.dart';
 import 'package:blood/privacy_statement.dart';
 import 'package:blood/streak/streak_screen.dart';
-import '../app_palette.dart';
+import '../widgets/dugtong_wordmark.dart';
 
 class SplashScreen extends StatefulWidget {
   final bool isLoggedIn;
@@ -21,24 +21,22 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with TickerProviderStateMixin {
-
   // ── Animation controllers ──────────────────────────────────────────────────
-  late final AnimationController _logoController;
+  late final AnimationController _lockupController;
   late final AnimationController _textController;
   late final AnimationController _pulseController;
   late final AnimationController _progressController;
   late final AnimationController _ringsController;
 
-  // Logo
-  late final Animation<double> _logoScale;
-  late final Animation<double> _logoFade;
-  late final Animation<Offset> _logoSlide;
+  // The lockup: the icon pops in, "Dug" and "tong" slide in from the sides
+  // and meet ("dugtong" means to connect), then the tagline fades in.
+  late final DugtongReveal _reveal;
 
-  // Text
-  late final Animation<double> _titleFade;
-  late final Animation<Offset> _titleSlide;
+  // The line at the bottom
   late final Animation<double> _subtitleFade;
-  late final Animation<Offset> _subtitleSlide;
+
+  // With animations removed the splash is its last frame, still.
+  bool _reduce = false;
 
   // Pulse glow behind logo
   late final Animation<double> _pulse;
@@ -53,9 +51,9 @@ class _SplashScreenState extends State<SplashScreen>
   void initState() {
     super.initState();
 
-    _logoController = AnimationController(
+    _lockupController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 1000),
     );
     _textController = AnimationController(
       vsync: this,
@@ -74,48 +72,26 @@ class _SplashScreenState extends State<SplashScreen>
       duration: const Duration(seconds: 8),
     )..repeat();
 
-    // Logo animations
-    _logoScale = Tween<double>(begin: 0.3, end: 1.0).animate(
-      CurvedAnimation(parent: _logoController, curve: Curves.elasticOut),
-    );
-    _logoFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _logoController,
-        curve: const Interval(0.0, 0.5, curve: Curves.easeIn),
-      ),
-    );
-    _logoSlide = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(parent: _logoController, curve: Curves.easeOutCubic),
+    // Lockup, on a 1000 ms clock: the icon pops in (0.7 → 1 with a small
+    // overshoot) in 500 ms; the two halves of the name start at 250 ms and
+    // take 450 ms; the tagline fades in from 700 ms.
+    Animation<double> part(double from, double to, Curve curve) =>
+        CurvedAnimation(
+          parent: _lockupController,
+          curve: Interval(from, to, curve: curve),
+        );
+    _reveal = DugtongReveal(
+      icon: part(0.0, 0.5, Curves.easeOutBack),
+      dug: part(0.25, 0.70, Curves.easeOutCubic),
+      tong: part(0.25, 0.70, Curves.easeOutCubic),
+      tagline: part(0.70, 1.0, Curves.easeOut),
     );
 
-    // Title
-    _titleFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _textController, curve: Curves.easeOut),
-    );
-    _titleSlide = Tween<Offset>(
-      begin: const Offset(0, 0.4),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(parent: _textController, curve: Curves.easeOutCubic),
-    );
-
-    // Subtitle
+    // The line at the bottom
     _subtitleFade = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _textController,
         curve: const Interval(0.3, 1.0, curve: Curves.easeOut),
-      ),
-    );
-    _subtitleSlide = Tween<Offset>(
-      begin: const Offset(0, 0.5),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _textController,
-        curve: const Interval(0.3, 1.0, curve: Curves.easeOutCubic),
       ),
     );
 
@@ -130,53 +106,77 @@ class _SplashScreenState extends State<SplashScreen>
     );
 
     // Rings rotation
-    _rings = Tween<double>(begin: 0.0, end: 2 * math.pi).animate(
-      CurvedAnimation(parent: _ringsController, curve: Curves.linear),
-    );
+    _rings = Tween<double>(
+      begin: 0.0,
+      end: 2 * math.pi,
+    ).animate(CurvedAnimation(parent: _ringsController, curve: Curves.linear));
 
-    // Sequence: logo → text → progress
-    Future.delayed(const Duration(milliseconds: 200), () {
-      if (mounted) _logoController.forward();
-    });
+    // Sequence: lockup → progress → bottom line
+    _lockupController.forward();
     Future.delayed(const Duration(milliseconds: 800), () {
-      if (mounted) _textController.forward();
+      if (mounted && !_reduce) _textController.forward();
     });
     Future.delayed(const Duration(milliseconds: 600), () {
-      if (mounted) _progressController.forward();
+      if (mounted && !_reduce) _progressController.forward();
     });
 
     getFCMToken();
 
     Timer(const Duration(milliseconds: 3200), () async {
-  if (!mounted) return;
+      if (!mounted) return;
 
-  // Privacy gate: anyone who hasn't accepted the current statement version
-  // sees the consent screen first. If preferences can't be read we assume
-  // no consent rather than skipping the gate.
-  var consented = false;
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    consented =
-        prefs.getString(kPrivacyConsentVersionKey) == kPrivacyPolicyVersion;
-  } catch (_) {}
-  if (!mounted) return;
+      // Privacy gate: anyone who hasn't accepted the current statement version
+      // sees the consent screen first. If preferences can't be read we assume
+      // no consent rather than skipping the gate.
+      var consented = false;
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        consented =
+            prefs.getString(kPrivacyConsentVersionKey) == kPrivacyPolicyVersion;
+      } catch (_) {}
+      if (!mounted) return;
 
-  Navigator.pushReplacement(
-    context,
-    PageRouteBuilder(
-      // Signed in and signed out both land on the newsfeed now — it already
-      // supports a signed-out state with its own sign-in CTA.
-      pageBuilder: (_, animation, __) => consented
-          ? const NewsfeedPage()
-          : PrivacyConsentScreen(nextBuilder: (_) => const NewsfeedPage()),
-      transitionsBuilder: (_, animation, __, child) {
-        return FadeTransition(opacity: animation, child: child);
-      },
-      transitionDuration: const Duration(milliseconds: 500),
-    ),
-  );
-  if (consented) unawaited(retryPendingPrivacyReceipt());
-});
+      Navigator.pushReplacement(
+        context,
+        PageRouteBuilder(
+          // Signed in and signed out both land on the newsfeed now — it already
+          // supports a signed-out state with its own sign-in CTA.
+          pageBuilder: (_, animation, __) => consented
+              ? const NewsfeedPage()
+              : PrivacyConsentScreen(nextBuilder: (_) => const NewsfeedPage()),
+          transitionsBuilder: (_, animation, __, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+          transitionDuration: const Duration(milliseconds: 500),
+        ),
+      );
+      if (consented) unawaited(retryPendingPrivacyReceipt());
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final reduce = MediaQuery.disableAnimationsOf(context);
+    if (reduce == _reduce) return;
+    _reduce = reduce;
+    if (reduce) {
+      // The final frame, no motion.
+      for (final c in [
+        _lockupController,
+        _textController,
+        _progressController,
+      ]) {
+        c.value = 1;
+      }
+      _pulseController.stop();
+      _pulseController.value = 0.5;
+      _ringsController.stop();
+      _ringsController.value = 0;
+    } else if (!_pulseController.isAnimating) {
+      _pulseController.repeat(reverse: true);
+      _ringsController.repeat();
+    }
   }
 
   void getFCMToken() async {
@@ -190,7 +190,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
-    _logoController.dispose();
+    _lockupController.dispose();
     _textController.dispose();
     _pulseController.dispose();
     _progressController.dispose();
@@ -199,8 +199,11 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   @override
-  Widget build(BuildContext context) =>
-      StreakScreen(id: 'splash', hideBubble: true, child: _buildScreen(context));
+  Widget build(BuildContext context) => StreakScreen(
+    id: 'splash',
+    hideBubble: true,
+    child: _buildScreen(context),
+  );
 
   Widget _buildScreen(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -225,10 +228,8 @@ class _SplashScreenState extends State<SplashScreen>
             Center(
               child: AnimatedBuilder(
                 animation: _rings,
-                builder: (_, __) => Transform.rotate(
-                  angle: _rings.value,
-                  child: _DecoRings(),
-                ),
+                builder: (_, __) =>
+                    Transform.rotate(angle: _rings.value, child: _DecoRings()),
               ),
             ),
 
@@ -238,129 +239,39 @@ class _SplashScreenState extends State<SplashScreen>
                 children: [
                   const Spacer(flex: 3),
 
-                  // Logo
-                  AnimatedBuilder(
-                    animation: Listenable.merge(
-                        [_logoController, _pulseController]),
-                    builder: (_, __) => FadeTransition(
-                      opacity: _logoFade,
-                      child: SlideTransition(
-                        position: _logoSlide,
-                        child: ScaleTransition(
-                          scale: _logoScale,
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              // Pulse glow
-                              Transform.scale(
-                                scale: _pulse.value,
-                                child: Container(
-                                  width: 170,
-                                  height: 170,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: context.palette.surface
-                                        .withOpacity(0.07 * _pulse.value),
-                                  ),
+                  // The lockup: icon, name and tagline, with a soft pulse
+                  // behind the icon.
+                  Stack(
+                    clipBehavior: Clip.none,
+                    alignment: Alignment.topCenter,
+                    children: [
+                      Positioned(
+                        top: (96 - 170) / 2,
+                        child: AnimatedBuilder(
+                          animation: _pulse,
+                          builder: (_, __) => Transform.scale(
+                            scale: _pulse.value,
+                            child: Container(
+                              width: 170,
+                              height: 170,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white.withOpacity(
+                                  0.07 * _pulse.value,
                                 ),
                               ),
-                              // White circle bg
-                              Container(
-                                width: 140,
-                                height: 140,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Colors.white.withOpacity(0.15),
-                                  border: Border.all(
-                                    color: Colors.white.withOpacity(0.25),
-                                    width: 1.5,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.20),
-                                      blurRadius: 30,
-                                      offset: const Offset(0, 10),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              // Logo image
-                              ClipOval(
-                                child: Image.asset(
-                                  'assets/images/1.png',
-                                  width: 110,
-                                  height: 110,
-                                  fit: BoxFit.contain,
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  // App name
-                  FadeTransition(
-                    opacity: _titleFade,
-                    child: SlideTransition(
-                      position: _titleSlide,
-                      child: const Text(
-                        'Dugtong',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 38,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 2.5,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black26,
-                              blurRadius: 12,
-                              offset: Offset(0, 4),
-                            ),
-                          ],
-                        ),
+                      DugtongLockup(
+                        iconSize: 96,
+                        axis: Axis.vertical,
+                        onGradient: true,
+                        tagline: true,
+                        reveal: _reduce ? DugtongReveal.done : _reveal,
                       ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  // Tagline
-                  FadeTransition(
-                    opacity: _subtitleFade,
-                    child: SlideTransition(
-                      position: _subtitleSlide,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                              color: Colors.white.withOpacity(0.2)),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.favorite_rounded,
-                                color: Colors.white70, size: 13),
-                            SizedBox(width: 6),
-                            Text(
-                              'Blood Donation Management',
-                              style: TextStyle(
-                                color: AppColors.onPrimary,
-                                fontSize: 13,
-                                letterSpacing: 0.5,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                    ],
                   ),
 
                   const Spacer(flex: 3),
@@ -381,11 +292,13 @@ class _SplashScreenState extends State<SplashScreen>
                                   height: 3,
                                   child: LinearProgressIndicator(
                                     value: _progress.value,
-                                    backgroundColor:
-                                        Colors.white.withOpacity(0.15),
+                                    backgroundColor: Colors.white.withOpacity(
+                                      0.15,
+                                    ),
                                     valueColor:
                                         const AlwaysStoppedAnimation<Color>(
-                                            Colors.white),
+                                          Colors.white,
+                                        ),
                                   ),
                                 ),
                               ),

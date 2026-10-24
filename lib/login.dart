@@ -15,6 +15,7 @@ import 'unread_notifications.dart';
 import 'streak/streak_screen.dart';
 import 'app_palette.dart';
 import 'my_avatar_controller.dart';
+import 'widgets/dugtong_wordmark.dart';
 
 // Design tokens now come from shared_design.dart (kCrimson) and context.palette
 // so this screen matches the rest of the app instead of its own palette.
@@ -170,28 +171,12 @@ class _LoginScreenState extends State<LoginScreen>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Icon(
-                        Icons.bloodtype_rounded,
-                        color: Colors.white,
-                        size: 36,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    const Text(
-                      'Dugtong',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 30,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                      ),
+                    const DugtongLockup(
+                      iconSize: 64,
+                      wordmarkSize: 30,
+                      axis: Axis.vertical,
+                      onGradient: true,
+                      tagline: false,
                     ),
                     const SizedBox(height: 4),
                     Text(

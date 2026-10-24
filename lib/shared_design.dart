@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import 'app_colors.dart';
 import 'app_palette.dart';
+import 'widgets/dugtong_wordmark.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 // The brand colors, which are the same in both modes. Everything that depends
@@ -230,31 +231,18 @@ class RegisterHeader extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-              Icon(Icons.bloodtype_rounded, color: Colors.white, size: 22),
-              SizedBox(width: 8),
-              Text(
-                'Dugtong',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.3,
-                ),
-              ),
-            ],
+          const DugtongLockup(
+            iconSize: 28,
+            wordmarkSize: 22,
+            onGradient: true,
+            tagline: false,
           ),
           const SizedBox(height: 16),
           StepIndicator(currentStep: step, totalSteps: 3),
           const SizedBox(height: 12),
           Text(
             subtitle,
-            style: TextStyle(
-              color: AppColors.onPrimary,
-              fontSize: 12,
-            ),
+            style: TextStyle(color: AppColors.onPrimary, fontSize: 12),
           ),
         ],
       ),
