@@ -1066,15 +1066,18 @@ class _UnreadBadge extends StatefulWidget {
 
 class _UnreadBadgeState extends State<_UnreadBadge>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _pop = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 320),
-  );
+  // Made in initState (not lazily): a badge that never popped must not
+  // create its ticker while being disposed.
+  late final AnimationController _pop;
   late int _last = widget.count.value;
 
   @override
   void initState() {
     super.initState();
+    _pop = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 320),
+    );
     widget.count.addListener(_onCount);
   }
 
