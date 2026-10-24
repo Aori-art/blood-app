@@ -2311,32 +2311,6 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     }
   }
 
-  /// "Showing Events - 4 posts" while a category is selected; nothing for
-  /// All, so the posts start where they always did.
-  Widget _buildReminder(BuildContext context) {
-    final reduce = MediaQuery.disableAnimationsOf(context);
-    final duration = reduce ? Duration.zero : const Duration(milliseconds: 200);
-    final shown = _shownFilter;
-    final show =
-        shown != FeedCategory.all && _postsError == null && !_loadingPosts;
-    return AnimatedSize(
-      duration: duration,
-      curve: Curves.easeOutCubic,
-      alignment: Alignment.topCenter,
-      child: AnimatedSwitcher(
-        duration: duration,
-        child: show
-            ? CategoryReminder(
-                key: ValueKey(shown),
-                label: shown.label,
-                count: _counts[shown] ?? 0,
-                onShowAll: () => _selectCategory(FeedCategory.all),
-              )
-            : const SizedBox(key: ValueKey('none'), width: double.infinity),
-      ),
-    );
-  }
-
   /// The feed: the welcome cards, then one row per post,
   /// built as it scrolls into view.
   Widget _buildFeed(BuildContext context, {required double bottomSpace}) {
@@ -2363,10 +2337,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
         SliverToBoxAdapter(child: Column(children: top)),
         // Where the posts start: a category tap scrolls here.
         SliverToBoxAdapter(
-          child: Column(
-            key: _postsKey,
-            children: [const SizedBox(height: 8), _buildReminder(context)],
-          ),
+          child: Column(key: _postsKey, children: const [SizedBox(height: 8)]),
         ),
         if (message != null)
           SliverToBoxAdapter(

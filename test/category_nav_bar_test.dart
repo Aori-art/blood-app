@@ -346,34 +346,23 @@ void main() {
     });
   });
 
-  testWidgets(
-    'the reminder row shows the category and Show all returns to All',
-    (tester) async {
-      final run = _Run(samplePostsJson());
-      await _with(run, () async {
-        await _pumpFeed(tester, run);
-        expect(find.textContaining('Showing'), findsNothing);
-        await _scrollDown(tester);
-
-        await tester.tap(_item('Events'));
-        await _frames(tester, 20);
-        expect(find.text('Showing Events - 2 posts'), findsOneWidget);
-        expect(find.text('Show all'), findsOneWidget);
-
-        await tester.tap(_item('Updates'));
-        await _frames(tester, 20);
-        expect(find.text('Showing Updates - 1 post'), findsOneWidget);
-
-        await tester.tap(find.text('Show all'));
-        await _frames(tester, 20);
-        expect(find.textContaining('Showing'), findsNothing);
-        expect(find.text('City Blood Bank'), findsOneWidget);
-        // The bar stays, as after any category tap.
-        expect(_barShown(tester), isTrue);
-        await _close(tester);
-      });
-    },
-  );
+  testWidgets('a category tap puts the first post right under the header', (
+    tester,
+  ) async {
+    final run = _Run(samplePostsJson());
+    await _with(run, () async {
+      await _pumpFeed(tester, run);
+      await _scrollDown(tester);
+      await tester.tap(_item('Events'));
+      await _frames(tester, 20);
+      final top = tester.getTopLeft(find.byType(RefreshIndicator)).dy;
+      final first = tester.getTopLeft(find.byType(PostCard).first).dy;
+      expect(first - top, closeTo(8, 1));
+      expect(_barShown(tester), isTrue);
+      expect(_goHomeShown(tester), isFalse);
+      await _close(tester);
+    });
+  });
 
   testWidgets('a category change is announced', (tester) async {
     final handle = tester.ensureSemantics();
