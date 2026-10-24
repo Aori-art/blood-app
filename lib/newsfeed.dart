@@ -1273,11 +1273,15 @@ class _PostCardState extends State<PostCard> {
     if (url.isNotEmpty) {
       face = netImage(url);
     } else if (post.authorType == 'admin') {
-      face = ColoredBox(
-        color: p.surface,
-        child: const Padding(
-          padding: EdgeInsets.all(3),
-          child: EdonateLogo(size: 34),
+      // An official poster without a photo: Dugtong's round avatar.
+      face = Image.asset(
+        EdonateLogo.avatarAsset,
+        fit: BoxFit.cover,
+        cacheWidth: (44 * MediaQuery.devicePixelRatioOf(context)).round(),
+        semanticLabel: 'Dugtong logo',
+        errorBuilder: (_, _, _) => ColoredBox(
+          color: p.accentBg,
+          child: Icon(Icons.water_drop_rounded, color: p.primaryText),
         ),
       );
     } else {

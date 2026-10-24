@@ -5,7 +5,11 @@ import '../app_colors.dart';
 /// The eDonate brand mark (Dugtong on the crimson rounded square), shown next
 /// to the "eDonate" wordmark.
 class EdonateLogo extends StatelessWidget {
-  static const String asset = 'assets/branding/edonate_logo_rounded_512.png';
+  static const String asset = 'assets/branding/dugtong_logo_rounded_512.png';
+
+  /// The round version, for a poster's avatar when it has no photo.
+  static const String avatarAsset =
+      'assets/branding/dugtong_avatar_circle_512.png';
 
   final double size;
   const EdonateLogo({super.key, this.size = 36});

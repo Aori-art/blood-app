@@ -67,7 +67,7 @@ dev_dependencies:
 flutter_launcher_icons:
   android: "ic_launcher"
   ios: false
-  image_path: "assets/branding/edonate_icon_1024.png"
+  image_path: "assets/branding/dugtong_icon_1024.png"
   min_sdk_android: 21
   adaptive_icon_background: "assets/branding/ic_launcher_background.png"
   adaptive_icon_foreground: "assets/branding/ic_launcher_foreground.png"
