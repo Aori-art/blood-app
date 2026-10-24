@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'widgets/pager_hand_off.dart';
 import 'package:flutter/scheduler.dart';
 import 'app_colors.dart';
 import 'package:flutter/services.dart';
@@ -1943,7 +1944,14 @@ class _BookScreenState extends State<BookScreen>
       today.day,
     ).add(const Duration(days: 1));
     final days = List.generate(14, (i) => start.add(Duration(days: i)));
-    return SizedBox(
+    // At the strip's start (or end) a drag the strip can't follow goes to the
+    // pager, so the donor can still swipe to the neighbor tab.
+    return PagerHandOff(
+      handRight: () => !_dateStripCtrl.hasClients || _dateStripCtrl.offset <= 0,
+      handLeft: () =>
+          _dateStripCtrl.hasClients &&
+          _dateStripCtrl.offset >= _dateStripCtrl.position.maxScrollExtent - 1,
+      child: SizedBox(
       height: 80,
       child: ListView.builder(
         controller: _dateStripCtrl,
@@ -1965,7 +1973,7 @@ class _BookScreenState extends State<BookScreen>
           );
         },
       ),
-    );
+    ));
   }
 
   Widget _dateTile(DateTime d, bool selected, int index) {

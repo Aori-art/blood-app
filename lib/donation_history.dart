@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'widgets/pager_hand_off.dart';
 import 'package:flutter/scheduler.dart';
 import 'app_colors.dart';
 import 'streak/streak_screen.dart';
@@ -41,6 +42,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
   int? _expandedDonationId;
 
   DigitalIdData? _digitalId;
+  final _milestoneCtrl = ScrollController();
 
   @override
   void initState() {
@@ -69,6 +71,12 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
     _lastLoad = now;
     fetchDonationHistory();
     _fetchAppointmentStatus();
+  }
+
+  @override
+  void dispose() {
+    _milestoneCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadDigitalId() async {
@@ -603,7 +611,14 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
       (10, '10 donations', Icons.workspace_premium_rounded),
     ];
     final p = context.palette;
-    return SingleChildScrollView(
+    // At either end a drag the row can't follow goes to the pager.
+    return PagerHandOff(
+      handRight: () => !_milestoneCtrl.hasClients || _milestoneCtrl.offset <= 0,
+      handLeft: () =>
+          _milestoneCtrl.hasClients &&
+          _milestoneCtrl.offset >= _milestoneCtrl.position.maxScrollExtent - 1,
+      child: SingleChildScrollView(
+      controller: _milestoneCtrl,
       scrollDirection: Axis.horizontal,
       clipBehavior: Clip.none,
       child: Row(
@@ -655,7 +670,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
           ],
         ],
       ),
-    );
+    ));
   }
 
   // ── Filters ─────────────────────────────────────────────────────────────
