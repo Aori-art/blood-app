@@ -26,6 +26,7 @@ import 'config.dart';
 import 'digital_id.dart';
 import 'digital_id_service.dart';
 import 'history.dart';
+import 'home_nav.dart';
 import 'newsfeed.dart';
 import 'donation_history.dart';
 import 'notification_service.dart';
@@ -47,12 +48,22 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin
+    implements HomeNavHost {
   int _selectedIndex = 0;
   int _donorId = 0;
 
   late List<Widget> _screens;
   StreamSubscription<void>? _alertsTapSub;
+
+  // The five tabs are pages side by side: a swipe moves between them and a
+  // tap on the nav glides there. The controller's animation is the
+  // fractional tab the nav's lens follows.
+  late final TabController _tabs;
+
+  // The route Home is on, so HomeNav can pop back to it.
+  ModalRoute<dynamic>? _route;
 
   @override
   void initState() {
@@ -71,13 +82,30 @@ class _HomeScreenState extends State<HomeScreen> {
       NotificationService.instance.consumeOpenAlertsOnStart();
     }
 
+    _tabs = TabController(
+      length: 5,
+      vsync: this,
+      initialIndex: _selectedIndex,
+    );
+    _tabs.animation!.addListener(_onTabPosition);
+    HomeNav.register(this);
+
     _alertsTapSub = NotificationService.instance.onAlertsTapped.listen((_) {
       if (mounted) _selectTab(4);
     });
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _route = ModalRoute.of(context);
+  }
+
+  @override
   void dispose() {
+    HomeNav.unregister(this);
+    _tabs.animation?.removeListener(_onTabPosition);
+    _tabs.dispose();
     _alertsTapSub?.cancel();
     super.dispose();
   }
@@ -131,9 +159,51 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// A tab became the current one: what selecting a tab has always done
+  /// (the nav, and with it the Check button, reacts to [_selectedIndex]).
+  void _activate(int index) {
+    setState(() => _selectedIndex = index);
+  }
+
+  /// A tap on the nav, or a tab chosen from code: the pages glide there (a
+  /// jump when animations are off) and the tab is current at once.
   void _selectTab(int index) {
     if (index < 0 || index >= _screens.length) return;
-    setState(() => _selectedIndex = index);
+    _activate(index);
+    if (_tabs.index != index) {
+      _tabs.animateTo(
+        index,
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  /// The pages moved. While a swipe drags them, the tab under the finger
+  /// becomes current once it is more than 0.55 of a page away from the last
+  /// one (so hovering half way does not make the Check button flicker). A
+  /// tap's glide is ignored here: its tab was made current at the tap.
+  void _onTabPosition() {
+    if (_tabs.indexIsChanging) return;
+    final position = _tabs.animation!.value;
+    if ((position - _selectedIndex).abs() <= 0.55) return;
+    final next = position.round().clamp(0, _screens.length - 1);
+    if (next != _selectedIndex) _activate(next);
+  }
+
+  // ── HomeNavHost ─────────────────────────────────────────────────────────
+
+  /// HomeNav.goTo: back to Home (closing every screen above it), then the
+  /// tab, the same way a tap selects it.
+  @override
+  void showTab(int index) {
+    final route = _route;
+    if (route != null && !route.isCurrent) {
+      Navigator.of(context).popUntil((r) => r == route);
+    }
+    _selectTab(index);
   }
 
   @override
@@ -161,19 +231,30 @@ class _HomeScreenState extends State<HomeScreen> {
         resizeToAvoidBottomInset: false,
         body: Stack(
           children: [
-            // Every tab stays mounted (like an IndexedStack), so switching
-            // tabs — e.g. tapping Home mid eligibility-check — doesn't
-            // dispose the other tabs and lose their state.
+            // The tabs are pages: swipe between them. Every tab stays alive
+            // once it has been shown, so switching tabs (e.g. tapping Home
+            // mid eligibility-check) never loses its state.
             Positioned.fill(
-              child: _TabSwitcher(
-                index: _selectedIndex,
-                // The tabs are not routes: tell each one whether it is
-                // showing, so Dugtong knows which tab the donor is on.
+              child: TabBarView(
+                controller: _tabs,
                 children: [
                   for (var i = 0; i < _screens.length; i++)
-                    StreakTabScope(
-                      active: i == _selectedIndex,
-                      child: _screens[i],
+                    _KeepAliveTab(
+                      // A tab off screen stops its animations.
+                      child: AnimatedBuilder(
+                        animation: _tabs.animation!,
+                        builder: (context, child) => TickerMode(
+                          enabled: (_tabs.animation!.value - i).abs() < 1,
+                          child: child!,
+                        ),
+                        // The tabs are not routes: tell each one whether it
+                        // is showing, so Dugtong knows which tab the donor
+                        // is on (and the tab can freshen up when it is).
+                        child: StreakTabScope(
+                          active: i == _selectedIndex,
+                          child: _screens[i],
+                        ),
+                      ),
                     ),
                 ],
               ),
@@ -186,6 +267,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: _FloatingNav(
                   selectedIndex: _selectedIndex,
                   onSelect: _selectTab,
+                  position: _tabs.animation,
                 ),
               ),
             ),
@@ -430,7 +512,15 @@ class _FloatingNav extends StatefulWidget {
   final int selectedIndex;
   final ValueChanged<int> onSelect;
 
-  const _FloatingNav({required this.selectedIndex, required this.onSelect});
+  /// The fractional tab the pages are at (the TabController's animation):
+  /// the lens and the item colors follow it while the donor swipes.
+  final Animation<double>? position;
+
+  const _FloatingNav({
+    required this.selectedIndex,
+    required this.onSelect,
+    this.position,
+  });
 
   @override
   State<_FloatingNav> createState() => _FloatingNavState();
@@ -1062,123 +1152,27 @@ class _FloatingNavState extends State<_FloatingNav>
   }
 }
 
-/// Shows one tab at a time and keeps the others alive (like an
-/// [IndexedStack], so a half-finished eligibility check survives a trip to
-/// another tab). The arriving tab fades in and settles from 0.98 to 1.0, 80 ms
-/// after the tap.
-class _TabSwitcher extends StatefulWidget {
-  final int index;
-  final List<Widget> children;
+/// Keeps a tab alive while it is swiped away (TabBarView would drop it), so a
+/// half-finished eligibility check, the Book form and every scroll position
+/// survive a trip to another tab.
+class _KeepAliveTab extends StatefulWidget {
+  final Widget child;
 
-  const _TabSwitcher({required this.index, required this.children});
+  const _KeepAliveTab({required this.child});
 
   @override
-  State<_TabSwitcher> createState() => _TabSwitcherState();
+  State<_KeepAliveTab> createState() => _KeepAliveTabState();
 }
 
-class _TabSwitcherState extends State<_TabSwitcher>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c;
-  late final Animation<double> _fade;
-  late final Animation<double> _scale;
-  late int _shown = widget.index;
-  int? _leaving;
-  Timer? _timer;
-  bool _reduced = false;
-
+class _KeepAliveTabState extends State<_KeepAliveTab>
+    with AutomaticKeepAliveClientMixin {
   @override
-  void initState() {
-    super.initState();
-    _c = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 240),
-      value: 1,
-    )..addStatusListener(_status);
-    _fade = CurvedAnimation(parent: _c, curve: Curves.easeOut);
-    _scale = Tween<double>(
-      begin: 0.98,
-      end: 1,
-    ).animate(CurvedAnimation(parent: _c, curve: Curves.easeOutCubic));
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _reduced = MediaQuery.disableAnimationsOf(context);
-  }
-
-  @override
-  void didUpdateWidget(covariant _TabSwitcher old) {
-    super.didUpdateWidget(old);
-    if (old.index == widget.index) return;
-    _timer?.cancel();
-    final to = widget.index;
-    if (_reduced) {
-      _show(to);
-    } else {
-      _timer = Timer(const Duration(milliseconds: 80), () => _show(to));
-    }
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _c.dispose();
-    super.dispose();
-  }
-
-  void _status(AnimationStatus status) {
-    if (status == AnimationStatus.completed && _leaving != null && mounted) {
-      setState(() => _leaving = null);
-    }
-  }
-
-  void _show(int to) {
-    if (!mounted || to == _shown) return;
-    setState(() {
-      _leaving = _shown;
-      _shown = to;
-    });
-    _c.duration = Duration(milliseconds: _reduced ? 120 : 240);
-    _c.forward(from: 0);
-  }
+  bool get wantKeepAlive => true;
 
   @override
   Widget build(BuildContext context) {
-    final n = widget.children.length;
-    // Paint order: parked tabs, the one leaving, the one arriving on top.
-    final order = <int>[
-      for (var i = 0; i < n; i++)
-        if (i != _shown && i != _leaving) i,
-      if (_leaving != null) _leaving!,
-      _shown,
-    ];
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        for (final i in order)
-          KeyedSubtree(
-            key: ValueKey(i),
-            child: Offstage(
-              offstage: i != _shown && i != _leaving,
-              child: TickerMode(
-                enabled: i == _shown || i == _leaving,
-                child: FadeTransition(
-                  opacity: (i == _shown && _leaving != null)
-                      ? _fade
-                      : kAlwaysCompleteAnimation,
-                  child: ScaleTransition(
-                    scale: (i == _shown && _leaving != null)
-                        ? _scale
-                        : kAlwaysCompleteAnimation,
-                    child: widget.children[i],
-                  ),
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
+    super.build(context);
+    return widget.child;
   }
 }
 
