@@ -195,7 +195,7 @@ class _PrivacyConsentScreenState extends State<PrivacyConsentScreen> {
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
         content: Text(
-          'You need to accept the Data Privacy Statement to use eDonate.',
+          'You need to accept the Data Privacy Statement to use Dugtong.',
           style: TextStyle(
             fontSize: 13,
             color: context.palette.muted,

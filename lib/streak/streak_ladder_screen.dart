@@ -4,9 +4,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../app_palette.dart';
 import '../shared_design.dart';
 import 'avatar_frame.dart';
+import '../my_avatar.dart';
 import 'next_reward_row.dart';
 import 'streak_controller.dart';
 import 'streak_screen.dart';
+
+/// Grayscale, for locked frame previews.
+const ColorFilter _kGray = ColorFilter.matrix(<double>[
+  0.2126, 0.7152, 0.0722, 0, 0, //
+  0.2126, 0.7152, 0.0722, 0, 0, //
+  0.2126, 0.7152, 0.0722, 0, 0, //
+  0, 0, 0, 1, 0,
+]);
 
 /// Icon + colour for a badge reward. The server decides which badges exist;
 /// this only picks a look for them.
@@ -590,24 +599,13 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
 
   Widget _preview(Milestone m, bool unlocked, int index) {
     if (m.isFrame) {
-      // A locked frame is dimmed, but its initials stay readable: muted text
-      // on a neutral disc (white on a faded red would not be).
-      final p = context.palette;
-      final avatar = CircleAvatar(
-        radius: 20,
-        backgroundColor: unlocked ? kCrimson : p.surfaceAlt,
-        child: Text(
-          _initials,
-          style: TextStyle(
-            color: unlocked ? Colors.white : p.muted,
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-          ),
-        ),
-      );
+      // The donor's own photo in the frame (initials without one).
+      const avatar = MyAvatar(radius: 20, showFrame: false);
       if (unlocked) {
         return StreakAvatarFrame(frameKey: m.key, radius: 20, child: avatar);
       }
+      // A locked frame is dimmed; the photo turns gray (not faded, so the
+      // initials stay readable when there is no photo).
       return Stack(
         alignment: Alignment.center,
         children: [
@@ -619,7 +617,7 @@ class _StreakLadderScreenState extends State<StreakLadderScreen>
               child: const SizedBox.square(dimension: 40),
             ),
           ),
-          avatar,
+          const ColorFiltered(colorFilter: _kGray, child: avatar),
         ],
       );
     }

@@ -17,6 +17,7 @@ import 'streak/streak_controller.dart';
 import 'streak/streak_screen.dart';
 import 'theme_controller.dart';
 import 'theme_transition.dart';
+import 'my_avatar_controller.dart';
 
 /// The floating streak bubble lives above the Navigator, so it reaches routes,
 /// dialogs and sheets through this key.
@@ -107,7 +108,11 @@ Future<void> main() async {
 
   runApp(MyApp(isLoggedIn: isLoggedIn));
 
-  if (isLoggedIn) unawaited(StreakController.instance.onLoggedIn());
+  if (isLoggedIn) {
+    unawaited(StreakController.instance.onLoggedIn());
+    // The donor's own photo, for every avatar of theirs.
+    unawaited(MyAvatarController.instance.load());
+  }
 }
 
 Future<void> _handleTokenRefresh(String token) async {
@@ -152,7 +157,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       navigatorKey: appNavigatorKey,
       debugShowCheckedModeBanner: false,
-      title: 'eDonate',
+      title: 'Dugtong',
 
       // Dugtong's floating bubble sits above every route. Each screen reports
       // itself with StreakScreen, and this observer follows the navigation.

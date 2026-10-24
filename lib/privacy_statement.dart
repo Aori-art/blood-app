@@ -59,7 +59,7 @@ class _PrivacySection {
 }
 
 const String _kIntro =
-    'eDonate respects your privacy. This statement explains what personal '
+    'Dugtong respects your privacy. This statement explains what personal '
     'information we collect, why we collect it, and how we protect it, in '
     'line with the Data Privacy Act of 2012 (Republic Act No. 10173).';
 
@@ -81,14 +81,16 @@ const List<_PrivacySection> _kSections = [
     'To send you verification codes, reminders and updates.',
   ]),
   _PrivacySection(Icons.visibility_outlined, '3. Who can see it', [
-    'Only authorized eDonate administrators and donation center staff, and '
+    'Only authorized Dugtong administrators and donation center staff, and '
         'only as needed for the purposes above.',
     'We do not sell or rent your information, and the app has no '
         'advertising or analytics trackers.',
     'Firebase (push notifications) and Gmail (email delivery) are used to '
         'deliver messages to you.',
     'If you comment on a post, your first name, last initial, profile photo '
-        'and frame are visible to other users.',
+        'and frame are visible to other users. You can hide your profile '
+        'photo in comments at any time from the comment box or in Privacy & '
+        'Security.',
   ]),
   _PrivacySection(Icons.lock_outline_rounded, '4. How we protect it', [
     'Your password is stored in encrypted (hashed) form and is never kept '

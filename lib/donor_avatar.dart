@@ -1,12 +1,7 @@
-import 'dart:async';
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 
-import 'config.dart';
-import 'newsfeed.dart' show resolveMediaUrl;
+import 'media_url.dart';
+import 'my_avatar_controller.dart';
 import 'shared_design.dart' show kCrimson;
 import 'streak/avatar_frame.dart';
 import 'streak/streak_controller.dart';
@@ -36,7 +31,34 @@ class DonorAvatar extends StatelessWidget {
     this.frame,
     required this.radius,
     this.reserveFrameSpace = false,
+    this.fallback,
+    this.placeholderColor,
+    this.decodeAtSize = false,
+    this.heroTag,
+    this.onTap,
+    this.hiddenBadge = false,
   });
+
+  /// A small eye-off badge on the circle's bottom right: the donor's own
+  /// avatar when their photo is hidden from other people in comments.
+  final bool hiddenBadge;
+
+  /// A Hero around the round photo only (never the frame ring), so the photo
+  /// can fly into a full-screen viewer while the ring stays where it is.
+  final Object? heroTag;
+
+  final VoidCallback? onTap;
+
+  /// Shown instead of the crimson-tinted letter when there is no photo (or it
+  /// fails to load). Sized by the avatar's circle.
+  final Widget? fallback;
+
+  /// While the photo loads: a plain circle of this color. Null shows the
+  /// fallback, as before.
+  final Color? placeholderColor;
+
+  /// Decode the photo at the size it is shown (radius x 2 x pixel ratio).
+  final bool decodeAtSize;
 
   /// The letter shown when there is no photo.
   static String initialOf(String name) {
@@ -48,21 +70,26 @@ class DonorAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final url = resolveMediaUrl(photoUrl);
     final size = radius * 2;
-    final fallback = Container(
-      width: size,
-      height: size,
-      color: kCrimson.withValues(alpha: 0.12),
-      alignment: Alignment.center,
-      child: Text(
-        initialOf(name),
-        style: TextStyle(
-          color: context.palette.primaryText,
-          fontSize: radius * 0.9,
-          fontWeight: FontWeight.w700,
-          height: 1,
-        ),
-      ),
-    );
+    final fallback =
+        this.fallback ??
+        Container(
+          width: size,
+          height: size,
+          color: kCrimson.withValues(alpha: 0.12),
+          alignment: Alignment.center,
+          child: Text(
+            initialOf(name),
+            style: TextStyle(
+              color: context.palette.primaryText,
+              fontSize: radius * 0.9,
+              fontWeight: FontWeight.w700,
+              height: 1,
+            ),
+          ),
+        );
+    final placeholder = placeholderColor == null
+        ? fallback
+        : ColoredBox(color: placeholderColor!);
     final circle = SizedBox(
       width: size,
       height: size,
@@ -75,17 +102,34 @@ class DonorAvatar extends StatelessWidget {
                 height: size,
                 fit: BoxFit.cover,
                 gaplessPlayback: true,
+                cacheWidth: decodeAtSize
+                    ? (size * MediaQuery.devicePixelRatioOf(context)).round()
+                    : null,
+                // A broken or blocked link never leaves a blank circle.
                 errorBuilder: (_, _, _) => fallback,
                 loadingBuilder: (context, child, progress) =>
-                    progress == null ? child : fallback,
+                    progress == null ? child : placeholder,
               ),
       ),
     );
 
+    final photo = heroTag == null ? circle : Hero(tag: heroTag!, child: circle);
     Widget avatar = StreakAvatarFrame(
       frameKey: frame,
       radius: radius,
-      child: circle,
+      child: hiddenBadge
+          ? Stack(
+              clipBehavior: Clip.none,
+              children: [
+                photo,
+                Positioned(
+                  right: -3,
+                  bottom: -3,
+                  child: ExcludeSemantics(child: _HiddenBadge(radius: radius)),
+                ),
+              ],
+            )
+          : photo,
     );
     if (reserveFrameSpace) {
       final extent = streakFrameExtent(radius);
@@ -95,8 +139,17 @@ class DonorAvatar extends StatelessWidget {
         child: Center(child: avatar),
       );
     }
+    if (onTap != null) {
+      avatar = GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: avatar,
+      );
+    }
     return Semantics(
-      label: '$name, profile picture',
+      label: hiddenBadge
+          ? '$name, profile picture. Your photo is hidden'
+          : '$name, profile picture',
       image: true,
       excludeSemantics: true,
       child: avatar,
@@ -104,97 +157,37 @@ class DonorAvatar extends StatelessWidget {
   }
 }
 
-/// The signed-in donor's own photo and frame, shared by the newsfeed header
-/// and the comment composer.
-///
-/// The photo path is cached in preferences ('my_avatar_path') so it shows
-/// straight away on the next start, then [refresh] asks the server.
-class MyAvatar extends ChangeNotifier {
-  MyAvatar._();
-  static final MyAvatar instance = MyAvatar._();
+/// The eye-off badge: a 14 px disc with a 10 px icon (smaller on tiny
+/// avatars).
+class _HiddenBadge extends StatelessWidget {
+  final double radius;
+  const _HiddenBadge({required this.radius});
 
-  static const String _kPath = 'my_avatar_path';
-
-  String? path;
-
-  /// The frame the server last said is still valid for this donor.
-  String? frame;
-  String name = '';
-
-  // Bumped by [clear]: an answer that was on its way is for a donor who is
-  // gone.
-  int _epoch = 0;
-
-  /// The frame to show: the streak's equipped frame (reactive, so equipping
-  /// one updates every avatar at once). Only while the streak has not been
-  /// loaded does the frame from the server's avatar answer stand in.
-  String? get viewerFrame {
-    final streak = StreakController.instance;
-    if (streak.data != null) return streak.equippedFrame;
-    return streak.equippedFrame ?? frame;
-  }
-
-  /// Reads what is cached, so the first frame already has the photo.
-  Future<void> load() async {
-    final epoch = _epoch;
-    final prefs = await SharedPreferences.getInstance();
-    if (epoch != _epoch) return;
-    final cached = prefs.getString(_kPath);
-    final userName = prefs.getString('userName') ?? '';
-    if (cached != path || userName != name) {
-      path = (cached == null || cached.isEmpty) ? null : cached;
-      name = userName;
-      notifyListeners();
-    }
-  }
-
-  /// Asks the server for the photo and frame. Errors are ignored: what is
-  /// shown stays as it was.
-  Future<void> refresh() async {
-    final epoch = _epoch;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final id = prefs.getString('donorId');
-      if (id == null || id.isEmpty) return;
-      final response = await http
-          .get(Uri.parse('${AppConfig.baseUrl}/get_my_avatar.php?donor_id=$id'))
-          .timeout(const Duration(seconds: 10));
-      final body = jsonDecode(response.body);
-      if (body is! Map || body['success'] != true || epoch != _epoch) return;
-      final avatar = body['avatar']?.toString();
-      final f = body['frame']?.toString();
-      final newPath = (avatar == null || avatar.isEmpty) ? null : avatar;
-      final newFrame = (f == null || f.isEmpty || f == 'null') ? null : f;
-      if (newPath == null) {
-        await prefs.remove(_kPath);
-      } else {
-        await prefs.setString(_kPath, newPath);
-      }
-      if (epoch != _epoch) return;
-      final userName = prefs.getString('userName') ?? name;
-      if (newPath != path || newFrame != frame || userName != name) {
-        path = newPath;
-        frame = newFrame;
-        name = userName;
-        notifyListeners();
-      }
-    } catch (_) {
-      // Offline or a server hiccup: keep the cached photo.
-    }
-  }
-
-  /// Forget the donor (sign out, account deletion).
-  void clear() {
-    _epoch++;
-    path = null;
-    frame = null;
-    name = '';
-    notifyListeners();
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final size = radius < 12 ? 11.0 : 14.0;
+    return Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: p.surface,
+        shape: BoxShape.circle,
+        border: Border.all(color: p.border),
+      ),
+      child: Icon(
+        Icons.visibility_off_outlined,
+        size: size - 4,
+        color: p.muted,
+      ),
+    );
   }
 }
 
-/// [DonorAvatar] of the signed-in donor. It follows [MyAvatar] and the
-/// streak's equipped frame.
+/// [DonorAvatar] of the signed-in donor. It follows [MyAvatarController] and the
+/// streak's equipped frame. With the photo hidden in comments it shows the
+/// initials and the eye-off badge, as other people see it.
 class ViewerAvatar extends StatelessWidget {
   final double radius;
   final bool reserveFrameSpace;
@@ -209,17 +202,19 @@ class ViewerAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: Listenable.merge([
-        MyAvatar.instance,
+        MyAvatarController.instance,
         StreakController.instance,
       ]),
       builder: (context, _) {
-        final me = MyAvatar.instance;
+        final me = MyAvatarController.instance;
+        final hidden = me.hidePhotoInComments;
         return DonorAvatar(
-          photoUrl: me.path,
+          photoUrl: hidden ? null : me.avatarPath,
           name: me.name,
           frame: me.viewerFrame,
           radius: radius,
           reserveFrameSpace: reserveFrameSpace,
+          hiddenBadge: hidden,
         );
       },
     );

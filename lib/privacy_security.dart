@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -16,7 +17,7 @@ import 'profile_page_widgets.dart';
 import 'shared_design.dart';
 import 'streak/streak_controller.dart';
 import 'unread_notifications.dart';
-import 'donor_avatar.dart';
+import 'my_avatar_controller.dart';
 import 'streak/streak_screen.dart';
 import 'app_palette.dart';
 
@@ -31,6 +32,25 @@ class PrivacySecurityScreen extends StatefulWidget {
 
 class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
   bool _deleteFlowActive = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // The comment-photo switch shows what the server has.
+    unawaited(MyAvatarController.instance.load());
+  }
+
+  Future<void> _setHidePhoto(bool hide) async {
+    final ok = await MyAvatarController.instance.setHidePhotoInComments(hide);
+    if (ok || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text("Couldn't save your choice. Please try again."),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
 
   // PIN: opens the PIN screen in "change" mode (current → new → confirm).
   Future<void> _changePin() async {
@@ -131,7 +151,7 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
     UnreadNotifications.instance
       ..stop()
       ..clear();
-    MyAvatar.instance.clear();
+    MyAvatarController.instance.reset();
     AppSession.homeInStack = false;
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -168,6 +188,42 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
             ),
           ),
           const Divider(),
+          ListenableBuilder(
+            listenable: MyAvatarController.instance,
+            builder: (context, _) {
+              final p = context.palette;
+              final hidden = MyAvatarController.instance.hidePhotoInComments;
+              WidgetStateProperty<Color> track() =>
+                  WidgetStateProperty.resolveWith(
+                    (states) => states.contains(WidgetState.selected)
+                        ? AppColors.primary
+                        : p.border,
+                  );
+              return Semantics(
+                container: true,
+                label: 'Hide my photo in comments',
+                toggled: hidden,
+                onTap: () => _setHidePhoto(!hidden),
+                excludeSemantics: true,
+                child: SettingsRow(
+                  icon: Icons.visibility_off_outlined,
+                  title: 'Hide my photo in comments',
+                  subtitle: 'Others will see your initials in comments',
+                  onTap: () => _setHidePhoto(!hidden),
+                  // Styled like the Dark mode row: a white thumb on the
+                  // brand track (the border color when off).
+                  trailing: Switch(
+                    value: hidden,
+                    onChanged: _setHidePhoto,
+                    thumbColor: WidgetStateProperty.all(Colors.white),
+                    trackColor: track(),
+                    trackOutlineColor: track(),
+                  ),
+                ),
+              );
+            },
+          ),
+          const Divider(),
           _DeleteAccountRow(onTap: _deleteAccount),
           // PIN: only verified donors have (or can create) a PIN.
           if (widget.showChangePin) ...[
@@ -175,7 +231,7 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
             SettingsRow(
               icon: Icons.password_rounded,
               title: 'Change PIN',
-              subtitle: 'Update the 4-digit PIN you use to open eDonate.',
+              subtitle: 'Update the 4-digit PIN you use to open Dugtong.',
               onTap: _changePin,
             ),
           ],
@@ -183,7 +239,7 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
           SettingsRow(
             icon: Icons.privacy_tip_outlined,
             title: 'Data Privacy',
-            subtitle: 'Learn how eDonate handles your information.',
+            subtitle: 'Learn how Dugtong handles your information.',
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const DataPrivacyScreen()),

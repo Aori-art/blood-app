@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'streak/streak_controller.dart';
 import 'streak/streak_screen.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -18,6 +20,20 @@ import 'config.dart';
 import 'donor_avatar.dart';
 import 'verify.dart';
 import 'app_palette.dart';
+import 'media_url.dart';
+import 'my_avatar_controller.dart';
+import 'widgets/image_viewer.dart';
+import 'home.dart' show FloatingNavMetrics;
+import 'newsfeed/category_nav_bar.dart';
+import 'newsfeed/feed_chrome.dart';
+import 'newsfeed/like_store.dart';
+import 'home_nav.dart';
+import 'widgets/dugtong_wordmark.dart';
+import 'newsfeed/post_content_parser.dart';
+import 'newsfeed/post_parts.dart';
+
+// Other files import resolveMediaUrl from here.
+export 'media_url.dart' show resolveMediaUrl;
 import 'widgets/edonate_logo.dart';
 // The palette lives in app_colors.dart; it is re-exported so files that took
 // AppColors from here keep working.
@@ -107,6 +123,16 @@ class Post {
     this.liked = false,
   });
 
+  // The server may send a flag as true/false, 1/0 or "1"/"0", and a count as
+  // a number or a string.
+  static bool _asBool(Object? v) =>
+      v == true ||
+      v == 1 ||
+      (v is String && (v == '1' || v.toLowerCase() == 'true'));
+
+  static int _asInt(Object? v) =>
+      v is num ? v.toInt() : (int.tryParse('$v') ?? 0);
+
   factory Post.fromJson(Map<String, dynamic> json) {
     return Post(
       id: json['id'] as int,
@@ -123,14 +149,14 @@ class Post {
       timeAgo: json['timeAgo'] as String? ?? '',
       content: json['content'] as String? ?? '',
       image: json['image'] as String?,
-      likes: (json['likes'] as num?)?.toInt() ?? 0,
-      comments: (json['comments'] as num?)?.toInt() ?? 0,
+      likes: _asInt(json['likes']),
+      comments: _asInt(json['comments']),
       bloodType: json['bloodType'] as String?,
       hospital: json['hospital'] as String?,
       eventDate: json['eventDate'] as String?,
       eventLocation: json['eventLocation'] as String?,
       urgency: _urgencyFromString(json['urgency'] as String?),
-      liked: json['liked'] == true,
+      liked: _asBool(json['liked']),
     );
   }
 }
@@ -218,18 +244,6 @@ class UrgencyBadge extends StatelessWidget {
 
 // ── Network Image Helper (graceful fallback) ────────────────────────────────
 
-// Builds a full URL for a server-relative media path (e.g. a profile
-// picture path like "uploads/profile/741.jpg"), leaving already-absolute
-// URLs untouched — same convention as the ready-made image/avatar URLs
-// this file already gets from get_posts.php.
-String? resolveMediaUrl(String? path) {
-  if (path == null || path.isEmpty) return null;
-  if (path.startsWith('http://') || path.startsWith('https://')) return path;
-  final origin = AppConfig.baseUrl.replaceAll(RegExp(r'/api/?$'), '');
-  final cleanPath = path.startsWith('/') ? path.substring(1) : path;
-  return '$origin/$cleanPath';
-}
-
 Widget netImage(String url, {BoxFit fit = BoxFit.cover}) {
   return Image.network(
     url,
@@ -246,292 +260,6 @@ Widget netImage(String url, {BoxFit fit = BoxFit.cover}) {
       if (progress == null) return child;
       return Container(color: context.palette.surfaceAlt);
     },
-  );
-}
-
-// ── Pressable post image (press-in scale + full-screen viewer) ─────────────
-
-class _PressableImage extends StatefulWidget {
-  final Widget child;
-  final VoidCallback onTap;
-  const _PressableImage({required this.child, required this.onTap});
-
-  @override
-  State<_PressableImage> createState() => _PressableImageState();
-}
-
-class _PressableImageState extends State<_PressableImage> {
-  double _scale = 1.0;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _scale = 1.03),
-      onTapUp: (_) => setState(() => _scale = 1.0),
-      onTapCancel: () => setState(() => _scale = 1.0),
-      onTap: widget.onTap,
-      child: AnimatedScale(
-        scale: _scale,
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOut,
-        child: widget.child,
-      ),
-    );
-  }
-}
-
-// ── Full-screen image viewer ────────────────────────────────────────────────
-
-class _ImageViewerPage extends StatefulWidget {
-  final List<String> imageUrls;
-  final int initialIndex;
-  final String heroTagPrefix;
-
-  const _ImageViewerPage({
-    required this.imageUrls,
-    required this.initialIndex,
-    required this.heroTagPrefix,
-  });
-
-  @override
-  State<_ImageViewerPage> createState() => _ImageViewerPageState();
-}
-
-class _ImageViewerPageState extends State<_ImageViewerPage> {
-  late final PageController _pageController;
-  late int _currentIndex;
-  final TransformationController _transformController =
-      TransformationController();
-  bool _isZoomed = false;
-
-  bool _dragging = false;
-  double _dragOffset = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _currentIndex = widget.initialIndex;
-    _pageController = PageController(initialPage: widget.initialIndex);
-    _transformController.addListener(_handleTransformChange);
-  }
-
-  @override
-  void dispose() {
-    _transformController.removeListener(_handleTransformChange);
-    _transformController.dispose();
-    _pageController.dispose();
-    super.dispose();
-  }
-
-  void _handleTransformChange() {
-    final zoomed = _transformController.value.getMaxScaleOnAxis() > 1.01;
-    if (zoomed != _isZoomed) setState(() => _isZoomed = zoomed);
-  }
-
-  void _handleDoubleTap(TapDownDetails details) {
-    if (_isZoomed) {
-      _transformController.value = Matrix4.identity();
-      return;
-    }
-    final position = details.localPosition;
-    const scale = 2.5;
-    final x = -position.dx * (scale - 1);
-    final y = -position.dy * (scale - 1);
-    _transformController.value = Matrix4.identity()
-      ..translate(x, y)
-      ..scale(scale);
-  }
-
-  void _handleVerticalDragUpdate(DragUpdateDetails details) {
-    if (_isZoomed) return;
-    setState(() {
-      _dragging = true;
-      _dragOffset = (_dragOffset + details.delta.dy).clamp(0, 400);
-    });
-  }
-
-  void _handleVerticalDragEnd(DragEndDetails details) {
-    if (_isZoomed) return;
-    final flungDown = details.velocity.pixelsPerSecond.dy > 700;
-    if (_dragOffset > 120 || flungDown) {
-      Navigator.of(context).pop();
-      return;
-    }
-    setState(() {
-      _dragging = false;
-      _dragOffset = 0;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final opacity = (1 - (_dragOffset / 400)).clamp(0.25, 1.0);
-    final multiple = widget.imageUrls.length > 1;
-
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light,
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: GestureDetector(
-          onVerticalDragUpdate: _handleVerticalDragUpdate,
-          onVerticalDragEnd: _handleVerticalDragEnd,
-          child: AnimatedContainer(
-            duration: _dragging
-                ? Duration.zero
-                : const Duration(milliseconds: 250),
-            curve: Curves.easeOut,
-            width: double.infinity,
-            height: double.infinity,
-            color: Colors.black.withValues(alpha: opacity),
-            transform: Matrix4.translationValues(0, _dragOffset, 0),
-            child: Stack(
-              children: [
-                PageView.builder(
-                  controller: _pageController,
-                  physics: _isZoomed
-                      ? const NeverScrollableScrollPhysics()
-                      : const PageScrollPhysics(),
-                  itemCount: widget.imageUrls.length,
-                  onPageChanged: (i) => setState(() {
-                    _currentIndex = i;
-                    _isZoomed = false;
-                    _transformController.value = Matrix4.identity();
-                  }),
-                  itemBuilder: (context, index) {
-                    final url = widget.imageUrls[index];
-                    return GestureDetector(
-                      onDoubleTapDown: _handleDoubleTap,
-                      child: InteractiveViewer(
-                        transformationController: _transformController,
-                        minScale: 1,
-                        maxScale: 4,
-                        // Panning is only meaningful once zoomed in — keeping
-                        // it off at rest lets our own vertical-drag-to-close
-                        // gesture win the arena instead of InteractiveViewer.
-                        panEnabled: _isZoomed,
-                        child: Center(
-                          child: Hero(
-                            tag: '${widget.heroTagPrefix}_$index',
-                            child: Image.network(
-                              url,
-                              fit: BoxFit.contain,
-                              loadingBuilder: (context, child, progress) {
-                                if (progress == null) return child;
-                                return const Center(
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                  ),
-                                );
-                              },
-                              errorBuilder: (context, error, stackTrace) =>
-                                  Center(
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.broken_image_outlined,
-                                          color: context.palette.muted,
-                                          size: 40,
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          "Couldn't load image",
-                                          style: TextStyle(
-                                            color: context.palette.muted,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Stack(
-                      children: [
-                        Align(
-                          alignment: Alignment.topLeft,
-                          child: Tooltip(
-                            message: 'Close',
-                            child: InkWell(
-                              onTap: () => Navigator.of(context).pop(),
-                              borderRadius: BorderRadius.circular(999),
-                              child: Container(
-                                width: 40,
-                                height: 40,
-                                decoration: const BoxDecoration(
-                                  color: Colors.black45,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.close_rounded,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (multiple)
-                          Align(
-                            alignment: Alignment.topCenter,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.black54,
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Text(
-                                '${_currentIndex + 1} / ${widget.imageUrls.length}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-void _openImageViewer(
-  BuildContext context, {
-  required List<String> imageUrls,
-  required int initialIndex,
-  required String heroTagPrefix,
-}) {
-  Navigator.of(context).push(
-    PageRouteBuilder(
-      opaque: false,
-      barrierColor: Colors.black,
-      transitionDuration: const Duration(milliseconds: 280),
-      reverseTransitionDuration: const Duration(milliseconds: 240),
-      pageBuilder: (_, __, ___) => _ImageViewerPage(
-        imageUrls: imageUrls,
-        initialIndex: initialIndex,
-        heroTagPrefix: heroTagPrefix,
-      ),
-      transitionsBuilder: (_, anim, __, child) =>
-          FadeTransition(opacity: anim, child: child),
-    ),
   );
 }
 
@@ -771,7 +499,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
     }
     if (profile != null && authorType == 'admin') {
       final label =
-          profile['role_label']?.toString() ?? 'Official eDonate Account';
+          profile['role_label']?.toString() ?? 'Official Dugtong Account';
       return _pill(
         icon: Icons.verified_rounded,
         label: label,
@@ -843,10 +571,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
                 const SizedBox(height: 2),
                 Text(
                   subParts.join(', '),
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: context.palette.muted,
-                  ),
+                  style: TextStyle(fontSize: 11, color: context.palette.muted),
                 ),
               ],
             ],
@@ -1000,10 +725,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: context.palette.muted,
-                  ),
+                  style: TextStyle(fontSize: 11, color: context.palette.muted),
                 ),
               ],
             ],
@@ -1069,7 +791,10 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
                 Expanded(
                   child: Text(
                     "This facility isn't accepting donations right now.",
-                    style: TextStyle(fontSize: 11, color: context.palette.warningText),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: context.palette.warningText,
+                    ),
                   ),
                 ),
               ],
@@ -1099,7 +824,7 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
         SizedBox(width: 8),
         Expanded(
           child: Text(
-            "Posts from this account are official announcements from the eDonate team.",
+            "Posts from this account are official announcements from the Dugtong team.",
             style: TextStyle(
               fontSize: 12,
               color: context.palette.infoText,
@@ -1240,11 +965,8 @@ class _PosterPreviewSheetState extends State<_PosterPreviewSheet> {
               if (memberSince != null) ...[
                 const SizedBox(height: 8),
                 Text(
-                  "On eDonate since $memberSince",
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: context.palette.muted,
-                  ),
+                  "On Dugtong since $memberSince",
+                  style: TextStyle(fontSize: 12, color: context.palette.muted),
                 ),
               ],
               const SizedBox(height: 16),
@@ -1290,6 +1012,14 @@ class PostCard extends StatefulWidget {
   // Called when the comments sheet learns the donor's verification changed.
   final VoidCallback? onVerificationChanged;
 
+  /// Where likes are kept, so a card that is rebuilt shows the same heart.
+  /// The feed passes its own; a card alone keeps its own.
+  final PostLikeStore? likeStore;
+
+  /// The same post is on two pages of the feed (All and its category), so
+  /// the hero tags of its photo and avatar carry the page's name.
+  final String heroScope;
+
   const PostCard({
     super.key,
     required this.post,
@@ -1297,38 +1027,80 @@ class PostCard extends StatefulWidget {
     this.isLoggedIn = false,
     this.verificationStatus = 'unverified',
     this.onVerificationChanged,
+    this.likeStore,
+    this.heroScope = '',
   });
 
   @override
   State<PostCard> createState() => _PostCardState();
 }
 
+/// The message for a like that was not saved.
+String likeFailureMessage(LikeFailure failure) =>
+    failure == LikeFailure.signedOut
+    ? 'Sign in to like posts.'
+    : "Couldn't save your like. Please try again.";
+
 class _PostCardState extends State<PostCard> {
-  late bool liked;
-  late int likeCount;
-  late int commentCount;
   double _likeIconScale = 1.0;
+
+  // The heart and the counts come from the store (see PostLikeStore), so
+  // the same post on two pages always shows the same thing.
+  PostLikeStore? _ownStore;
+  late final PostLikeStore _store;
+  late final ValueListenable<LikeInfo> _like;
+  late final ValueListenable<int> _comments;
+
+  // The text split into title, info rows and body, read once per text.
+  late ParsedPost _parsed = parsePostContent(widget.post.content);
 
   @override
   void initState() {
     super.initState();
-    liked = widget.post.liked;
-    likeCount = widget.post.likes;
-    commentCount = widget.post.comments;
+    final shared = widget.likeStore;
+    if (shared != null) {
+      _store = shared;
+    } else {
+      _store = _ownStore = PostLikeStore()
+        ..onFailure = (failure) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(likeFailureMessage(failure)),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        };
+    }
+    _like = _store.watch(
+      widget.post.id,
+      liked: widget.post.liked,
+      likes: widget.post.likes,
+      comments: widget.post.comments,
+    );
+    _comments = _store.watchComments(widget.post.id);
   }
 
   @override
   void didUpdateWidget(covariant PostCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.post.liked != widget.post.liked ||
-        oldWidget.post.likes != widget.post.likes) {
-      setState(() {
-        liked = widget.post.liked;
-        likeCount = widget.post.likes;
-      });
+    if (oldWidget.post.content != widget.post.content) {
+      _parsed = parsePostContent(widget.post.content);
     }
-    if (oldWidget.post.comments != widget.post.comments) {
-      setState(() => commentCount = widget.post.comments);
+    // A card on its own takes a new post's likes; in the feed the page
+    // merges them (with care for taps that are still in flight).
+    if (_ownStore != null &&
+        (oldWidget.post.liked != widget.post.liked ||
+            oldWidget.post.likes != widget.post.likes ||
+            oldWidget.post.comments != widget.post.comments)) {
+      _store.merge([
+        PostSnapshot(
+          id: widget.post.id,
+          liked: widget.post.liked,
+          likes: widget.post.likes,
+          comments: widget.post.comments,
+        ),
+      ], _store.mark);
     }
   }
 
@@ -1339,12 +1111,9 @@ class _PostCardState extends State<PostCard> {
       postId: widget.post.id,
       isLoggedIn: widget.isLoggedIn,
       verificationStatus: widget.verificationStatus,
-      total: commentCount,
-      onTotalChanged: (total) {
-        if (mounted && total != commentCount) {
-          setState(() => commentCount = total);
-        }
-      },
+      total: _comments.value,
+      // The store keeps the count, even if this card has been scrolled away.
+      onTotalChanged: (total) => _store.setComments(widget.post.id, total),
       onVerificationChanged: widget.onVerificationChanged,
     );
   }
@@ -1353,9 +1122,10 @@ class _PostCardState extends State<PostCard> {
   // person sharing it.
   String _shareText() {
     final post = widget.post;
-    String? field(String? v) => (v == null || v.trim().isEmpty) ? null : v.trim();
+    String? field(String? v) =>
+        (v == null || v.trim().isEmpty) ? null : v.trim();
     final lines = <String>[
-      '${post.author} on eDonate:',
+      '${post.author} on Dugtong:',
       post.content,
       if (field(post.eventDate) != null) 'Date: ${field(post.eventDate)}',
       if (field(post.eventLocation) != null)
@@ -1364,7 +1134,7 @@ class _PostCardState extends State<PostCard> {
         'Blood type needed: ${field(post.bloodType)}',
       if (field(post.hospital) != null) 'Hospital: ${field(post.hospital)}',
       if (resolveMediaUrl(post.image) != null) resolveMediaUrl(post.image)!,
-      'Every drop counts. Every life matters. #eDonate',
+      'Every drop counts. Every life matters. #Dugtong',
     ];
     return lines.join('\n');
   }
@@ -1391,487 +1161,579 @@ class _PostCardState extends State<PostCard> {
     }
   }
 
-  // One of the three equal-width buttons under a post.
-  Widget _actionButton({
-    required void Function(BuildContext buttonContext) onTap,
-    required IconData icon,
-    required String label,
-    Color? color,
-    Widget? iconWidget,
-  }) {
-    return Expanded(
-      child: Builder(
-        builder: (buttonContext) => InkWell(
-          onTap: () => onTap(buttonContext),
-          borderRadius: BorderRadius.circular(999),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                iconWidget ??
-                    Icon(
-                      icon,
-                      size: 17,
-                      color: color ?? context.palette.muted,
-                    ),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: color ?? context.palette.muted,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   String _countLabel(int n, String one, String many) =>
       '${formatCount(n)} ${n == 1 ? one : many}';
 
-  Future<void> _handleLike() async {
-    final wasLiked = liked;
-    final previousCount = likeCount;
-
-    setState(() {
-      liked = !liked;
-      likeCount += liked ? 1 : -1;
-    });
-    if (liked) {
-      setState(() => _likeIconScale = 1.4);
-      Future.delayed(const Duration(milliseconds: 140), () {
+  /// The donor wants this post liked ([want] true) or not. The store shows it
+  /// at once, sends it in order and settles it by the server's answer.
+  void _setLiked(bool want) {
+    HapticFeedback.lightImpact();
+    if (want && !MediaQuery.disableAnimationsOf(context)) {
+      // A quick pop: 1 → 1.3 → 1 in about 250 ms.
+      setState(() => _likeIconScale = 1.3);
+      Future.delayed(const Duration(milliseconds: 125), () {
         if (mounted) setState(() => _likeIconScale = 1.0);
       });
     }
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final donorId = prefs.getString('donorId');
-      if (donorId == null || donorId.isEmpty) {
-        // Not logged in — undo the optimistic toggle instead of leaving the
-        // heart in a state that was never actually persisted.
-        if (mounted) {
-          setState(() {
-            liked = wasLiked;
-            likeCount = previousCount;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Sign in to like posts.'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-        return;
-      }
-
-      final uri = Uri.parse('${AppConfig.baseUrl}/like_post.php');
-      final response = await http
-          .post(
-            uri,
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'post_id': widget.post.id,
-              'donor_id': donorId,
-              'liked': liked,
-            }),
-          )
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode != 200) {
-        throw Exception('Like request failed');
-      }
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      if (body['success'] != true) {
-        throw Exception('Like request failed');
-      }
-      if (mounted && body['likes'] != null) {
-        setState(() => likeCount = (body['likes'] as num).toInt());
-      }
-    } catch (_) {
-      // Revert on failure so the UI doesn't lie about the like state.
-      if (mounted) {
-        setState(() {
-          liked = wasLiked;
-          likeCount = previousCount;
-        });
-      }
-    }
+    _store.setLiked(widget.post.id, want);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final post = widget.post;
+  // A double tap on the photo only ever likes; it never takes a like back.
+  void _likeFromImage() {
+    if (!_like.value.liked) _setLiked(true);
+  }
 
-    return Container(
-      decoration: BoxDecoration(
-        color: context.palette.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: context.palette.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+  void _copyText() {
+    Clipboard.setData(ClipboardData(text: widget.post.content));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Copied'),
+        behavior: SnackBarBehavior.floating,
       ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    );
+  }
+
+  void _openDonate() {
+    // Opened from Home: the Book tab (with the nav) and this post's center.
+    final facility = widget.post.donationFacilityId;
+    if (HomeNav.goTo(HomeTab.book, bookFacilityId: facility)) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BookScreen(
+          showBackButton: true,
+          preselectedFacilityId: widget.post.donationFacilityId,
+        ),
+      ),
+    );
+  }
+
+  // ── Reading the post ───────────────────────────────────────────────────
+
+  bool get _isOfficial =>
+      widget.post.authorType == 'admin' || widget.post.authorType == 'facility';
+
+  static String? _field(String? v) =>
+      (v == null || v.trim().isEmpty) ? null : v.trim();
+
+  /// The rows for the info panel: what the text lists, plus the post's own
+  /// date and place when the text leaves them out. Status gets a chip.
+  List<InfoRow> _infoRows() {
+    final post = widget.post;
+    final rows = _parsed.rows.where((r) => r.kind != InfoKind.status).toList();
+    final date = _field(post.eventDate);
+    if (date != null && _parsed.row(InfoKind.date) == null) {
+      rows.insert(0, InfoRow(kind: InfoKind.date, label: 'Date', value: date));
+    }
+    final place = _field(post.eventLocation);
+    if (place != null && _parsed.row(InfoKind.location) == null) {
+      rows.add(
+        InfoRow(kind: InfoKind.location, label: 'Location', value: place),
+      );
+    }
+    return rows;
+  }
+
+  String? get _status {
+    final post = widget.post;
+    final written = _parsed.row(InfoKind.status)?.value;
+    // The server's flag wins over text that still says "Open".
+    if (post.isDonation &&
+        !post.donationOpen &&
+        (written == null || written.toLowerCase().contains('open'))) {
+      return 'Closed';
+    }
+    if (written != null) return written;
+    if (post.type == PostType.event && post.isDonation) {
+      return post.donationOpen ? 'Open' : 'Closed';
+    }
+    return null;
+  }
+
+  /// What a screen reader hears for the header, e.g. "Official event by
+  /// eDonate, 1 week ago, Capstone, Mon, October 12, 2026, Open".
+  String _summary(List<InfoRow> rows) {
+    final post = widget.post;
+    final kind = switch (post.type) {
+      PostType.event => 'event',
+      PostType.urgent => 'urgent request',
+      PostType.milestone => 'milestone',
+      PostType.story => 'post',
+    };
+    final who = '${_isOfficial ? 'Official ' : ''}$kind by ${post.author}';
+    final date = rows.where((r) => r.kind == InfoKind.date).firstOrNull;
+    return [
+      who[0].toUpperCase() + who.substring(1),
+      post.timeAgo,
+      _parsed.title,
+      date?.value,
+      _status,
+    ].whereType<String>().where((s) => s.trim().isNotEmpty).join(', ');
+  }
+
+  // ── Look ───────────────────────────────────────────────────────────────
+
+  Widget _avatar(BuildContext context) {
+    final p = context.palette;
+    final post = widget.post;
+    final url = post.authorAvatar.trim();
+    final Widget face;
+    if (url.isNotEmpty) {
+      face = netImage(url);
+    } else if (post.authorType == 'admin') {
+      // An official poster without a photo: Dugtong's round avatar.
+      face = Image.asset(
+        EdonateLogo.avatarAsset,
+        fit: BoxFit.cover,
+        cacheWidth: (44 * MediaQuery.devicePixelRatioOf(context)).round(),
+        semanticLabel: 'Dugtong logo',
+        errorBuilder: (_, _, _) => ColoredBox(
+          color: p.accentBg,
+          child: Icon(Icons.water_drop_rounded, color: p.primaryText),
+        ),
+      );
+    } else {
+      final name = post.author.trim();
+      face = ColoredBox(
+        color: p.accentBg,
+        child: Center(
+          child: Text(
+            name.isEmpty ? '?' : name.characters.first.toUpperCase(),
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: p.primaryText,
+            ),
+          ),
+        ),
+      );
+    }
+
+    final photo = Hero(
+      tag: 'author_avatar_${widget.heroScope}_${post.id}',
+      child: ClipOval(child: face),
+    );
+    if (!_isOfficial) {
+      return Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: p.border),
+        ),
+        child: photo,
+      );
+    }
+    // Official posters: a brand ring and a check.
+    return SizedBox(
+      width: 44,
+      height: 44,
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          // Header
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-            child: InkWell(
-              onTap: () => _showPosterPreview(context, post: post),
-              borderRadius: BorderRadius.circular(10),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Hero(
-                        tag: 'author_avatar_${post.id}',
-                        child: Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: AppColors.primary.withOpacity(0.2),
-                              width: 2,
-                            ),
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: netImage(post.authorAvatar),
-                        ),
-                      ),
-                      if (post.type == PostType.urgent)
-                        Positioned(
-                          bottom: -2,
-                          right: -2,
-                          child: Container(
-                            width: 16,
-                            height: 16,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
-                            ),
-                            child: const Icon(
-                              Icons.water_drop,
-                              size: 8,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Wrap(
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          spacing: 8,
-                          runSpacing: 4,
-                          children: [
-                            Text(
-                              post.author,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: context.palette.foreground,
-                              ),
-                            ),
-                            if (post.urgency != null)
-                              UrgencyBadge(urgency: post.urgency!),
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        Row(
-                          children: [
-                            if (post.authorBadge != null) ...[
-                              Icon(
-                                Icons.emoji_events,
-                                size: 10,
-                                color: context.palette.primaryText,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                post.authorBadge!,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
-                                  color: context.palette.primaryText,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                "·",
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: context.palette.muted,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                            ],
-                            Text(
-                              post.timeAgo,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: context.palette.muted,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Post text
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: Text(
-              post.content,
-              style: TextStyle(
-                fontSize: 13.5,
-                height: 1.5,
-                color: context.palette.foreground,
-              ),
-            ),
-          ),
-
-          // Post image
-          if (post.image != null)
-            _PressableImage(
-              onTap: () => _openImageViewer(
-                context,
-                imageUrls: [post.image!],
-                initialIndex: 0,
-                heroTagPrefix: 'post_image_${post.id}',
-              ),
-              child: Hero(
-                tag: 'post_image_${post.id}_0',
-                child: Container(
-                  color: context.palette.surfaceAlt,
-                  constraints: const BoxConstraints(maxHeight: 240),
-                  width: double.infinity,
-                  child: netImage(post.image!),
-                ),
-              ),
-            ),
-
-          // Donate block — only for open donation posts, and only when the
-          // viewer is a verified, logged-in donor.
-          if (post.isDonation && post.donationOpen && widget.canDonate)
-            _DonateBlock(post: post),
-
-          // Counts row — only when there is something to count.
-          if (likeCount > 0 || commentCount > 0)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-              child: Row(
-                children: [
-                  if (likeCount > 0)
-                    Text(
-                      _countLabel(likeCount, 'like', 'likes'),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: context.palette.muted,
-                      ),
-                    ),
-                  const Spacer(),
-                  if (commentCount > 0)
-                    InkWell(
-                      onTap: _openComments,
-                      borderRadius: BorderRadius.circular(6),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 2,
-                        ),
-                        child: Text(
-                          _countLabel(commentCount, 'comment', 'comments'),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: context.palette.muted,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-
-          // Action bar: Like, Comment, Share
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: context.palette.border)),
+            padding: const EdgeInsets.all(2),
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: AppColors.primaryGradient,
+              ),
             ),
-            child: Row(
-              children: [
-                _actionButton(
-                  onTap: (_) => _handleLike(),
-                  icon: liked ? Icons.favorite : Icons.favorite_border,
-                  label: liked ? "Liked" : "Like",
-                  color: liked ? context.palette.primaryText : context.palette.muted,
-                  iconWidget: AnimatedScale(
-                    scale: _likeIconScale,
-                    duration: const Duration(milliseconds: 140),
-                    curve: Curves.easeOut,
-                    child: Icon(
-                      liked ? Icons.favorite : Icons.favorite_border,
-                      size: 17,
-                      color: liked ? context.palette.primaryText : context.palette.muted,
-                    ),
-                  ),
-                ),
-                _actionButton(
-                  onTap: (_) => _openComments(),
-                  icon: Icons.mode_comment_outlined,
-                  label: "Comment",
-                ),
-                _actionButton(
-                  onTap: _handleShare,
-                  icon: Icons.ios_share_rounded,
-                  label: "Share",
-                ),
-              ],
+            child: Container(
+              padding: const EdgeInsets.all(1.5),
+              decoration: BoxDecoration(
+                color: p.surface,
+                shape: BoxShape.circle,
+              ),
+              child: photo,
+            ),
+          ),
+          Positioned(
+            right: -3,
+            bottom: -3,
+            child: Container(
+              width: 18,
+              height: 18,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                shape: BoxShape.circle,
+                border: Border.all(color: p.surface, width: 2),
+              ),
+              child: const Icon(
+                Icons.check_rounded,
+                size: 10,
+                color: Colors.white,
+              ),
             ),
           ),
         ],
       ),
     );
   }
-}
 
-// ── Donate block (shown on open donation posts to verified donors) ────────
-
-class _DonateBlock extends StatefulWidget {
-  final Post post;
-  const _DonateBlock({required this.post});
-
-  @override
-  State<_DonateBlock> createState() => _DonateBlockState();
-}
-
-class _DonateBlockState extends State<_DonateBlock> {
-  double _scale = 1.0;
-
-  Widget _detailRow(IconData icon, String text) => Row(
-    children: [
-      Icon(icon, size: 14, color: context.palette.primaryText),
-      const SizedBox(width: 6),
-      Expanded(
-        child: Text(
-          text,
-          style: TextStyle(fontSize: 12, color: context.palette.foreground),
+  ({String label, Color bg, Color fg}) _typeStyle(AppPalette p) =>
+      switch (widget.post.type) {
+        PostType.event => (label: 'EVENT', bg: p.accentBg, fg: p.primaryText),
+        PostType.urgent => (
+          label: 'URGENT',
+          bg: AppColors.critical.withValues(alpha: p.isDark ? 0.18 : 0.08),
+          fg: p.criticalText,
         ),
-      ),
-    ],
-  );
+        PostType.milestone => (
+          label: 'MILESTONE',
+          bg: p.warningBg,
+          fg: p.warningText,
+        ),
+        PostType.story => (label: 'STORY', bg: p.infoBg, fg: p.infoText),
+      };
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _header(BuildContext context, List<InfoRow> rows) {
+    final p = context.palette;
     final post = widget.post;
-    final hasDate = post.eventDate != null && post.eventDate!.isNotEmpty;
-    final hasLocation =
-        post.eventLocation != null && post.eventLocation!.isNotEmpty;
-
-    final detailRows = <Widget>[];
-    if (hasDate)
-      detailRows.add(_detailRow(Icons.event_rounded, post.eventDate!));
-    if (hasLocation) {
-      if (detailRows.isNotEmpty) detailRows.add(const SizedBox(height: 6));
-      detailRows.add(
-        _detailRow(Icons.location_on_rounded, post.eventLocation!),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ...detailRows,
-          if (detailRows.isNotEmpty) const SizedBox(height: 10),
-          GestureDetector(
-            onTapDown: (_) => setState(() => _scale = 0.97),
-            onTapUp: (_) => setState(() => _scale = 1.0),
-            onTapCancel: () => setState(() => _scale = 1.0),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => BookScreen(
-                    showBackButton: true,
-                    preselectedFacilityId: post.donationFacilityId,
-                  ),
-                ),
-              );
-            },
-            child: AnimatedScale(
-              scale: _scale,
-              duration: const Duration(milliseconds: 120),
-              curve: Curves.easeOut,
-              child: Container(
-                width: double.infinity,
-                height: 46,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: AppColors.primaryGradient,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.25),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+    final type = _typeStyle(p);
+    final badge = _field(post.authorBadge) ?? (_isOfficial ? 'Official' : null);
+    return Row(
+      children: [
+        Expanded(
+          child: Semantics(
+            button: true,
+            label: _summary(rows),
+            excludeSemantics: true,
+            child: InkWell(
+              onTap: () => _showPosterPreview(context, post: post),
+              borderRadius: BorderRadius.circular(14),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 48),
+                child: Row(
                   children: [
-                    Icon(Icons.water_drop, size: 16, color: Colors.white),
-                    SizedBox(width: 8),
-                    Text(
-                      "Donate Now",
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
+                    _avatar(context),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  post.author,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: p.foreground,
+                                  ),
+                                ),
+                              ),
+                              if (_isOfficial) ...[
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.verified_rounded,
+                                  size: 16,
+                                  color: p.primaryText,
+                                ),
+                              ],
+                              if (post.type != PostType.urgent &&
+                                  post.urgency != null) ...[
+                                const SizedBox(width: 6),
+                                UrgencyBadge(urgency: post.urgency!),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              if (badge != null) ...[
+                                Text(
+                                  badge,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: p.primaryText,
+                                  ),
+                                ),
+                                Text(
+                                  '·',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: p.muted,
+                                  ),
+                                ),
+                              ],
+                              Text(
+                                post.timeAgo,
+                                style: TextStyle(fontSize: 12, color: p.muted),
+                              ),
+                              Text(
+                                '·',
+                                style: TextStyle(fontSize: 12, color: p.muted),
+                              ),
+                              PostTypeChip(
+                                label: type.label,
+                                background: type.bg,
+                                foreground: type.fg,
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
-                    SizedBox(width: 2),
-                    Icon(Icons.chevron_right, size: 18, color: Colors.white),
                   ],
                 ),
               ),
             ),
           ),
+        ),
+        _moreButton(context),
+      ],
+    );
+  }
+
+  Widget _moreButton(BuildContext context) {
+    final p = context.palette;
+    Widget item(IconData icon, String label) => Row(
+      children: [
+        Icon(icon, size: 20, color: p.muted),
+        const SizedBox(width: 12),
+        Text(label, style: TextStyle(fontSize: 14, color: p.foreground)),
+      ],
+    );
+    return Builder(
+      builder: (buttonContext) => PopupMenuButton<String>(
+        tooltip: 'More options',
+        icon: Icon(Icons.more_horiz_rounded, color: p.muted),
+        color: p.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: p.border),
+        ),
+        onSelected: (value) {
+          if (value == 'share') {
+            _handleShare(buttonContext);
+          } else {
+            _copyText();
+          }
+        },
+        itemBuilder: (_) => [
+          PopupMenuItem(
+            value: 'share',
+            child: item(Icons.ios_share_rounded, 'Share post'),
+          ),
+          PopupMenuItem(
+            value: 'copy',
+            child: item(Icons.copy_rounded, 'Copy text'),
+          ),
         ],
+      ),
+    );
+  }
+
+  /// The post's words, laid out for its kind.
+  List<Widget> _content(BuildContext context, List<InfoRow> rows) {
+    final p = context.palette;
+    final post = widget.post;
+    final bodyStyle = TextStyle(
+      fontSize: 14.5,
+      height: 1.5,
+      color: p.foreground,
+    );
+    final out = <Widget>[];
+
+    if (rows.isNotEmpty) {
+      // Event: date tile and title, the details, then the note.
+      final date = rows.where((r) => r.kind == InfoKind.date).firstOrNull;
+      final status = _status;
+      out.add(
+        Row(
+          children: [
+            EventDateTile(date: date?.value),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _parsed.title ??
+                        (post.type == PostType.event
+                            ? 'Blood donation event'
+                            : post.author),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 17,
+                      height: 1.25,
+                      fontWeight: FontWeight.w700,
+                      color: p.foreground,
+                    ),
+                  ),
+                  if (status != null) ...[
+                    const SizedBox(height: 6),
+                    EventStatusChip(status: status),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+      out.add(EventInfoPanel(rows: rows));
+      if (_parsed.body.isNotEmpty) out.add(PostNote(text: _parsed.body));
+    } else if (post.type == PostType.milestone) {
+      // Milestone: the first line in the gold band, the rest below.
+      final lines = post.content.trim().split('\n');
+      final headline = stripLeadingEmoji(lines.first);
+      final rest = lines.skip(1).join('\n').trim();
+      if (headline.isNotEmpty) out.add(MilestoneBand(headline: headline));
+      if (rest.isNotEmpty) out.add(ExpandableText(rest, style: bodyStyle));
+    } else if (post.content.trim().isNotEmpty) {
+      out.add(
+        ExpandableText(
+          post.content.trim(),
+          style: post.type == PostType.story
+              ? TextStyle(fontSize: 15, height: 1.55, color: p.foreground)
+              : bodyStyle,
+        ),
+      );
+    }
+
+    if (post.type == PostType.urgent &&
+        (_field(post.bloodType) != null || _field(post.hospital) != null)) {
+      out.add(
+        UrgentNeedRow(
+          bloodType: _field(post.bloodType),
+          hospital: _field(post.hospital),
+        ),
+      );
+    }
+    return out;
+  }
+
+  Widget _actions() {
+    return Row(
+      children: [
+        Expanded(
+          flex: 5,
+          child: ValueListenableBuilder<LikeInfo>(
+            valueListenable: _like,
+            builder: (context, like, _) => ActionPill(
+              icon: like.liked
+                  ? Icons.favorite_rounded
+                  : Icons.favorite_border_rounded,
+              label: like.likes > 0
+                  ? 'Like ${formatCount(like.likes)}'
+                  : 'Like',
+              semanticLabel:
+                  'Like, ${_countLabel(like.likes, 'like', 'likes')}',
+              toggled: like.liked,
+              active: like.liked,
+              iconScale: _likeIconScale,
+              onTap: (_) => _setLiked(!_like.value.liked),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          // A little wider: "Comment 12" is the longest label.
+          flex: 6,
+          child: ValueListenableBuilder<int>(
+            valueListenable: _comments,
+            builder: (context, count, _) => ActionPill(
+              icon: Icons.mode_comment_outlined,
+              label: count > 0 ? 'Comment ${formatCount(count)}' : 'Comment',
+              semanticLabel:
+                  'Comment, ${_countLabel(count, 'comment', 'comments')}',
+              onTap: (_) => _openComments(),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          flex: 5,
+          child: ActionPill(
+            icon: Icons.ios_share_rounded,
+            label: 'Share',
+            semanticLabel: 'Share',
+            onTap: _handleShare,
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final post = widget.post;
+    final rows = _infoRows();
+    final image = post.image;
+
+    final sections = <Widget>[
+      _header(context, rows),
+      ..._content(context, rows),
+      if (image != null)
+        PostImage(
+          url: image,
+          heroTag: 'post_image_${widget.heroScope}_${post.id}_0',
+          onOpen: () => openImageViewer(
+            context,
+            imageUrls: [image],
+            initialIndex: 0,
+            heroTagPrefix: 'post_image_${widget.heroScope}_${post.id}',
+          ),
+          onDoubleTap: _likeFromImage,
+        ),
+      // Donate Now — only for open donation posts, and only when the viewer
+      // is a verified, logged-in donor. It glows on urgent posts.
+      if (post.isDonation && post.donationOpen && widget.canDonate)
+        DonateNowButton(
+          onPressed: _openDonate,
+          glow: post.type == PostType.urgent,
+        ),
+    ];
+
+    return RepaintBoundary(
+      child: Container(
+        decoration: BoxDecoration(
+          color: p.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: p.border),
+          boxShadow: p.shadow,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (post.type == PostType.urgent)
+              UrgentBand(
+                level: switch (post.urgency) {
+                  Urgency.critical => 'CRITICAL',
+                  Urgency.high => 'HIGH',
+                  _ => null,
+                },
+              ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < sections.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 16),
+                    sections[i],
+                  ],
+                  const SizedBox(height: 12),
+                  Divider(height: 1, thickness: 1, color: p.border),
+                  const SizedBox(height: 4),
+                  _actions(),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1899,39 +1761,219 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
   bool _loadingPosts = true;
   String? _postsError;
 
-  final ScrollController _scrollController = ScrollController();
-  bool _fabVisible = true;
-  double _lastScrollOffset = 0;
+  // One scrolling page per category, side by side in a PageView; a swipe
+  // moves between them. Each page keeps its own scroll position.
+  final PageController _pages = PageController();
+  final Map<FeedCategory, ScrollController> _scrollControllers = {};
+
+  ScrollController _scrollFor(FeedCategory c) =>
+      _scrollControllers.putIfAbsent(c, ScrollController.new);
+
+  // Scrolling only moves these two notifiers; nothing rebuilds the feed.
+  /// "Go to Home" shows at the top and when scrolling back up, and hides
+  /// while scrolling down.
+  final ValueNotifier<bool> goHomeVisible = ValueNotifier(true);
+
+  /// The header gets its shadow once the feed has moved under it.
+  final ValueNotifier<bool> _scrolled = ValueNotifier(false);
+
+  // The selected category: the page that is showing.
+  FeedCategory _selected = FeedCategory.all;
+
+  // Posts per category and the categories that exist, worked out once per
+  // load of the feed.
+  Map<FeedCategory, int> _counts = const {};
+  Map<FeedCategory, List<Post>> _byCategory = const {};
+  List<FeedCategory> _categories = const [];
+
+  // True while the code (a tap, a reload) moves the pages: those page changes
+  // are not the donor's swipes. [_pageSeq] tells the latest move from an
+  // earlier one that was replaced.
+  bool _pagingByCode = false;
+  int _pageSeq = 0;
+
+  // True while a page scrolls itself to the top after a tap on its own
+  // category: that move must not flip "Go to Home" back.
+  bool _programmaticScroll = false;
+  int _scrollSeq = 0;
+
+  // Likes live here, so they outlive the cards that show them.
+  final PostLikeStore _likes = PostLikeStore();
+
+  // Posts that have already played their entrance.
+  final Set<int> _entered = {};
+  // Only the cards on screen when the feed first shows slide in one after
+  // another; any card built after that frame just fades in.
+  bool _staggerDone = false;
 
   @override
   void initState() {
     super.initState();
+    _likes.onFailure = _likeFailed;
     _checkLoginStatus();
     _fetchVerificationStatus();
     _loadPosts();
-    _scrollController.addListener(_handleScroll);
   }
 
   @override
   void dispose() {
-    _scrollController.removeListener(_handleScroll);
-    _scrollController.dispose();
+    _pages.dispose();
+    for (final c in _scrollControllers.values) {
+      c.dispose();
+    }
+    goHomeVisible.dispose();
+    _scrolled.dispose();
     super.dispose();
   }
 
-  void _handleScroll() {
-    final offset = _scrollController.offset;
-    final delta = offset - _lastScrollOffset;
-    _lastScrollOffset = offset;
+  /// There is a category bar to show: the feed has loaded and has more than
+  /// one kind of post.
+  bool get _barAvailable =>
+      !_loadingPosts && _postsError == null && _categories.isNotEmpty;
+
+  /// The pages, in the bar's order; just All while there is no bar.
+  List<FeedCategory> get _pageCategories =>
+      _categories.isEmpty ? const [FeedCategory.all] : _categories;
+
+  /// The vertical scrolling of the CURRENT page drives the header shadow and
+  /// "Go to Home" (the paging itself is horizontal and ignored here).
+  bool _onScroll(ScrollNotification n) {
+    if (n is! ScrollUpdateNotification || n.metrics.axis != Axis.vertical) {
+      return false;
+    }
+    final scrollContext = n.context;
+    if (scrollContext == null) return false;
+    final scrollable = Scrollable.maybeOf(scrollContext);
+    if (scrollable == null ||
+        scrollable.widget.controller != _scrollControllers[_selected]) {
+      return false;
+    }
+    final offset = n.metrics.pixels;
+    final delta = n.scrollDelta ?? 0;
+
+    _scrolled.value = offset > 2;
+
+    // The page scrolling itself says nothing about which way the donor goes.
+    if (_programmaticScroll) return false;
+
+    // A list too short to scroll (a bounce on iOS still reports offsets):
+    // inside a category the bar stays, so the donor is never stuck in a
+    // filter; with All selected it is the top of the feed again.
+    if (_barAvailable && n.metrics.maxScrollExtent <= 0) {
+      goHomeVisible.value = _selected == FeedCategory.all;
+      return false;
+    }
 
     if (offset <= 0) {
-      if (!_fabVisible) setState(() => _fabVisible = true);
-      return;
+      goHomeVisible.value = true;
+      return false;
     }
-    if (delta > 6 && _fabVisible) {
-      setState(() => _fabVisible = false);
-    } else if (delta < -6 && !_fabVisible) {
-      setState(() => _fabVisible = true);
+    if (delta > 6 && goHomeVisible.value) {
+      goHomeVisible.value = false;
+    } else if (delta < -6 && !goHomeVisible.value) {
+      goHomeVisible.value = true;
+    }
+    return false;
+  }
+
+  /// After the page or its list changed: the header shadow follows the new
+  /// page, and a page too short to scroll has no scroll events to go by, so
+  /// decide here (see [_onScroll]).
+  void _settleBar() {
+    if (!mounted) return;
+    final c = _scrollControllers[_selected];
+    if (c == null || !c.hasClients) return;
+    _scrolled.value = c.offset > 2;
+    if (_barAvailable && c.position.maxScrollExtent <= 0) {
+      goHomeVisible.value = _selected == FeedCategory.all;
+    }
+  }
+
+  void _announce(FeedCategory c) {
+    SemanticsService.sendAnnouncement(
+      View.of(context),
+      'Showing ${c.label}, ${postsLabel(_counts[c] ?? 0)}',
+      Directionality.of(context),
+    );
+  }
+
+  /// The donor swiped to another page: the bar says where they are.
+  void _onPageChanged(int index) {
+    final pages = _pageCategories;
+    if (_pagingByCode || index < 0 || index >= pages.length) return;
+    final c = pages[index];
+    if (c == _selected) return;
+    setState(() => _selected = c);
+    HapticFeedback.selectionClick();
+    _announce(c);
+    goHomeVisible.value = false;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _settleBar());
+  }
+
+  /// The page index of [_selected] is the controller's page again (after the
+  /// categories changed under it): jump there, without animation.
+  void _syncPage() {
+    if (!mounted || !_pages.hasClients) return;
+    final want = _pageCategories.indexOf(_selected);
+    if (want < 0 || !_pages.position.hasPixels) return;
+    if ((_pages.page ?? want.toDouble()).round() == want) return;
+    _pagingByCode = true;
+    _pages.jumpToPage(want);
+    _pagingByCode = false;
+  }
+
+  /// Moves the pages to [target]: animated (a jump to the page next to it
+  /// first when it is far, so the pages in between are never built), or a
+  /// plain jump when animations are off.
+  Future<void> _goToPage(int target) async {
+    if (!_pages.hasClients || !_pages.position.hasPixels) return;
+    final seq = ++_pageSeq;
+    _pagingByCode = true;
+    try {
+      final current = (_pages.page ?? target.toDouble()).round();
+      if (MediaQuery.disableAnimationsOf(context)) {
+        _pages.jumpToPage(target);
+      } else {
+        if ((target - current).abs() > 1) {
+          _pages.jumpToPage(target > current ? target - 1 : target + 1);
+        }
+        await _pages.animateToPage(
+          target,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    } finally {
+      // Only the latest move hands the pages back to the donor.
+      if (seq == _pageSeq) {
+        _pagingByCode = false;
+        if (mounted) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => _settleBar());
+        }
+      }
+    }
+  }
+
+  /// The selected category was tapped again: its page scrolls to the top
+  /// (like the iOS tab bar); the bar stays.
+  Future<void> _scrollSelectedToTop() async {
+    final c = _scrollControllers[_selected];
+    if (c == null || !c.hasClients) return;
+    final seq = ++_scrollSeq;
+    _programmaticScroll = true;
+    try {
+      await c.animateTo(
+        0,
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    } finally {
+      if (seq == _scrollSeq) {
+        _programmaticScroll = false;
+        _settleBar();
+      }
     }
   }
 
@@ -1942,14 +1984,14 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     final signedIn = loggedIn && donorId != null && donorId.isNotEmpty;
     // The cached photo path first, so the header has the picture straight
     // away; the server's answer follows.
-    if (signedIn) await MyAvatar.instance.load();
+    if (signedIn) await MyAvatarController.instance.loadCached();
     if (!mounted) return;
     setState(() {
       _isLoggedIn = signedIn;
       _userName = prefs.getString('userName');
       _checkedLogin = true;
     });
-    if (signedIn) unawaited(MyAvatar.instance.refresh());
+    if (signedIn) unawaited(MyAvatarController.instance.refresh());
   }
 
   Future<void> _fetchVerificationStatus() async {
@@ -2040,9 +2082,34 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     );
   }
 
-  void _scrollToVerifyCta() {
-    if (!_scrollController.hasClients) return;
-    _scrollController.animateTo(
+  /// "Verify your ID": the card is on the All page, so go there first (a
+  /// jump when it is far), then scroll up to it.
+  Future<void> _scrollToVerifyCta() async {
+    if (_selected != FeedCategory.all && _categories.isNotEmpty) {
+      setState(() => _selected = FeedCategory.all);
+      if (_pages.hasClients && _pages.position.hasPixels) {
+        final seq = ++_pageSeq;
+        _pagingByCode = true;
+        try {
+          final current = (_pages.page ?? 0).round();
+          if (current > 1 || MediaQuery.disableAnimationsOf(context)) {
+            _pages.jumpToPage(0);
+          } else {
+            await _pages.animateToPage(
+              0,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOutCubic,
+            );
+          }
+        } finally {
+          if (seq == _pageSeq) _pagingByCode = false;
+        }
+        await WidgetsBinding.instance.endOfFrame;
+      }
+    }
+    final c = _scrollControllers[FeedCategory.all];
+    if (!mounted || c == null || !c.hasClients) return;
+    c.animateTo(
       0,
       duration: const Duration(milliseconds: 400),
       curve: Curves.easeOutCubic,
@@ -2067,35 +2134,92 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       return;
     }
     HapticFeedback.selectionClick();
-    await navigator.push(
-      MaterialPageRoute(builder: (_) => const PinScreen()),
-    );
+    await navigator.push(MaterialPageRoute(builder: (_) => const PinScreen()));
     // Back here without unlocking (the user pressed back) — refresh in case
     // anything changed while the PIN screen was open.
     if (mounted) _fetchVerificationStatus();
   }
 
-  Future<void> _loadPosts() async {
-    setState(() {
-      _loadingPosts = true;
-      _postsError = null;
-    });
+  // A like was not saved: the heart is already back; say so.
+  void _likeFailed(LikeFailure failure) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(likeFailureMessage(failure)),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _loadPosts({bool refresh = false}) async {
+    // Taps after this moment are newer than what the server is about to say.
+    final likesMark = _likes.mark;
+    // A refresh keeps showing the posts (the pull spinner is enough), so the
+    // pages and their scroll positions are not thrown away while it runs.
+    final keepShowing = refresh && _posts.isNotEmpty;
+    if (!keepShowing) {
+      setState(() {
+        _loadingPosts = true;
+        _postsError = null;
+      });
+    }
     // The newsfeed loading is also when the header photo gets refreshed.
-    unawaited(MyAvatar.instance.refresh());
+    unawaited(MyAvatarController.instance.refresh());
     try {
       final prefs = await SharedPreferences.getInstance();
       final donorId = prefs.getString('donorId');
       final posts = await NewsfeedApi.fetchPosts(donorId: donorId);
       if (!mounted) return;
+      _likes.merge([
+        for (final p in posts)
+          PostSnapshot(
+            id: p.id,
+            liked: p.liked,
+            likes: p.likes,
+            comments: p.comments,
+          ),
+      ], likesMark);
       setState(() {
         _posts = posts;
         _loadingPosts = false;
+        _postsError = null;
+        final counts = <FeedCategory, int>{FeedCategory.all: posts.length};
+        final byCategory = <FeedCategory, List<Post>>{FeedCategory.all: posts};
+        for (final p in posts) {
+          final group = FeedCategory.of(p.type.name);
+          counts[group] = (counts[group] ?? 0) + 1;
+          (byCategory[group] ??= []).add(p);
+        }
+        _counts = counts;
+        _byCategory = byCategory;
+        _categories = FeedCategory.available(posts.map((p) => p.type.name));
+        // A category that is gone after a reload falls back to All.
+        if (_selected != FeedCategory.all && !_categories.contains(_selected)) {
+          _selected = FeedCategory.all;
+        }
+      });
+      // The pages may have moved (a category is gone): the PageView follows
+      // the selected page, without animation.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _syncPage();
+        _settleBar();
       });
     } catch (e) {
       if (!mounted) return;
+      if (keepShowing) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Couldn't refresh the feed."),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
       setState(() {
-        _postsError = 'Could not load the newsfeed. Pull down to try again.';
+        _postsError = "Couldn't load the feed.";
         _loadingPosts = false;
+        _categories = const [];
+        _selected = FeedCategory.all;
       });
     }
   }
@@ -2105,52 +2229,93 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       StreakScreen(id: 'newsfeed', child: _buildScreen(context));
 
   Widget _buildScreen(BuildContext context) {
-    return Scaffold(
-      backgroundColor: context.palette.background,
-      body: SafeArea(
-        child: Column(
+    // The bar floats over the feed (like Home's nav), so the feed ends with
+    // room for it: the bar, its margins and a little air.
+    final barRoom =
+        CategoryNavBar.largeTextHeight +
+        FloatingNavMetrics.bottomMargin +
+        MediaQuery.paddingOf(context).bottom +
+        16;
+    return PopScope(
+      // Back from a category goes to All first; from All it leaves as before.
+      canPop: _selected == FeedCategory.all,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _selectCategory(FeedCategory.all);
+      },
+      child: Scaffold(
+        backgroundColor: context.palette.background,
+        body: Stack(
           children: [
-            _buildHeader(context),
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: () =>
-                    Future.wait([_loadPosts(), _fetchVerificationStatus()]),
-                child: ListView(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.only(bottom: 110),
+            Positioned.fill(
+              child: SafeArea(
+                child: Column(
                   children: [
-                    FadeSlideIn(index: 0, child: _buildSignInCta(context)),
-                    if (_isLoggedIn)
-                      FadeSlideIn(index: 1, child: _buildVerifyIdCta(context)),
-                    const SizedBox(height: 16),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: _buildPostsList(),
+                    _buildHeader(context),
+                    Expanded(
+                      child: _buildPages(
+                        context,
+                        bottomSpace: _barAvailable ? barRoom : 0,
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
+            // The category bar and "Go to Home" take turns: the bar is on
+            // screen exactly when "Go to Home" is away.
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: ValueListenableBuilder<bool>(
+                valueListenable: goHomeVisible,
+                builder: (context, goHome, _) => CategoryNavBar(
+                  items: _categories,
+                  selected: _selected,
+                  counts: _counts,
+                  onSelected: _selectCategory,
+                  visible: _barAvailable && !goHome,
+                  pageController: _pages,
+                  onScrub: _scrub,
+                  onScrubEnd: _scrubEnd,
+                ),
+              ),
+            ),
           ],
         ),
+        floatingActionButton: _buildFabArea(context),
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       ),
-      floatingActionButton: _buildFabArea(context),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 
   // ── FAB slot: "Go to Home"/"Sign In" button, or a quiet status banner ───
   Widget? _buildFabArea(BuildContext context) {
-    if (!_isLoggedIn) return _buildHomeFab(context);
-    if (_checkingVerification) return null;
-    if (_verificationStatus == 'verified') return _buildHomeFab(context);
-    return _buildVerificationBanner(context);
+    final Widget Function(BuildContext, bool) build;
+    if (!_isLoggedIn) {
+      build = _buildHomeFab;
+    } else if (_checkingVerification) {
+      return null;
+    } else if (_verificationStatus == 'verified') {
+      build = _buildHomeFab;
+    } else {
+      build = _buildVerificationBanner;
+    }
+    // Only this button follows the scroll; the rest of the screen stays put.
+    return ValueListenableBuilder<bool>(
+      valueListenable: goHomeVisible,
+      builder: (context, visible, _) => build(context, visible),
+    );
   }
 
-  Widget _buildVerificationBanner(BuildContext context) {
+  Widget _buildVerificationBanner(BuildContext context, bool fabVisible) {
     final isPending = _verificationStatus == 'pending';
-    final bg = isPending ? context.palette.warningBg : context.palette.surfaceAlt;
-    final border = isPending ? context.palette.warningBorder : context.palette.border;
+    final bg = isPending
+        ? context.palette.warningBg
+        : context.palette.surfaceAlt;
+    final border = isPending
+        ? context.palette.warningBorder
+        : context.palette.border;
     final fg = isPending ? context.palette.warningText : context.palette.muted;
     final icon = isPending
         ? Icons.hourglass_top_rounded
@@ -2162,13 +2327,13 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     return AnimatedSlide(
       duration: const Duration(milliseconds: 280),
       curve: Curves.easeOutCubic,
-      offset: _fabVisible ? Offset.zero : const Offset(0, 2),
+      offset: fabVisible ? Offset.zero : const Offset(0, 2),
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOut,
-        opacity: _fabVisible ? 1 : 0,
+        opacity: fabVisible ? 1 : 0,
         child: IgnorePointer(
-          ignoring: !_fabVisible,
+          ignoring: !fabVisible,
           child: GestureDetector(
             onTap: isPending ? null : _scrollToVerifyCta,
             child: Container(
@@ -2201,19 +2366,19 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
   }
 
   // ── Floating "Go to Home" / "Sign In" button ────────────────────────────
-  Widget _buildHomeFab(BuildContext context) {
+  Widget _buildHomeFab(BuildContext context, bool fabVisible) {
     final label = _isLoggedIn ? "Go to Home" : "Sign In to Donate";
 
     return AnimatedSlide(
       duration: const Duration(milliseconds: 280),
       curve: Curves.easeOutCubic,
-      offset: _fabVisible ? Offset.zero : const Offset(0, 2),
+      offset: fabVisible ? Offset.zero : const Offset(0, 2),
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOut,
-        opacity: _fabVisible ? 1 : 0,
+        opacity: fabVisible ? 1 : 0,
         child: IgnorePointer(
-          ignoring: !_fabVisible,
+          ignoring: !fabVisible,
           child: GestureDetector(
             onTap: () {
               if (_isLoggedIn) {
@@ -2274,120 +2439,207 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       !_checkingVerification &&
       _verificationStatus == 'verified';
 
-  Widget _buildPostsList() {
-    if (_loadingPosts) {
-      return Padding(
-        padding: EdgeInsets.symmetric(vertical: 40),
-        child: Center(
-          child: CircularProgressIndicator(color: context.palette.primaryText),
-        ),
-      );
+  /// A category was tapped (or the back button asked for All): the pages
+  /// move to it and the category bar stays on screen (it is "Go to Home"
+  /// that gives way). Tapping the selected one scrolls its page to the top.
+  void _selectCategory(FeedCategory f) {
+    HapticFeedback.selectionClick();
+    final target = _pageCategories.indexOf(f);
+    if (target < 0) return;
+    goHomeVisible.value = false;
+    if (f == _selected) {
+      _scrollSelectedToTop();
+      return;
     }
+    _announce(f);
+    setState(() => _selected = f);
+    _goToPage(target);
+  }
 
-    if (_postsError != null) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 40),
-        child: Column(
-          children: [
-            Icon(Icons.wifi_off, color: context.palette.muted, size: 32),
-            const SizedBox(height: 8),
-            Text(
-              _postsError!,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: context.palette.muted),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton(onPressed: _loadPosts, child: const Text("Retry")),
-          ],
+  /// A finger drags along the bar: the pages move with it (one page per slot
+  /// of the bar). The page changes it passes through select, buzz and are
+  /// announced like a swipe's.
+  void _scrub(double pages) {
+    if (!_pages.hasClients || !_pages.position.hasPixels) return;
+    final position = _pages.position;
+    position.jumpTo(
+      (position.pixels + pages * position.viewportDimension).clamp(
+        position.minScrollExtent,
+        position.maxScrollExtent,
+      ),
+    );
+    goHomeVisible.value = false;
+  }
+
+  /// The finger left the bar: settle on the nearest page.
+  void _scrubEnd() {
+    final page = _pages.hasClients && _pages.position.hasPixels
+        ? _pages.page
+        : null;
+    if (page == null) return;
+    _goToPage(page.round().clamp(0, _pageCategories.length - 1));
+  }
+
+  /// The pages: one scrolling list per category, swiped sideways. Only the
+  /// vertical scrolling of the current page is read ([_onScroll]).
+  Widget _buildPages(BuildContext context, {required double bottomSpace}) {
+    final pages = _pageCategories;
+    final swipeable = _barAvailable && pages.length > 1;
+    return NotificationListener<ScrollNotification>(
+      onNotification: _onScroll,
+      child: PageView.builder(
+        controller: _pages,
+        // iOS feel: pages snap, with the bounce at both ends.
+        physics: swipeable
+            ? const PageScrollPhysics(parent: BouncingScrollPhysics())
+            : const NeverScrollableScrollPhysics(),
+        itemCount: pages.length,
+        onPageChanged: _onPageChanged,
+        findChildIndexCallback: (key) {
+          if (key is! ValueKey<String>) return null;
+          final i = pages.indexWhere((c) => 'page-${c.name}' == key.value);
+          return i < 0 ? null : i;
+        },
+        itemBuilder: (context, i) => _FeedPageShell(
+          key: ValueKey('page-${pages[i].name}'),
+          label: '${pages[i].label} posts, page ${i + 1} of ${pages.length}',
+          child: _buildPage(context, pages[i], bottomSpace: bottomSpace),
         ),
-      );
-    }
-
-    if (_posts.isEmpty) {
-      return Padding(
-        padding: EdgeInsets.symmetric(vertical: 40),
-        child: Center(
-          child: Text(
-            "No posts yet. Check back soon!",
-            style: TextStyle(fontSize: 13, color: context.palette.muted),
-          ),
-        ),
-      );
-    }
-
-    return Column(
-      children: [
-        for (int i = 0; i < _posts.length; i++) ...[
-          FadeSlideIn(
-            index: i,
-            child: PostCard(
-              key: ValueKey(_posts[i].id),
-              post: _posts[i],
-              canDonate: _canDonate,
-              isLoggedIn: _isLoggedIn,
-              verificationStatus: _verificationStatus,
-              onVerificationChanged: _fetchVerificationStatus,
-            ),
-          ),
-          const SizedBox(height: 12),
-        ],
-      ],
+      ),
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-      decoration: BoxDecoration(
-        color: context.palette.surface,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+  /// One page: the welcome cards (All only), then one row per post, built as
+  /// it scrolls into view.
+  Widget _buildPage(
+    BuildContext context,
+    FeedCategory category, {
+    required double bottomSpace,
+  }) {
+    final isAll = category == FeedCategory.all;
+
+    Widget? message;
+    if (isAll) {
+      if (_loadingPosts) {
+        message = const FeedSkeleton();
+      } else if (_postsError != null) {
+        message = FeedMessage(
+          message: _postsError!,
+          onRetry: () => _loadPosts(),
+        );
+      } else if (_posts.isEmpty) {
+        message = const FeedMessage(message: 'No posts yet. Check back soon!');
+      }
+    }
+    final posts = message != null
+        ? const <Post>[]
+        : (_byCategory[category] ?? const <Post>[]);
+
+    return RefreshIndicator(
+      onRefresh: () =>
+          Future.wait([_loadPosts(refresh: true), _fetchVerificationStatus()]),
+      child: CustomScrollView(
+        key: ValueKey('feed-scroll-${category.name}'),
+        controller: _scrollFor(category),
+        slivers: [
+          if (isAll)
+            SliverToBoxAdapter(
+              child: Column(
+                children: [
+                  FadeSlideIn(index: 0, child: _buildSignInCta(context)),
+                  if (_isLoggedIn)
+                    FadeSlideIn(index: 1, child: _buildVerifyIdCta(context)),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
+          const SliverToBoxAdapter(child: SizedBox(height: 8)),
+          if (message != null)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: message,
+              ),
+            )
+          else
+            SliverList.builder(
+              itemCount: posts.length + 1,
+              // Cards keep their state (Read more) when the list changes.
+              findChildIndexCallback: (key) {
+                if (key is! ValueKey<String>) return null;
+                final i = posts.indexWhere((p) => 'post-${p.id}' == key.value);
+                return i < 0 ? null : i;
+              },
+              itemBuilder: (context, i) {
+                if (i == posts.length) return const CaughtUpFooter();
+                return KeyedSubtree(
+                  key: ValueKey('post-${posts[i].id}'),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    child: _entrance(i, posts[i], category),
+                  ),
+                );
+              },
+            ),
+          SliverToBoxAdapter(
+            child: SizedBox(height: bottomSpace > 110 ? bottomSpace : 110),
           ),
         ],
       ),
+    );
+  }
+
+  /// The first cards slide in one after another; cards further down fade in
+  /// the first time they are built. A card plays its entrance only once.
+  Widget _entrance(int i, Post post, FeedCategory category) {
+    final card = PostCard(
+      key: ValueKey(post.id),
+      heroScope: category.name,
+      post: post,
+      canDonate: _canDonate,
+      isLoggedIn: _isLoggedIn,
+      verificationStatus: _verificationStatus,
+      onVerificationChanged: _fetchVerificationStatus,
+      likeStore: _likes,
+    );
+    // The widget in this slot is always a FadeSlideIn: a slot whose widget
+    // type changes between builds throws its State away, and with it the
+    // card. Only whether it animates changes, and only the first time.
+    final first = _entered.add(post.id);
+    var index = 0;
+    if (first && i < 6 && !_staggerDone) {
+      index = i;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _staggerDone = true);
+    }
+    return FadeSlideIn(animate: first, index: index, child: card);
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    final p = context.palette;
+    // Flat at the top; a soft shadow (a hairline in dark) fades in once the
+    // feed scrolls under it.
+    return ValueListenableBuilder<bool>(
+      valueListenable: _scrolled,
+      builder: (context, scrolled, child) => AnimatedContainer(
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 200),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+        decoration: BoxDecoration(
+          color: p.surface,
+          border: Border(
+            bottom: BorderSide(
+              color: scrolled && p.isDark ? p.border : p.border.withAlpha(0),
+            ),
+          ),
+          boxShadow: scrolled ? p.shadow : const [],
+        ),
+        child: child,
+      ),
       child: Row(
         children: [
-          const EdonateLogo(),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              RichText(
-                text: TextSpan(
-                  children: [
-                    TextSpan(
-                      text: "e",
-                      style: TextStyle(
-                        color: context.palette.primaryText,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 18,
-                      ),
-                    ),
-                    TextSpan(
-                      text: "Donate",
-                      style: TextStyle(
-                        color: context.palette.foreground,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 18,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Text(
-                "BLOOD DONATION NETWORK",
-                style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w600,
-                  color: context.palette.muted,
-                  letterSpacing: 1.2,
-                ),
-              ),
-            ],
-          ),
+          // The name, the icon and the tagline: one lockup.
+          const Flexible(child: DugtongLockup(iconSize: 36, tagline: true)),
           const Spacer(),
           _buildHeaderProfileButton(),
         ],
@@ -2400,7 +2652,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       context,
     ).push(MaterialPageRoute(builder: (_) => const HistoryScreen()));
     // The photo or frame may have changed over there.
-    if (mounted) unawaited(MyAvatar.instance.refresh());
+    if (mounted) unawaited(MyAvatarController.instance.refresh());
   }
 
   Widget _buildHeaderProfileButton() {
@@ -2429,11 +2681,11 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     // a frame may poke a little past the 36 px box, which is only paint.
     return ListenableBuilder(
       listenable: Listenable.merge([
-        MyAvatar.instance,
+        MyAvatarController.instance,
         StreakController.instance,
       ]),
       builder: (context, _) {
-        final me = MyAvatar.instance;
+        final me = MyAvatarController.instance;
         final frame = me.viewerFrame;
         return SizedBox(
           width: 36,
@@ -2452,7 +2704,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
                 maxHeight: 48,
                 child: Center(
                   child: DonorAvatar(
-                    photoUrl: me.path,
+                    photoUrl: me.avatarPath,
                     name: me.name.isNotEmpty ? me.name : (_userName ?? ''),
                     frame: frame,
                     radius: frame != null ? 15 : 17,
@@ -2471,10 +2723,10 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     if (!_checkedLogin) return const SizedBox.shrink();
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -2495,7 +2747,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
                           ? "WELCOME BACK${_userName != null ? ', ${_userName!.split(' ').first.toUpperCase()}' : ''}"
                           : "YOUR BLOOD CAN SAVE 3 LIVES",
                       style: const TextStyle(
-                        color: Colors.white70,
+                        color: AppColors.onPrimarySoft,
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 1,
@@ -2508,7 +2760,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
                           : "Become a Donor Today",
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 18,
+                        fontSize: 17,
                         fontWeight: FontWeight.w900,
                         height: 1.2,
                       ),
@@ -2529,12 +2781,12 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
               ),
               Icon(
                 Icons.water_drop,
-                size: 40,
+                size: 34,
                 color: Colors.white.withOpacity(0.3),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Row(
@@ -2582,11 +2834,11 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 11, color: Colors.white70),
+        Icon(icon, size: 11, color: AppColors.onPrimarySoft),
         const SizedBox(width: 4),
         Text(
           label,
-          style: const TextStyle(fontSize: 11, color: Colors.white70),
+          style: const TextStyle(fontSize: 11, color: AppColors.onPrimarySoft),
         ),
       ],
     );
@@ -2694,7 +2946,8 @@ class _VerificationCard extends StatelessWidget {
     ),
   );
 
-  Widget _card(BuildContext context, {
+  Widget _card(
+    BuildContext context, {
     required IconData icon,
     required Color iconBg,
     required Color accent,
@@ -2854,7 +3107,7 @@ class _VerificationCard extends StatelessWidget {
                 ),
               ),
               Text(
-                "Your account has full access to eDonate",
+                "Your account has full access to Dugtong",
                 style: TextStyle(fontSize: 12, color: context.palette.muted),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -2886,6 +3139,36 @@ class _VerificationCard extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// A page of the feed that stays alive while it is swiped away, so its
+/// scroll position and cards are there when the donor comes back. Labelled
+/// for a screen reader ("Events posts, page 2 of 5").
+class _FeedPageShell extends StatefulWidget {
+  const _FeedPageShell({super.key, required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  State<_FeedPageShell> createState() => _FeedPageShellState();
+}
+
+class _FeedPageShellState extends State<_FeedPageShell>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      label: widget.label,
+      child: widget.child,
     );
   }
 }

@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'app_colors.dart';
 import 'app_palette.dart';
 import 'streak/streak_screen.dart';
@@ -20,15 +22,16 @@ import 'privacy_security.dart';
 import 'privacy_statement.dart';
 import 'shared_design.dart';
 import 'skeleton.dart';
-import 'streak/avatar_frame.dart';
 import 'streak/frame_picker.dart';
 import 'streak/streak_controller.dart';
 import 'unread_notifications.dart';
-import 'donor_avatar.dart';
+import 'my_avatar.dart';
+import 'my_avatar_controller.dart';
 import 'streak/streak_routes.dart';
 import 'theme_controller.dart';
 import 'theme_transition.dart';
 import 'verify.dart';
+import 'widgets/image_viewer.dart';
 import 'widgets/count_up_text.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -205,7 +208,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     UnreadNotifications.instance
       ..stop()
       ..clear();
-    MyAvatar.instance.clear();
+    MyAvatarController.instance.reset();
     AppSession.homeInStack = false; // PIN: next Home visit asks for the PIN
     if (mounted)
       Navigator.pushAndRemoveUntil(
@@ -292,7 +295,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
         child: RefreshIndicator(
           color: context.palette.primaryText,
           backgroundColor: context.palette.surface,
-          onRefresh: () => _load(progress: false),
+          onRefresh: () => Future.wait([
+            _load(progress: false),
+            MyAvatarController.instance.refresh(),
+          ]),
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.only(bottom: 24),
@@ -392,6 +398,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               ),
                             );
                             if (changed == true) _load(progress: false);
+                            // A new photo may have been chosen there.
+                            unawaited(MyAvatarController.instance.refresh());
                           },
                           subtitle: 'Update your personal details',
                           tint: context.palette.info,
@@ -638,39 +646,36 @@ class _HistoryScreenState extends State<HistoryScreen> {
           left: 0,
           right: 0,
           child: Center(
-            child: Container(
-              width: avatarBox,
-              height: avatarBox,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: context.palette.surface,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(
-                      alpha: context.palette.isDark ? .35 : .12,
-                    ),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: ListenableBuilder(
-                listenable: StreakController.instance,
-                builder: (context, _) => StreakAvatarFrame(
-                  frameKey: StreakController.instance.equippedFrame,
-                  radius: _avatarRadius,
-                  child: CircleAvatar(
-                    radius: _avatarRadius,
-                    backgroundColor: kCrimson,
-                    child: Text(
-                      initials(name),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
+            // The photo, its frame ring and the white disc around them all
+            // open the photo full screen.
+            child: Semantics(
+              button: true,
+              label: 'View profile photo',
+              excludeSemantics: true,
+              onTap: () => _openPhoto(name),
+              child: PressableScale(
+                onTap: () => _openPhoto(name),
+                child: Container(
+                  width: avatarBox,
+                  height: avatarBox,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: context.palette.surface,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(
+                          alpha: context.palette.isDark ? .35 : .12,
+                        ),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
                       ),
-                    ),
+                    ],
+                  ),
+                  // The donor's own photo and frame (initials without a photo).
+                  child: const MyAvatar(
+                    radius: _avatarRadius,
+                    heroTag: 'profile_photo_0',
                   ),
                 ),
               ),
@@ -678,6 +683,33 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  /// Opens the donor's photo full screen (it grows out of the round avatar).
+  /// Without a photo there is nothing to show: a short note instead.
+  void _openPhoto(String name) {
+    final url = MyAvatarController.instance.avatarUrl;
+    if (url == null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text("You haven't added a profile photo yet."),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      return;
+    }
+    HapticFeedback.selectionClick();
+    final me = MyAvatarController.instance.name;
+    openImageViewer(
+      context,
+      imageUrls: [url],
+      initialIndex: 0,
+      heroTagPrefix: 'profile_photo',
+      title: name != 'N/A' ? name : (me.isNotEmpty ? me : null),
+      fromCircle: true,
     );
   }
 

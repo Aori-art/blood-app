@@ -26,15 +26,17 @@ import 'config.dart';
 import 'digital_id.dart';
 import 'digital_id_service.dart';
 import 'history.dart';
+import 'home_nav_glass.dart';
+import 'home_nav.dart';
 import 'newsfeed.dart';
 import 'donation_history.dart';
 import 'notification_service.dart';
 import 'shared_design.dart';
-import 'streak/avatar_frame.dart';
-import 'streak/streak_controller.dart';
 import 'unread_notifications.dart';
 import 'verify.dart';
 import 'app_palette.dart';
+import 'my_avatar.dart';
+import 'my_avatar_controller.dart';
 import 'skeleton.dart';
 import 'widgets/count_up_text.dart';
 import 'widgets/glow_pulse.dart';
@@ -47,12 +49,22 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin
+    implements HomeNavHost {
   int _selectedIndex = 0;
   int _donorId = 0;
 
   late List<Widget> _screens;
   StreamSubscription<void>? _alertsTapSub;
+
+  // The five tabs are pages side by side: a swipe moves between them and a
+  // tap on the nav glides there. The controller's animation is the
+  // fractional tab the nav's lens follows.
+  late final TabController _tabs;
+
+  // The route Home is on, so HomeNav can pop back to it.
+  ModalRoute<dynamic>? _route;
 
   @override
   void initState() {
@@ -71,13 +83,30 @@ class _HomeScreenState extends State<HomeScreen> {
       NotificationService.instance.consumeOpenAlertsOnStart();
     }
 
+    _tabs = TabController(
+      length: 5,
+      vsync: this,
+      initialIndex: _selectedIndex,
+    );
+    _tabs.animation!.addListener(_onTabPosition);
+    HomeNav.register(this);
+
     _alertsTapSub = NotificationService.instance.onAlertsTapped.listen((_) {
       if (mounted) _selectTab(4);
     });
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _route = ModalRoute.of(context);
+  }
+
+  @override
   void dispose() {
+    HomeNav.unregister(this);
+    _tabs.animation?.removeListener(_onTabPosition);
+    _tabs.dispose();
     _alertsTapSub?.cancel();
     super.dispose();
   }
@@ -131,9 +160,51 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// A tab became the current one: what selecting a tab has always done
+  /// (the nav, and with it the Check button, reacts to [_selectedIndex]).
+  void _activate(int index) {
+    setState(() => _selectedIndex = index);
+  }
+
+  /// A tap on the nav, or a tab chosen from code: the pages glide there (a
+  /// jump when animations are off) and the tab is current at once.
   void _selectTab(int index) {
     if (index < 0 || index >= _screens.length) return;
-    setState(() => _selectedIndex = index);
+    _activate(index);
+    if (_tabs.index != index) {
+      _tabs.animateTo(
+        index,
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  /// The pages moved. While a swipe drags them, the tab under the finger
+  /// becomes current once it is more than 0.55 of a page away from the last
+  /// one (so hovering half way does not make the Check button flicker). A
+  /// tap's glide is ignored here: its tab was made current at the tap.
+  void _onTabPosition() {
+    if (_tabs.indexIsChanging) return;
+    final position = _tabs.animation!.value;
+    if ((position - _selectedIndex).abs() <= 0.55) return;
+    final next = position.round().clamp(0, _screens.length - 1);
+    if (next != _selectedIndex) _activate(next);
+  }
+
+  // ── HomeNavHost ─────────────────────────────────────────────────────────
+
+  /// HomeNav.goTo: back to Home (closing every screen above it), then the
+  /// tab, the same way a tap selects it.
+  @override
+  void showTab(int index) {
+    final route = _route;
+    if (route != null && !route.isCurrent) {
+      Navigator.of(context).popUntil((r) => r == route);
+    }
+    _selectTab(index);
   }
 
   @override
@@ -161,19 +232,30 @@ class _HomeScreenState extends State<HomeScreen> {
         resizeToAvoidBottomInset: false,
         body: Stack(
           children: [
-            // Every tab stays mounted (like an IndexedStack), so switching
-            // tabs — e.g. tapping Home mid eligibility-check — doesn't
-            // dispose the other tabs and lose their state.
+            // The tabs are pages: swipe between them. Every tab stays alive
+            // once it has been shown, so switching tabs (e.g. tapping Home
+            // mid eligibility-check) never loses its state.
             Positioned.fill(
-              child: _TabSwitcher(
-                index: _selectedIndex,
-                // The tabs are not routes: tell each one whether it is
-                // showing, so Dugtong knows which tab the donor is on.
+              child: TabBarView(
+                controller: _tabs,
                 children: [
                   for (var i = 0; i < _screens.length; i++)
-                    StreakTabScope(
-                      active: i == _selectedIndex,
-                      child: _screens[i],
+                    _KeepAliveTab(
+                      // A tab off screen stops its animations.
+                      child: AnimatedBuilder(
+                        animation: _tabs.animation!,
+                        builder: (context, child) => TickerMode(
+                          enabled: (_tabs.animation!.value - i).abs() < 1,
+                          child: child!,
+                        ),
+                        // The tabs are not routes: tell each one whether it
+                        // is showing, so Dugtong knows which tab the donor
+                        // is on (and the tab can freshen up when it is).
+                        child: StreakTabScope(
+                          active: i == _selectedIndex,
+                          child: _screens[i],
+                        ),
+                      ),
                     ),
                 ],
               ),
@@ -186,6 +268,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: _FloatingNav(
                   selectedIndex: _selectedIndex,
                   onSelect: _selectTab,
+                  position: _tabs.animation,
                 ),
               ),
             ),
@@ -309,70 +392,6 @@ class _NavClipper extends CustomClipper<Path> {
   bool shouldReclip(covariant _NavClipper oldClipper) => true;
 }
 
-/// A soft, neutral drop shadow: black at 10 %, blur 24, offset (0, 8).
-class _NavShadowPainter extends CustomPainter {
-  final ValueGetter<double> depth;
-
-  _NavShadowPainter(this.depth, Listenable repaint) : super(repaint: repaint);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.save();
-    canvas.translate(0, 8);
-    canvas.drawPath(
-      _floatingNavPath(size, depth()),
-      Paint()
-        ..color = Colors.black.withValues(alpha: 0.10)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
-    );
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(covariant _NavShadowPainter old) => false;
-}
-
-/// The glass: white at 86 % over the blur (94 % when the blur is off) and a
-/// 1 px white border at 60 %.
-class _NavGlassPainter extends CustomPainter {
-  final ValueGetter<double> depth;
-  final bool frosted;
-
-  /// The surface color and the border: white / 60 % white in light, the dark
-  /// surface / 10 % white in dark.
-  final Color surface;
-  final Color border;
-
-  _NavGlassPainter(
-    this.depth,
-    this.frosted,
-    this.surface,
-    this.border,
-    Listenable repaint,
-  ) : super(repaint: repaint);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final path = _floatingNavPath(size, depth());
-    canvas.drawPath(
-      path,
-      Paint()..color = surface.withValues(alpha: frosted ? 0.86 : 0.94),
-    );
-    // The clip keeps the inner half of this 2 px stroke: a 1 px border.
-    canvas.drawPath(
-      path,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..color = border,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _NavGlassPainter old) =>
-      old.frosted != frosted || old.surface != surface || old.border != border;
-}
-
 class _RingPainter extends CustomPainter {
   final Offset center;
   final double radius;
@@ -425,12 +444,22 @@ const _kNavDefs = <_NavDef>[
 /// * `_move` runs the Check button between BLENDED (t = 0: a 48 px circle
 ///   inside the bar, the bar's top edge flat) and RAISED (t = 1: a 62 px
 ///   circle 6 px above the top edge, with a scoop in the bar around it).
-/// * `_pillC` glides the selected-tab pill.
+/// * A glass lens sits behind the selected tab. It follows the pages'
+///   fractional position ([_FloatingNav.position]), so it moves with a swipe
+///   and glides with a tap's page animation; it has no animation of its own.
 class _FloatingNav extends StatefulWidget {
   final int selectedIndex;
   final ValueChanged<int> onSelect;
 
-  const _FloatingNav({required this.selectedIndex, required this.onSelect});
+  /// The fractional tab the pages are at (the TabController's animation):
+  /// the lens and the item colors follow it while the donor swipes.
+  final Animation<double>? position;
+
+  const _FloatingNav({
+    required this.selectedIndex,
+    required this.onSelect,
+    this.position,
+  });
 
   @override
   State<_FloatingNav> createState() => _FloatingNavState();
@@ -452,17 +481,8 @@ class _FloatingNavState extends State<_FloatingNav>
   bool _raising = true;
   double _glowFrom = 1;
 
-  // The selected-tab pill: position (in slots) and visibility, in ms.
-  late final AnimationController _pillC;
-  double _pFromS = 0;
-  double _pToS = 0;
-  double _pDelay = 0;
-  double _pGlide = 300;
-  double _vFrom = 1;
-  double _vTo = 1;
-  double _vDelay = 0;
-  double _vMs = 240;
-  double _pillDur = 1;
+  // The bar is being pressed: the lens swells a little.
+  final ValueNotifier<bool> _pressed = ValueNotifier(false);
 
   late final AnimationController _pop; // the selected icon's small pop
   late final AnimationController _squash; // the Check press
@@ -484,13 +504,10 @@ class _FloatingNavState extends State<_FloatingNav>
     _tFrom = _tTo = onCheck ? 0 : 1;
     _raising = !onCheck;
     _glowFrom = onCheck ? 0 : 1;
-    _pFromS = _pToS = widget.selectedIndex.toDouble();
-    _vFrom = _vTo = onCheck ? 0 : 1;
     _popIndex = widget.selectedIndex;
 
     _move = AnimationController(vsync: this, value: 1)
       ..addStatusListener(_moveStatus);
-    _pillC = AnimationController(vsync: this, value: 1);
     _pop = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 180),
@@ -538,7 +555,7 @@ class _FloatingNavState extends State<_FloatingNav>
       SchedulerBinding.instance.removeTimingsCallback(_onTimings);
     }
     _move.dispose();
-    _pillC.dispose();
+    _pressed.dispose();
     _pop.dispose();
     _squash.dispose();
     _settle.dispose();
@@ -561,8 +578,6 @@ class _FloatingNavState extends State<_FloatingNav>
     }
 
     if (toCheck) {
-      // The pill fades out where it is while the circle sinks into the bar.
-      _startPill(toS: _pillS, toVis: 0, visMs: 240);
       if (_reduced) {
         _beginMove(0);
       } else {
@@ -573,19 +588,8 @@ class _FloatingNavState extends State<_FloatingNav>
         });
       }
     } else if (fromCheck) {
-      // The circle rises out of the bar; the pill starts 60 ms later and
-      // glides from the centre slot to its tab.
+      // The circle rises out of the bar (the lens comes with the pages).
       _beginMove(1);
-      _startPill(
-        fromS: _check.toDouble(),
-        toS: to.toDouble(),
-        toVis: 1,
-        delay: 60,
-        visDelay: 60,
-        visMs: 300,
-      );
-    } else {
-      _startPill(toS: to.toDouble(), toVis: 1);
     }
   }
 
@@ -618,39 +622,6 @@ class _FloatingNavState extends State<_FloatingNav>
     }
   }
 
-  void _startPill({
-    double? fromS,
-    required double toS,
-    required double toVis,
-    double delay = 0,
-    double glide = 300,
-    double visDelay = 0,
-    double visMs = 240,
-  }) {
-    final s0 = fromS ?? _pillS;
-    final v0 = _pillVis;
-    if (_reduced) {
-      // No movement: the pill is already at its tab and just fades.
-      _pFromS = toS;
-      _pDelay = 0;
-      _pGlide = 1;
-      _vDelay = 0;
-      _vMs = 120;
-    } else {
-      _pFromS = s0;
-      _pDelay = delay;
-      _pGlide = glide;
-      _vDelay = visDelay;
-      _vMs = visMs;
-    }
-    _pToS = toS;
-    _vFrom = v0;
-    _vTo = toVis;
-    _pillDur = math.max(_pDelay + _pGlide, _vDelay + _vMs);
-    _pillC.duration = Duration(milliseconds: _pillDur.round());
-    _pillC.forward(from: 0);
-  }
-
   void _syncIdle() {
     final want = _tTo > 0.5 && !_reduced;
     if (want && !_idle.isAnimating) {
@@ -662,7 +633,7 @@ class _FloatingNavState extends State<_FloatingNav>
 
   void _onTimings(List<ui.FrameTiming> timings) {
     if (!mounted || !FloatingNavMetrics.frosted) return;
-    if (!_move.isAnimating && !_pillC.isAnimating) return;
+    if (!_move.isAnimating && !_lensMoving) return;
     for (final t in timings) {
       _frames++;
       if (t.totalSpan > const Duration(milliseconds: 24)) _slowFrames++;
@@ -697,20 +668,15 @@ class _FloatingNavState extends State<_FloatingNav>
     FloatingNavMetrics.scoopRadius - 2,
   );
 
-  double get _pillMs => _pillC.value * _pillDur;
+  /// The fractional tab the lens and the items follow.
+  Animation<double> get _position =>
+      widget.position ??
+      AlwaysStoppedAnimation(widget.selectedIndex.toDouble());
 
-  double get _pillS {
-    final k = Curves.easeOutCubic.transform(
-      ((_pillMs - _pDelay) / _pGlide).clamp(0.0, 1.0),
-    );
-    return _pFromS + (_pToS - _pFromS) * k;
-  }
-
-  double get _pillVis {
-    final k = Curves.easeOutCubic.transform(
-      ((_pillMs - _vDelay) / _vMs).clamp(0.0, 1.0),
-    );
-    return _vFrom + (_vTo - _vFrom) * k;
+  /// The pages are between two tabs (a swipe or a tap's glide).
+  bool get _lensMoving {
+    final v = widget.position?.value ?? 0;
+    return v != v.roundToDouble();
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
@@ -725,8 +691,8 @@ class _FloatingNavState extends State<_FloatingNav>
     const barH = FloatingNavMetrics.barHeight;
     final frosted = FloatingNavMetrics.frosted;
     final p = context.palette;
-    final glassSurface = p.surface;
-    final glassBorder = Colors.white.withValues(alpha: p.isDark ? 0.10 : 0.60);
+    final glassColors = NavGlassColors.of(p, frosted: frosted);
+    Path outline(Size size) => _floatingNavPath(size, _depth());
 
     return MediaQuery.withClampedTextScaling(
       maxScaleFactor: 1.2,
@@ -739,7 +705,7 @@ class _FloatingNavState extends State<_FloatingNav>
             child: Stack(
               clipBehavior: Clip.none,
               children: [
-                // Soft shadow, outside the glass.
+                // Soft shadow and the hairline, outside the glass.
                 Positioned(
                   left: 0,
                   right: 0,
@@ -747,11 +713,16 @@ class _FloatingNavState extends State<_FloatingNav>
                   height: barH,
                   child: IgnorePointer(
                     child: CustomPaint(
-                      painter: _NavShadowPainter(_depth, _move),
+                      painter: NavShadowPainter.of(
+                        p,
+                        path: outline,
+                        repaint: _move,
+                      ),
                     ),
                   ),
                 ),
-                // The glass: blur + white + border, all inside the one path.
+                // The glass: blur + color, tint, sheen and rim, all inside
+                // the one path.
                 Positioned(
                   left: 0,
                   right: 0,
@@ -761,49 +732,75 @@ class _FloatingNavState extends State<_FloatingNav>
                     clipper: _NavClipper(_depth, _move),
                     child: frosted
                         ? BackdropFilter(
-                            filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                            filter: kNavGlassFilter,
                             child: CustomPaint(
-                              painter: _NavGlassPainter(
-                                _depth,
-                                true,
-                                glassSurface,
-                                glassBorder,
-                                _move,
+                              painter: NavGlassPainter(
+                                path: outline,
+                                colors: glassColors,
+                                repaint: _move,
                               ),
                             ),
                           )
                         : CustomPaint(
-                            painter: _NavGlassPainter(
-                              _depth,
-                              false,
-                              glassSurface,
-                              glassBorder,
-                              _move,
+                            painter: NavGlassPainter(
+                              path: outline,
+                              colors: glassColors,
+                              repaint: _move,
                             ),
                           ),
                   ),
                 ),
+                // The lens and the items follow the pages; nothing else
+                // rebuilds while the donor swipes.
                 Positioned(
                   left: 0,
                   right: 0,
                   bottom: 0,
                   height: barH,
-                  child: _pill(slotW),
-                ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  height: barH,
-                  child: Row(
-                    children: [
-                      for (var i = 0; i < _slotCount; i++)
-                        SizedBox(
-                          width: slotW,
-                          height: barH,
-                          child: i == _check ? null : _item(i),
-                        ),
-                    ],
+                  child: Listener(
+                    onPointerDown: (_) => _pressed.value = true,
+                    onPointerUp: (_) => _pressed.value = false,
+                    onPointerCancel: (_) => _pressed.value = false,
+                    child: AnimatedBuilder(
+                      animation: _position,
+                      builder: (context, _) {
+                        final position = _position.value;
+                        return Stack(
+                          children: [
+                            Positioned.fill(
+                              child: IgnorePointer(
+                                child: ValueListenableBuilder<bool>(
+                                  valueListenable: _pressed,
+                                  builder: (context, pressed, _) =>
+                                      NavGlassLens(
+                                        geometry: NavLensGeometry.at(
+                                          position,
+                                          slotWidth: slotW,
+                                          reduceMotion: _reduced,
+                                        ),
+                                        barHeight: barH,
+                                        pressed: pressed,
+                                        reduceMotion: _reduced,
+                                      ),
+                                ),
+                              ),
+                            ),
+                            Row(
+                              children: [
+                                for (var i = 0; i < _slotCount; i++)
+                                  SizedBox(
+                                    width: slotW,
+                                    height: barH,
+                                    child: i == _check
+                                        ? null
+                                        : _item(i, position),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        );
+                      },
+                    ),
                   ),
                 ),
                 Positioned.fill(child: _checkLayer(w)),
@@ -815,50 +812,20 @@ class _FloatingNavState extends State<_FloatingNav>
     );
   }
 
-  Widget _pill(double slotW) {
-    return IgnorePointer(
-      child: AnimatedBuilder(
-        animation: _pillC,
-        builder: (context, _) {
-          final vis = _pillVis.clamp(0.0, 1.0);
-          if (vis < 0.01) return const SizedBox.shrink();
-          final x = (_pillS + 0.5) * slotW;
-          return Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned(
-                left: x - 26,
-                top: (FloatingNavMetrics.barHeight - 40) / 2,
-                width: 52,
-                height: 40,
-                child: Transform.scale(
-                  scale: 0.6 + 0.4 * vis,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: context.palette.accentBg.withValues(alpha: vis),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _item(int i) {
+  Widget _item(int i, double position) {
     final def = _kNavDefs.firstWhere((d) => d.index == i);
     final selected = widget.selectedIndex == i;
     final badge = i == 4 ? UnreadNotifications.instance.count : null;
 
-    Widget icon = TweenAnimationBuilder<Color?>(
-      tween: ColorTween(
-        end: selected ? context.palette.primaryText : context.palette.muted,
+    // The color and size follow the pages: from muted to the brand red, a
+    // little bigger, as the position reaches this tab.
+    Widget icon = Transform.scale(
+      scale: 1 + 0.08 * navCloseness(position, i),
+      child: Icon(
+        def.icon,
+        size: 24,
+        color: navItemColor(context.palette, position, i),
       ),
-      duration: const Duration(milliseconds: 200),
-      builder: (context, color, _) => Icon(def.icon, size: 24, color: color),
     );
     // A small pop (1.0 -> 1.12 -> 1.0) when the tab becomes the selected one.
     icon = AnimatedBuilder(
@@ -1062,123 +1029,27 @@ class _FloatingNavState extends State<_FloatingNav>
   }
 }
 
-/// Shows one tab at a time and keeps the others alive (like an
-/// [IndexedStack], so a half-finished eligibility check survives a trip to
-/// another tab). The arriving tab fades in and settles from 0.98 to 1.0, 80 ms
-/// after the tap.
-class _TabSwitcher extends StatefulWidget {
-  final int index;
-  final List<Widget> children;
+/// Keeps a tab alive while it is swiped away (TabBarView would drop it), so a
+/// half-finished eligibility check, the Book form and every scroll position
+/// survive a trip to another tab.
+class _KeepAliveTab extends StatefulWidget {
+  final Widget child;
 
-  const _TabSwitcher({required this.index, required this.children});
+  const _KeepAliveTab({required this.child});
 
   @override
-  State<_TabSwitcher> createState() => _TabSwitcherState();
+  State<_KeepAliveTab> createState() => _KeepAliveTabState();
 }
 
-class _TabSwitcherState extends State<_TabSwitcher>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c;
-  late final Animation<double> _fade;
-  late final Animation<double> _scale;
-  late int _shown = widget.index;
-  int? _leaving;
-  Timer? _timer;
-  bool _reduced = false;
-
+class _KeepAliveTabState extends State<_KeepAliveTab>
+    with AutomaticKeepAliveClientMixin {
   @override
-  void initState() {
-    super.initState();
-    _c = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 240),
-      value: 1,
-    )..addStatusListener(_status);
-    _fade = CurvedAnimation(parent: _c, curve: Curves.easeOut);
-    _scale = Tween<double>(
-      begin: 0.98,
-      end: 1,
-    ).animate(CurvedAnimation(parent: _c, curve: Curves.easeOutCubic));
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _reduced = MediaQuery.disableAnimationsOf(context);
-  }
-
-  @override
-  void didUpdateWidget(covariant _TabSwitcher old) {
-    super.didUpdateWidget(old);
-    if (old.index == widget.index) return;
-    _timer?.cancel();
-    final to = widget.index;
-    if (_reduced) {
-      _show(to);
-    } else {
-      _timer = Timer(const Duration(milliseconds: 80), () => _show(to));
-    }
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _c.dispose();
-    super.dispose();
-  }
-
-  void _status(AnimationStatus status) {
-    if (status == AnimationStatus.completed && _leaving != null && mounted) {
-      setState(() => _leaving = null);
-    }
-  }
-
-  void _show(int to) {
-    if (!mounted || to == _shown) return;
-    setState(() {
-      _leaving = _shown;
-      _shown = to;
-    });
-    _c.duration = Duration(milliseconds: _reduced ? 120 : 240);
-    _c.forward(from: 0);
-  }
+  bool get wantKeepAlive => true;
 
   @override
   Widget build(BuildContext context) {
-    final n = widget.children.length;
-    // Paint order: parked tabs, the one leaving, the one arriving on top.
-    final order = <int>[
-      for (var i = 0; i < n; i++)
-        if (i != _shown && i != _leaving) i,
-      if (_leaving != null) _leaving!,
-      _shown,
-    ];
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        for (final i in order)
-          KeyedSubtree(
-            key: ValueKey(i),
-            child: Offstage(
-              offstage: i != _shown && i != _leaving,
-              child: TickerMode(
-                enabled: i == _shown || i == _leaving,
-                child: FadeTransition(
-                  opacity: (i == _shown && _leaving != null)
-                      ? _fade
-                      : kAlwaysCompleteAnimation,
-                  child: ScaleTransition(
-                    scale: (i == _shown && _leaving != null)
-                        ? _scale
-                        : kAlwaysCompleteAnimation,
-                    child: widget.children[i],
-                  ),
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
+    super.build(context);
+    return widget.child;
   }
 }
 
@@ -1195,15 +1066,18 @@ class _UnreadBadge extends StatefulWidget {
 
 class _UnreadBadgeState extends State<_UnreadBadge>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _pop = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 320),
-  );
+  // Made in initState (not lazily): a badge that never popped must not
+  // create its ticker while being disposed.
+  late final AnimationController _pop;
   late int _last = widget.count.value;
 
   @override
   void initState() {
     super.initState();
+    _pop = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 320),
+    );
     widget.count.addListener(_onCount);
   }
 
@@ -1364,6 +1238,7 @@ class _HomeContentState extends State<HomeContent> {
 
     await Future.wait([
       loadUserName(),
+      MyAvatarController.instance.refresh(),
       loadProfileData(),
       loadEligibilityData(),
       loadAppointments(),
@@ -1785,15 +1660,6 @@ class _HomeContentState extends State<HomeContent> {
             .join(' ');
     }
   }
-
-  Widget _headerInitial(String firstName) => Text(
-    firstName.isNotEmpty ? firstName[0].toUpperCase() : 'U',
-    style: const TextStyle(
-      color: Colors.white,
-      fontSize: 20,
-      fontWeight: FontWeight.bold,
-    ),
-  );
 
   void _navigateToHistory() {
     Navigator.push(
@@ -2491,44 +2357,11 @@ class _HomeContentState extends State<HomeContent> {
               ),
               PressableScale(
                 onTap: _navigateToHistory,
-                child: ListenableBuilder(
-                  listenable: StreakController.instance,
-                  builder: (context, _) {
-                    final frame = StreakController.instance.equippedFrame;
-                    final avatar = CircleAvatar(
-                      radius: 22,
-                      backgroundColor: Colors.white24,
-                      child: _digitalId?.donor.photoUrl != null
-                          ? ClipOval(
-                              child: Image.network(
-                                _digitalId!.donor.photoUrl!,
-                                fit: BoxFit.cover,
-                                width: 44,
-                                height: 44,
-                                errorBuilder: (_, _, _) =>
-                                    _headerInitial(firstName),
-                              ),
-                            )
-                          : _headerInitial(firstName),
-                    );
-                    // A framed avatar draws its own ring, so the plain white
-                    // outline is only used when no frame is equipped.
-                    if (frame != null && kStreakFrameKeys.contains(frame)) {
-                      return StreakAvatarFrame(
-                        frameKey: frame,
-                        radius: 22,
-                        child: avatar,
-                      );
-                    }
-                    return Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white38, width: 2),
-                      ),
-                      child: avatar,
-                    );
-                  },
+                // The donor's own photo and frame (initials without a photo).
+                child: const MyAvatar(
+                  radius: 22,
+                  onGradient: true,
+                  ringColor: Colors.white38,
                 ),
               ),
             ],

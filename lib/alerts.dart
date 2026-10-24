@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'widgets/pager_hand_off.dart';
 import 'app_colors.dart';
 import 'streak/streak_screen.dart';
 import 'package:http/http.dart' as http;
@@ -791,7 +792,9 @@ class _NotificationCard extends StatelessWidget {
             ],
           ),
         ),
-        child: GestureDetector(
+        // A rightward swipe is not a delete: it goes to the tab pager (back to
+        // History); a leftward one is still the Dismissible's.
+        child: PagerHandOff(child: GestureDetector(
           onTap: onTap,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 300),
@@ -1027,7 +1030,7 @@ class _NotificationCard extends StatelessWidget {
               ],
             ),
           ),
-        ),
+        )),
       ),
     );
   }

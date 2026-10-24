@@ -14,6 +14,7 @@ import 'shared_design.dart' show HeaderIconButton;
 import 'home.dart' show FloatingNavMetrics;
 import 'streak/streak_screen.dart';
 import 'app_palette.dart';
+import 'home_nav.dart';
 import 'check/eligibility_result_view.dart';
 
 class Question {
@@ -2028,9 +2029,15 @@ class _CheckScreenState extends State<CheckScreen>
     ),
     entrance: _resultAnimation,
     celebrate: _celebrate,
-    onBook: () => Navigator.of(context, rootNavigator: true).push(
-      MaterialPageRoute(builder: (_) => const BookScreen(showBackButton: true)),
-    ),
+    onBook: () {
+      // The Book tab, with the nav, when Home is open; a Book screen if not.
+      if (HomeNav.goTo(HomeTab.book)) return;
+      Navigator.of(context, rootNavigator: true).push(
+        MaterialPageRoute(
+          builder: (_) => const BookScreen(showBackButton: true),
+        ),
+      );
+    },
     onRetake: _retake,
     onRefresh: _refresh,
     onPullRefresh: () => _refresh(silent: true),

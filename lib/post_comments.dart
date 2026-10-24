@@ -11,6 +11,7 @@ import 'comment_options.dart';
 import 'commenter_profile_sheet.dart';
 import 'config.dart';
 import 'donor_avatar.dart';
+import 'my_avatar_controller.dart';
 import 'login.dart';
 import 'post_comments_api.dart';
 import 'shared_design.dart' show kCrimson;
@@ -120,8 +121,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
     if (_loggedIn) {
       unawaited(_refreshStatus());
       // The composer shows the donor's own photo and frame.
-      unawaited(MyAvatar.instance.load());
-      unawaited(MyAvatar.instance.refresh());
+      unawaited(MyAvatarController.instance.load());
     }
     await _load();
   }
@@ -688,15 +688,23 @@ class _CommentsSheetState extends State<_CommentsSheet> {
       final frame = c.isMine && streak.data != null
           ? streak.equippedFrame
           : c.frame;
-      final photo = (c.isMine && c.avatar.isEmpty)
-          ? MyAvatar.instance.path
-          : c.avatar;
+      final me = MyAvatarController.instance;
+      final hidden = _photoHiddenFor(c);
+      final String? photo;
+      if (hidden) {
+        photo = null;
+      } else if (c.isMine && c.avatar.isEmpty) {
+        photo = me.avatarPath;
+      } else {
+        photo = c.avatar;
+      }
       return DonorAvatar(
         photoUrl: photo,
         name: c.authorName,
         frame: frame,
         radius: 18,
         reserveFrameSpace: true,
+        hiddenBadge: hidden,
       );
     }
 
@@ -704,9 +712,38 @@ class _CommentsSheetState extends State<_CommentsSheet> {
     return ListenableBuilder(
       listenable: Listenable.merge([
         StreakController.instance,
-        MyAvatar.instance,
+        MyAvatarController.instance,
       ]),
       builder: (context, _) => avatar(context),
+    );
+  }
+
+  // The viewer's own comments follow their current choice (once it is known,
+  // so changing it shows at once); otherwise what the server said.
+  bool _photoHiddenFor(PostComment c) {
+    if (!c.isMine) return false;
+    final me = MyAvatarController.instance;
+    return me.hideKnown ? me.hidePhotoInComments : c.photoHidden;
+  }
+
+  // The avatar as a button that opens the brief profile.
+  Widget _avatarButton(PostComment c) {
+    Widget button(BuildContext context) => Semantics(
+      label:
+          "Open ${c.authorName}'s profile"
+          '${_photoHiddenFor(c) ? '. Your photo is hidden' : ''}',
+      button: true,
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _openProfile(c),
+        child: _avatar(c),
+      ),
+    );
+    if (!c.isMine) return button(context);
+    return ListenableBuilder(
+      listenable: MyAvatarController.instance,
+      builder: (context, _) => button(context),
     );
   }
 
@@ -723,16 +760,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Tapping the photo or the name opens the brief profile.
-            Semantics(
-              label: "Open ${c.authorName}'s profile",
-              button: true,
-              excludeSemantics: true,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => _openProfile(c),
-                child: _avatar(c),
-              ),
-            ),
+            _avatarButton(c),
             const SizedBox(width: 4),
             Expanded(
               child: Container(
@@ -951,7 +979,90 @@ class _CommentsSheetState extends State<_CommentsSheet> {
     ),
   );
 
-  Widget _textBox() => Row(
+  // ─── Hide my photo ───────────────────────────────────────────────────────
+
+  bool _photoBusy = false;
+
+  Future<void> _togglePhoto() async {
+    if (_photoBusy) return;
+    final me = MyAvatarController.instance;
+    final hide = !me.hidePhotoInComments;
+    _photoBusy = true;
+    final ok = await me.setHidePhotoInComments(hide);
+    _photoBusy = false;
+    if (!mounted) return;
+    _snack(
+      !ok
+          ? "Couldn't save your choice. Please try again."
+          : hide
+          ? 'Others will see your initials instead of your photo in comments.'
+          : 'Your photo is visible in comments again.',
+    );
+  }
+
+  /// "Photo visible" / "Photo hidden": a compact switch under the text field.
+  Widget _photoChip() => ListenableBuilder(
+    listenable: MyAvatarController.instance,
+    builder: (context, _) {
+      final p = context.palette;
+      final hidden = MyAvatarController.instance.hidePhotoInComments;
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: Semantics(
+          button: true,
+          toggled: hidden,
+          label: hidden
+              ? 'Photo hidden. Tap to show your photo in comments'
+              : 'Photo visible. Tap to hide your photo in comments',
+          excludeSemantics: true,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(999),
+            onTap: _togglePhoto,
+            child: ConstrainedBox(
+              // A 36 px pill with a 48 px touch target.
+              constraints: const BoxConstraints(minHeight: 48),
+              child: Center(
+                widthFactor: 1,
+                child: Container(
+                  height: 36,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: p.surfaceAlt,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: p.border),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        hidden
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        size: 16,
+                        color: p.muted,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        hidden ? 'Photo hidden' : 'Photo visible',
+                        style: TextStyle(fontSize: 12, color: p.foreground),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    },
+  );
+
+  Widget _textBox() => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [_textRow(), _photoChip()],
+  );
+
+  Widget _textRow() => Row(
     crossAxisAlignment: CrossAxisAlignment.end,
     children: [
       // The donor's own photo and frame, as everyone else sees them.

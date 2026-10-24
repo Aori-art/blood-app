@@ -168,7 +168,7 @@ class _NotificationSettingsScreenState
 
   Widget _buildScreen(BuildContext context) => ProfilePage(
     title: 'Notification Settings',
-    subtitle: 'Control how eDonate notifies you',
+    subtitle: 'Control how Dugtong notifies you',
     child: loading
         ? Center(
             child: Padding(

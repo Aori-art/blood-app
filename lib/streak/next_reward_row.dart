@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app_colors.dart';
 import '../app_palette.dart';
-import '../shared_design.dart' show kCrimson;
+import '../my_avatar.dart';
 import 'avatar_frame.dart';
 import 'streak_controller.dart';
 import 'streak_ladder_screen.dart' show badgeVisualFor;
@@ -64,18 +64,8 @@ class NextRewardRow extends StatelessWidget {
       preview = StreakAvatarFrame(
         frameKey: next.key,
         radius: 16,
-        child: CircleAvatar(
-          radius: 16,
-          backgroundColor: kCrimson,
-          child: Text(
-            initials,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 11,
-            ),
-          ),
-        ),
+        // The donor's own photo in the reward's frame.
+        child: const MyAvatar(radius: 16, showFrame: false),
       );
     } else {
       final (icon, color) = badgeVisualFor(context, next.key, index);

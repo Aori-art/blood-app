@@ -483,7 +483,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
 
         // Steps
         _stepRow(Icons.inbox_rounded, context.palette.info,
-            'Open the email from eDonate'),
+            'Open the email from Dugtong'),
         const SizedBox(height: 12),
         _stepRow(Icons.link_rounded, context.palette.purple,
             'Tap the reset link inside'),

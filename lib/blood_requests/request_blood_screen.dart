@@ -826,7 +826,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
     children: [
       _infoBanner(
         Icons.lock_outline_rounded,
-        "Only you and the eDonate team can see the patient's name and your contact details.",
+        "Only you and the Dugtong team can see the patient's name and your contact details.",
       ),
       const SizedBox(height: 18),
       _fieldLabel("Patient's full name"),
@@ -1473,7 +1473,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
         _fieldError(_errors['contact_number']!),
       const SizedBox(height: 6),
       Text(
-        'The eDonate team may call to confirm your request.',
+        'The Dugtong team may call to confirm your request.',
         style: TextStyle(fontSize: 11, color: context.palette.muted),
       ),
       const SizedBox(height: 20),
@@ -1527,7 +1527,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
       Text(
         options.autoApprove
             ? 'Your request will be visible to matching donors right away.'
-            : "The eDonate team reviews every request before it's shown to donors.",
+            : "The Dugtong team reviews every request before it's shown to donors.",
         style: TextStyle(fontSize: 11, color: context.palette.muted),
       ),
     ],
@@ -1920,7 +1920,7 @@ class BloodRequestSubmittedScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final steps = _pending
         ? const [
-            'eDonate reviews your request',
+            'Dugtong reviews your request',
             'Matching donors can volunteer',
             'Donors visit facility and mention your reference',
           ]

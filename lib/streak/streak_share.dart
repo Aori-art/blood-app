@@ -51,7 +51,7 @@ class StreakShareCard extends StatelessWidget {
                 Icon(Icons.bloodtype_rounded, color: Colors.white, size: 22),
                 SizedBox(width: 6),
                 Text(
-                  'eDonate',
+                  'Dugtong',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 20,
@@ -94,7 +94,7 @@ class StreakShareCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'day streak on eDonate',
+                      'day streak on Dugtong',
                       style: _white.copyWith(fontSize: 18),
                     ),
                     const SizedBox(height: 12),
@@ -181,7 +181,7 @@ Future<File> renderStreakShareImage(
     final data = await image.toByteData(format: ui.ImageByteFormat.png);
     if (data == null) throw StateError('Could not encode the share image.');
     final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/edonate-streak-$streak.png');
+    final file = File('${dir.path}/dugtong-streak-$streak.png');
     await file.writeAsBytes(data.buffer.asUint8List(), flush: true);
     return file;
   } finally {
@@ -205,7 +205,7 @@ Future<void> shareStreak(
   await SharePlus.instance.share(
     ShareParams(
       text:
-          "I'm on a $streak-day streak with Dugtong on eDonate! Join me and help "
+          "I'm on a $streak-day streak on Dugtong! Join me and help "
           'save lives. #EveryDropCounts',
       files: [XFile(file.path, mimeType: 'image/png')],
       sharePositionOrigin: origin,

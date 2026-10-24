@@ -14,8 +14,9 @@ import 'login.dart';
 import 'privacy_statement.dart';
 import 'streak/streak_controller.dart';
 import 'unread_notifications.dart';
-import 'donor_avatar.dart';
+import 'my_avatar_controller.dart';
 import 'app_palette.dart';
+import 'widgets/dugtong_wordmark.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // eDonate PIN — a 4-digit PIN (like GCash's MPIN) that protects Home.
@@ -82,18 +83,9 @@ const Color _crimson = AppColors.primary;
 const Color _crimsonMid = AppColors.primaryDark;
 const Color _blush = AppColors.onPrimarySoft;
 
-// The eDonate logo at the top of the PIN screen. Both files go in
-// assets/images/ (declared under flutter → assets in pubspec.yaml).
-//   edonate_logo_white.png → white wordmark, globe lines cut out so the
-//                            crimson background shows through them
-//   edonate_logo.png       → original red colors
-const String _kLogoWhiteAsset = 'assets/images/edonate_logo_white.png';
-const String _kLogoColorAsset = 'assets/images/edonate_logo.png';
-const double _kLogoAspect = 4.15; // width ÷ height of both logo files
-
-// false → white logo directly on the crimson background (GCash style).
-// true  → original red logo on a white rounded card.
-const bool _kLogoOnCard = false;
+// The Dugtong logo at the top of the PIN screen: the icon and the name,
+// drawn by DugtongLockup (no image file).
+const double _kLogoAspect = 4.15; // width ÷ height of the logo
 
 class PinScreen extends StatefulWidget {
   final PinPurpose purpose;
@@ -209,7 +201,7 @@ class _PinScreenState extends State<PinScreen> with TickerProviderStateMixin {
       if (!hasPin && !verified) {
         _block(
           'Verify your identity first',
-          'You can create your eDonate PIN once your ID has been verified.',
+          'You can create your Dugtong PIN once your ID has been verified.',
         );
         return;
       }
@@ -227,7 +219,7 @@ class _PinScreenState extends State<PinScreen> with TickerProviderStateMixin {
       if (!mounted) return;
       _block(
         'No connection',
-        "We couldn't reach eDonate. Check your internet and try again.",
+        "We couldn't reach Dugtong. Check your internet and try again.",
         retry: true,
       );
     }
@@ -496,7 +488,7 @@ class _PinScreenState extends State<PinScreen> with TickerProviderStateMixin {
           _hadPin = false;
           _stage = _PinStage.create;
           _entered = '';
-          _message = 'Please create your eDonate PIN.';
+          _message = 'Please create your Dugtong PIN.';
           _messageIsError = false;
         });
         break;
@@ -553,7 +545,7 @@ class _PinScreenState extends State<PinScreen> with TickerProviderStateMixin {
         _hadPin = false;
         _stage = _PinStage.create;
         _entered = '';
-        _message = 'Create your eDonate PIN.';
+        _message = 'Create your Dugtong PIN.';
         _messageIsError = false;
       });
       return;
@@ -582,7 +574,7 @@ class _PinScreenState extends State<PinScreen> with TickerProviderStateMixin {
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
         ),
         content: Text(
-          "You'll be signed out of eDonate on this device.",
+          "You'll be signed out of Dugtong on this device.",
           style: TextStyle(
             fontSize: 13,
             color: context.palette.muted,
@@ -633,7 +625,7 @@ class _PinScreenState extends State<PinScreen> with TickerProviderStateMixin {
     UnreadNotifications.instance
       ..stop()
       ..clear();
-    MyAvatar.instance.clear();
+    MyAvatarController.instance.reset();
     AppSession.homeInStack = false;
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
@@ -647,14 +639,14 @@ class _PinScreenState extends State<PinScreen> with TickerProviderStateMixin {
   String get _title => switch (_stage) {
     _PinStage.loading => 'Checking your account…',
     _PinStage.blocked => _blockedTitle,
-    _PinStage.unlock => 'Enter your eDonate PIN',
+    _PinStage.unlock => 'Enter your Dugtong PIN',
     _PinStage.current => 'Enter your current PIN',
     _PinStage.create =>
       _resetPassword != null
           ? 'Create a new PIN'
           : widget.purpose == PinPurpose.change
           ? 'Create your new PIN'
-          : 'Create your eDonate PIN',
+          : 'Create your Dugtong PIN',
     _PinStage.confirm => 'Confirm your PIN',
     _PinStage.success => _successTitle,
   };
@@ -1206,7 +1198,7 @@ class _PinScreenState extends State<PinScreen> with TickerProviderStateMixin {
             const SizedBox(width: 6),
             Flexible(
               child: Text(
-                'Never share your PIN with anyone, including eDonate staff.',
+                'Never share your PIN with anyone, including Dugtong staff.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: .7),
@@ -1293,56 +1285,25 @@ class _KeyButtonState extends State<_KeyButton> {
   }
 }
 
-// ── eDonate logo ────────────────────────────────────────────────────────────
+// ── Dugtong logo ────────────────────────────────────────────────────────────
 
+/// The icon and the name, on the crimson background. [width] is the room the
+/// logo has; its height is that over [_kLogoAspect].
 class _EDonateLogo extends StatelessWidget {
   final double width;
   const _EDonateLogo({required this.width});
 
   @override
   Widget build(BuildContext context) {
-    final onCard = _kLogoOnCard;
-    final imageWidth = onCard ? width * 0.84 : width;
-    final image = Image.asset(
-      onCard ? _kLogoColorAsset : _kLogoWhiteAsset,
-      width: imageWidth,
-      height: imageWidth / _kLogoAspect,
-      fit: BoxFit.contain,
-      filterQuality: FilterQuality.high,
-      // If the asset is missing, fall back to the name so the screen still works.
-      errorBuilder: (_, __, ___) => SizedBox(
-        width: imageWidth,
-        height: imageWidth / _kLogoAspect,
-        child: FittedBox(
-          child: Text(
-            'eDonate',
-            style: TextStyle(
-              color: onCard ? _crimson : Colors.white,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
+    return SizedBox(
+      width: width,
+      child: Center(
+        child: DugtongLockup(
+          iconSize: width / _kLogoAspect,
+          onGradient: true,
+          tagline: false,
         ),
       ),
-    );
-
-    if (!onCard) return image;
-
-    return Container(
-      width: width,
-      padding: EdgeInsets.symmetric(vertical: width * 0.06),
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: Colors.white, // the colored logo sits on white in both modes
-        borderRadius: BorderRadius.circular(width * 0.08),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: .18),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: image,
     );
   }
 }
@@ -1529,7 +1490,7 @@ class _ForgotPinSheetState extends State<_ForgotPinSheet> {
                         ),
                         SizedBox(height: 2),
                         Text(
-                          'Enter your eDonate account password to create a new PIN.',
+                          'Enter your Dugtong account password to create a new PIN.',
                           style: TextStyle(
                             fontSize: 12.5,
                             color: context.palette.muted,

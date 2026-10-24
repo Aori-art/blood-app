@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'widgets/pager_hand_off.dart';
+import 'package:flutter/scheduler.dart';
 import 'app_colors.dart';
 import 'streak/streak_screen.dart';
 import 'package:http/http.dart' as http;
@@ -16,6 +18,7 @@ import 'skeleton.dart';
 import 'widgets/count_up_text.dart';
 import 'widgets/glow_pulse.dart';
 import 'app_palette.dart';
+import 'home_nav.dart';
 
 class DonationHistoryScreen extends StatefulWidget {
   const DonationHistoryScreen({super.key});
@@ -39,6 +42,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
   int? _expandedDonationId;
 
   DigitalIdData? _digitalId;
+  final _milestoneCtrl = ScrollController();
 
   @override
   void initState() {
@@ -46,6 +50,33 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
     fetchDonationHistory();
     _fetchAppointmentStatus();
     _loadDigitalId();
+  }
+
+  // The History tab stays alive between visits, so it freshens up each time
+  // it becomes the tab on screen: a silent reload (what is shown stays until
+  // the new data is in). At most once per 5 seconds.
+  bool? _wasActiveTab;
+  // Frame time (it advances with the app, and with a test's clock).
+  Duration _lastLoad = SchedulerBinding.instance.currentSystemFrameTimeStamp;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final active = StreakTabScope.isActive(context);
+    final was = _wasActiveTab;
+    _wasActiveTab = active;
+    if (was != false || !active) return;
+    final now = SchedulerBinding.instance.currentSystemFrameTimeStamp;
+    if (now - _lastLoad < const Duration(seconds: 5)) return;
+    _lastLoad = now;
+    fetchDonationHistory();
+    _fetchAppointmentStatus();
+  }
+
+  @override
+  void dispose() {
+    _milestoneCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadDigitalId() async {
@@ -580,7 +611,14 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
       (10, '10 donations', Icons.workspace_premium_rounded),
     ];
     final p = context.palette;
-    return SingleChildScrollView(
+    // At either end a drag the row can't follow goes to the pager.
+    return PagerHandOff(
+      handRight: () => !_milestoneCtrl.hasClients || _milestoneCtrl.offset <= 0,
+      handLeft: () =>
+          _milestoneCtrl.hasClients &&
+          _milestoneCtrl.offset >= _milestoneCtrl.position.maxScrollExtent - 1,
+      child: SingleChildScrollView(
+      controller: _milestoneCtrl,
       scrollDirection: Axis.horizontal,
       clipBehavior: Clip.none,
       child: Row(
@@ -632,7 +670,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
           ],
         ],
       ),
-    );
+    ));
   }
 
   // ── Filters ─────────────────────────────────────────────────────────────
@@ -859,12 +897,15 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
               width: double.infinity,
               height: 50,
               child: ElevatedButton.icon(
-                onPressed: () => Navigator.of(context, rootNavigator: true)
-                    .push(
-                      MaterialPageRoute(
-                        builder: (_) => const BookScreen(showBackButton: true),
-                      ),
+                onPressed: () {
+                  // The Book tab, with the nav, when Home is open.
+                  if (HomeNav.goTo(HomeTab.book)) return;
+                  Navigator.of(context, rootNavigator: true).push(
+                    MaterialPageRoute(
+                      builder: (_) => const BookScreen(showBackButton: true),
                     ),
+                  );
+                },
                 icon: const Icon(Icons.calendar_month_rounded, size: 18),
                 label: const Text(
                   "Book an Appointment",

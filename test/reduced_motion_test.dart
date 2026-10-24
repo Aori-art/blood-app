@@ -19,6 +19,7 @@ const _screens = {
   'donation history',
   'donation history (with donations)',
   'eligibility check',
+  'splash',
   'book',
 };
 
@@ -70,6 +71,10 @@ void main() {
             );
             await tester.pump(const Duration(seconds: 3));
             await tester.pump(const Duration(seconds: 3));
+            // The splash hands over to the feed in that second step; its fade
+            // needs a frame or two more.
+            await tester.pump(const Duration(seconds: 1));
+            await tester.pump(const Duration(seconds: 1));
             expect(tester.binding.transientCallbackCount, 0);
             await tester.pumpWidget(const SizedBox());
             await tester.pump(const Duration(seconds: 10));
