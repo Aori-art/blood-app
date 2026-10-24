@@ -16,6 +16,7 @@ import 'shared_design.dart';
 import 'app_palette.dart';
 import 'widgets/glow_pulse.dart';
 import 'cancel_appointment_sheet.dart';
+import 'home_nav.dart';
 
 // Sticky bottom bar's own content height (12 top pad + 50 confirm button
 // height + 12 bottom pad) — used so the scroll content ends exactly one
@@ -120,9 +121,43 @@ class _BookScreenState extends State<BookScreen>
 
   late final AnimationController _pulseController;
 
+  // A center asked for through HomeNav (a post's Donate Now) that the
+  // centers have not loaded for yet.
+  int? _pendingFacility;
+
+  /// HomeNav asked the Book tab for a center: select it (now, or once the
+  /// centers are in), then clear the request so it is used once.
+  void _takePendingFacility() {
+    // Only the Book tab takes it; a pushed Book screen has its own preselect.
+    if (!mounted || widget.showBackButton) return;
+    final id = HomeNav.pendingBookFacilityId.value;
+    if (id == null) return;
+    HomeNav.pendingBookFacilityId.value = null;
+    if (_isRescheduling) return;
+    final known = _facilities.any(
+      (f) => (f['facility_id'] as num?)?.toInt() == id,
+    );
+    if (!known) {
+      _pendingFacility = id;
+      return;
+    }
+    setState(() {
+      selectedFacilityId = id;
+      // Keep the time only if this center offers the same slot.
+      if (selectedTime != null &&
+          !_slotsForSelectedFacility.any((s) => s.value == selectedTime)) {
+        selectedTime = null;
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
+    HomeNav.pendingBookFacilityId.addListener(_takePendingFacility);
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _takePendingFacility(),
+    );
     _loadStatuses();
     _pulseController = AnimationController(
       vsync: this,
@@ -145,6 +180,7 @@ class _BookScreenState extends State<BookScreen>
 
   @override
   void dispose() {
+    HomeNav.pendingBookFacilityId.removeListener(_takePendingFacility);
     _pulseController.dispose();
     _dateStripCtrl.dispose();
     _facilitySearchCtrl.dispose();
@@ -380,7 +416,18 @@ class _BookScreenState extends State<BookScreen>
               .toList();
 
           int? preselect;
-          if (!_appliedPreselect &&
+          // A center asked for through HomeNav before the centers loaded.
+          final pending = _pendingFacility;
+          if (pending != null &&
+              !_isRescheduling &&
+              facilities.any(
+                (f) => (f['facility_id'] as num?)?.toInt() == pending,
+              )) {
+            preselect = pending;
+          }
+          _pendingFacility = null;
+          if (preselect == null &&
+              !_appliedPreselect &&
               widget.preselectedFacilityId != null &&
               !_isRescheduling &&
               selectedFacilityId == null) {
@@ -1668,6 +1715,8 @@ class _BookScreenState extends State<BookScreen>
         retakeDate: _retakeDate,
         retakeDaysRemaining: _retakeDaysRemaining,
         onGoToCheck: () {
+          // The Check tab, with the nav, when Home is open.
+          if (HomeNav.goTo(HomeTab.check)) return;
           Navigator.of(
             context,
           ).push(MaterialPageRoute(builder: (_) => const CheckScreen()));

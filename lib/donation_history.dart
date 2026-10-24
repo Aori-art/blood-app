@@ -16,6 +16,7 @@ import 'skeleton.dart';
 import 'widgets/count_up_text.dart';
 import 'widgets/glow_pulse.dart';
 import 'app_palette.dart';
+import 'home_nav.dart';
 
 class DonationHistoryScreen extends StatefulWidget {
   const DonationHistoryScreen({super.key});
@@ -859,12 +860,15 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
               width: double.infinity,
               height: 50,
               child: ElevatedButton.icon(
-                onPressed: () => Navigator.of(context, rootNavigator: true)
-                    .push(
-                      MaterialPageRoute(
-                        builder: (_) => const BookScreen(showBackButton: true),
-                      ),
+                onPressed: () {
+                  // The Book tab, with the nav, when Home is open.
+                  if (HomeNav.goTo(HomeTab.book)) return;
+                  Navigator.of(context, rootNavigator: true).push(
+                    MaterialPageRoute(
+                      builder: (_) => const BookScreen(showBackButton: true),
                     ),
+                  );
+                },
                 icon: const Icon(Icons.calendar_month_rounded, size: 18),
                 label: const Text(
                   "Book an Appointment",

@@ -20,6 +20,7 @@ import 'newsfeed.dart' show resolveMediaUrl;
 import 'shared_design.dart';
 import 'streak/streak_screen.dart';
 import 'app_palette.dart';
+import 'home_nav.dart';
 
 // Fixed design canvas every ID card is authored at, then uniformly scaled
 // (via FittedBox) to whatever box it's actually shown or captured in — so
@@ -623,12 +624,16 @@ class _DigitalIdScreenState extends State<DigitalIdScreen>
         width: double.infinity,
         child: PrimaryButton(
           label: 'Book a Donation',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const BookScreen(showBackButton: true),
-            ),
-          ),
+          onTap: () {
+            // The Book tab, with the nav, when Home is open.
+            if (HomeNav.goTo(HomeTab.book)) return;
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const BookScreen(showBackButton: true),
+              ),
+            );
+          },
         ),
       ),
     ],

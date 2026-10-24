@@ -27,6 +27,7 @@ import 'home.dart' show FloatingNavMetrics;
 import 'newsfeed/category_nav_bar.dart';
 import 'newsfeed/feed_chrome.dart';
 import 'newsfeed/like_store.dart';
+import 'home_nav.dart';
 import 'widgets/dugtong_wordmark.dart';
 import 'newsfeed/post_content_parser.dart';
 import 'newsfeed/post_parts.dart';
@@ -1193,6 +1194,9 @@ class _PostCardState extends State<PostCard> {
   }
 
   void _openDonate() {
+    // Opened from Home: the Book tab (with the nav) and this post's center.
+    final facility = widget.post.donationFacilityId;
+    if (HomeNav.goTo(HomeTab.book, bookFacilityId: facility)) return;
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => BookScreen(
