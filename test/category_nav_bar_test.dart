@@ -1,3 +1,5 @@
+import 'dart:ui' show Tristate;
+
 import 'package:blood/app_theme.dart';
 import 'package:blood/newsfeed.dart';
 import 'package:blood/newsfeed/category_nav_bar.dart';
@@ -20,8 +22,11 @@ import 'support/sample_posts.dart';
 class _Run {
   _Run(this.posts);
 
-  final List<Map<String, dynamic>> posts;
+  List<Map<String, dynamic>> posts;
   final overflows = <String>[];
+
+  /// What the server says about the donor's ID.
+  String verification = 'verified';
 }
 
 Future<void> _frames(WidgetTester tester, [int n = 12]) async {
@@ -37,6 +42,8 @@ Future<void> _pumpFeed(
   double scale = 1,
   bool reduceMotion = false,
   Size size = const Size(360, 640),
+  // The feed opened from another page, so "back" has somewhere to go.
+  bool below = false,
 }) async {
   SharedPreferences.setMockInitialValues({
     kPrivacyConsentVersionKey: kPrivacyPolicyVersion,
@@ -84,7 +91,20 @@ Future<void> _pumpFeed(
         ).copyWith(textScaler: TextScaler.linear(scale)),
         child: child!,
       ),
-      home: const NewsfeedPage(),
+      home: below
+          ? Builder(
+              builder: (context) => Scaffold(
+                body: Center(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const NewsfeedPage()),
+                    ),
+                    child: const Text('open the feed'),
+                  ),
+                ),
+              ),
+            )
+          : const NewsfeedPage(),
     ),
   );
   await _frames(tester);
@@ -101,6 +121,12 @@ Future<void> _with(_Run run, Future<void> Function() body) =>
       () => MockClient((r) async {
         if (r.url.path.endsWith('get_posts.php')) {
           return okJson({'success': true, 'posts': run.posts});
+        }
+        if (r.url.path.endsWith('get_verification_status.php')) {
+          return okJson({
+            'status': 'success',
+            'verification_status': run.verification,
+          });
         }
         return pumpableServer(r);
       }),
@@ -480,4 +506,418 @@ void main() {
       );
     }
   }
+
+  // ── Swipeable pages and the glass bar ─────────────────────────────────
+
+  Finder pageScroll(String name) =>
+      find.byKey(ValueKey('feed-scroll-$name'), skipOffstage: false);
+
+  double pageOffset(WidgetTester tester, String name) => tester
+      .state<ScrollableState>(
+        find.descendant(
+          of: pageScroll(name),
+          matching: find.byType(Scrollable),
+          skipOffstage: false,
+        ),
+      )
+      .position
+      .pixels;
+
+  Future<void> swipeLeft(WidgetTester tester) async {
+    await tester.drag(find.byType(PageView), const Offset(-300, 0));
+    await _frames(tester, 20);
+  }
+
+  Future<void> swipeRight(WidgetTester tester) async {
+    await tester.drag(find.byType(PageView), const Offset(300, 0));
+    await _frames(tester, 20);
+  }
+
+  /// Whether the bar item [label] is the selected one.
+  bool selectedItem(WidgetTester tester, String label, int posts) {
+    final node = tester.getSemantics(
+      find.bySemanticsLabel('$label, ${postsLabel(posts)}'),
+    );
+    return node.flagsCollection.isSelected == Tristate.isTrue;
+  }
+
+  testWidgets('swiping changes the category, reveals the bar, then the rules', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    final run = _Run(samplePostsJson());
+    final haptics = <String>[];
+    final announced = <String>[];
+    await _with(run, () async {
+      await _pumpFeed(tester, run);
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'HapticFeedback.vibrate') {
+            haptics.add('${call.arguments}');
+          }
+          return null;
+        },
+      );
+      tester.binding.defaultBinaryMessenger
+          .setMockDecodedMessageHandler<dynamic>(SystemChannels.accessibility, (
+            message,
+          ) async {
+            final m = message as Map;
+            if (m['type'] == 'announce') {
+              announced.add((m['data'] as Map)['message'] as String);
+            }
+            return null;
+          });
+
+      // At the top: Go to Home only.
+      expect(_goHomeShown(tester), isTrue);
+      expect(_barShown(tester), isFalse);
+
+      await swipeLeft(tester);
+      // The Events page: its posts, the bar revealed, Go to Home away.
+      expect(find.text('Capstone'), findsWidgets);
+      expect(find.text('City Blood Bank'), findsNothing);
+      expect(_barShown(tester), isTrue);
+      expect(_goHomeShown(tester), isFalse);
+      expect(selectedItem(tester, 'Events', 2), isTrue);
+      expect(selectedItem(tester, 'All', 6), isFalse);
+      expect(haptics.where((h) => h.contains('selectionClick')), hasLength(1));
+      expect(announced, ['Showing Events, 2 posts']);
+      // Each page is labelled for a screen reader.
+      expect(
+        find.bySemanticsLabel('Events posts, page 2 of 5'),
+        findsOneWidget,
+      );
+
+      // The bar stays until a vertical scroll; then the normal swap rules.
+      await _scrollDown(tester, 200);
+      expect(_barShown(tester), isTrue);
+      await _scrollUp(tester);
+      expect(_goHomeShown(tester), isTrue);
+      expect(_barShown(tester), isFalse);
+
+      // Swiping back selects All again.
+      await swipeRight(tester);
+      expect(selectedItem(tester, 'All', 6), isTrue);
+      await _close(tester);
+    });
+    handle.dispose();
+  });
+
+  testWidgets('a far tap lands on its page without building the middle ones', (
+    tester,
+  ) async {
+    final run = _Run(samplePostsJson());
+    await _with(run, () async {
+      await _pumpFeed(tester, run);
+      await _scrollDown(tester);
+      await tester.tap(_item('Updates'));
+      await _frames(tester, 20);
+      expect(find.text('Dugtong'), findsWidgets); // the milestone's poster
+      expect(find.text('1,000 donations this year!'), findsOneWidget);
+      // Events and Urgent were never built (only the page next to the target
+      // was, by the jump before the animation).
+      expect(pageScroll('events'), findsNothing);
+      expect(pageScroll('urgent'), findsNothing);
+      expect(pageScroll('updates'), findsOneWidget);
+      expect(_barShown(tester), isTrue);
+      expect(_goHomeShown(tester), isFalse);
+      await _close(tester);
+    });
+  });
+
+  testWidgets('tapping the selected category scrolls its page to the top', (
+    tester,
+  ) async {
+    final run = _Run(samplePostsJson());
+    await _with(run, () async {
+      await _pumpFeed(tester, run);
+      await _scrollDown(tester);
+      await tester.tap(_item('Events'));
+      await _frames(tester, 20);
+      await _scrollDown(tester, 500);
+      expect(pageOffset(tester, 'events'), greaterThan(100));
+
+      await tester.tap(_item('Events'));
+      await _frames(tester, 20);
+      expect(pageOffset(tester, 'events'), 0);
+      // The bar stays: the donor tapped it.
+      expect(_barShown(tester), isTrue);
+      expect(_goHomeShown(tester), isFalse);
+      await _close(tester);
+    });
+  });
+
+  testWidgets('each page keeps its scroll position', (tester) async {
+    final run = _Run(samplePostsJson());
+    await _with(run, () async {
+      await _pumpFeed(tester, run);
+      await _scrollDown(tester, 500);
+      final before = pageOffset(tester, 'all');
+      expect(before, greaterThan(300));
+
+      await swipeLeft(tester); // Events
+      await _scrollDown(tester, 250);
+      final events = pageOffset(tester, 'events');
+      expect(events, greaterThan(100));
+
+      await swipeRight(tester); // back to All
+      expect(pageOffset(tester, 'all'), before);
+      await swipeLeft(tester);
+      expect(pageOffset(tester, 'events'), events);
+      await _close(tester);
+    });
+  });
+
+  testWidgets('one category: one page, no swiping, no bar', (tester) async {
+    final run = _Run([for (var i = 0; i < 6; i++) storyPostJson(id: 200 + i)]);
+    await _with(run, () async {
+      await _pumpFeed(tester, run);
+      await tester.drag(find.byType(PageView), const Offset(-300, 0));
+      await _frames(tester);
+      expect(pageScroll('all'), findsOneWidget);
+      expect(find.byType(PageView), findsOneWidget);
+      expect(
+        tester.widget<PageView>(find.byType(PageView)).physics,
+        isA<NeverScrollableScrollPhysics>(),
+      );
+      await _scrollDown(tester);
+      expect(_barShown(tester), isFalse);
+      await _close(tester);
+    });
+  });
+
+  testWidgets('a reload that removes the category falls back to All', (
+    tester,
+  ) async {
+    final run = _Run(samplePostsJson());
+    await _with(run, () async {
+      await _pumpFeed(tester, run);
+      await _scrollDown(tester);
+      await tester.tap(_item('Events'));
+      await _frames(tester, 20);
+      expect(selectedItem(tester, 'Events', 2), isTrue);
+
+      // The events are gone on the server; pull to refresh on that page.
+      run.posts = [
+        urgentPostJson(),
+        milestonePostJson(),
+        storyPostJson(),
+        plainPostJson(),
+      ];
+      await tester.fling(
+        find.byType(CustomScrollView).hitTestable(),
+        const Offset(0, 400),
+        1000,
+      );
+      await _frames(tester, 30);
+      await tester.pump(const Duration(milliseconds: 100));
+      // The page is All again, shown, and Events is not in the bar.
+      expect(selectedItem(tester, 'All', 4), isTrue);
+      expect(find.text('City Blood Bank'), findsOneWidget);
+      expect(_item('Events'), findsNothing);
+      await _close(tester);
+    });
+  });
+
+  testWidgets('a reload that shifts the pages keeps the page you are on', (
+    tester,
+  ) async {
+    final run = _Run(samplePostsJson());
+    await _with(run, () async {
+      await _pumpFeed(tester, run);
+      await _scrollDown(tester);
+      await tester.tap(_item('Stories'));
+      await _frames(tester, 20);
+      expect(selectedItem(tester, 'Stories', 2), isTrue);
+
+      // The urgent post is gone: Stories moves from page 3 to page 2.
+      run.posts = [
+        for (final p in samplePostsJson())
+          if (p['type'] != 'urgent') p,
+      ];
+      await tester.fling(
+        find.byType(CustomScrollView).hitTestable(),
+        const Offset(0, 400),
+        1000,
+      );
+      await _frames(tester, 30);
+      expect(selectedItem(tester, 'Stories', 2), isTrue);
+      expect(find.text('Maria Santos'), findsWidgets);
+      await _close(tester);
+    });
+  });
+
+  testWidgets('the glass lens follows the page, stretches between, rests', (
+    tester,
+  ) async {
+    final run = _Run(samplePostsJson());
+    await _with(run, () async {
+      await _pumpFeed(tester, run);
+      await _scrollDown(tester);
+      final lens = find.byKey(const ValueKey('glass-lens'));
+      final allX = tester.getCenter(_item('All')).dx;
+      final eventsX = tester.getCenter(_item('Events')).dx;
+
+      // At rest: centered on the item, not stretched.
+      final rest = tester.getRect(lens);
+      expect(rest.center.dx, closeTo(allX, 1));
+      expect(rest.width, lessThanOrEqualTo(76.01));
+
+      // Half way through a swipe: between the two items, stretched.
+      final g = await tester.startGesture(const Offset(300, 200));
+      for (var i = 0; i < 6; i++) {
+        await g.moveBy(const Offset(-30, 0));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      final page = tester
+          .widget<PageView>(find.byType(PageView))
+          .controller!
+          .page!;
+      expect(page, inExclusiveRange(0.2, 0.8));
+      final mid = tester.getRect(lens);
+      expect(mid.center.dx, greaterThan(allX));
+      expect(mid.center.dx, lessThan(eventsX));
+      expect(mid.width, greaterThan(rest.width * 1.05));
+      expect(mid.height, lessThan(rest.height));
+
+      // Far enough past half way to settle on Events.
+      for (var i = 0; i < 2; i++) {
+        await g.moveBy(const Offset(-30, 0));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await g.up();
+      await _frames(tester, 20);
+      final done = tester.getRect(lens);
+      expect(done.center.dx, closeTo(eventsX, 1));
+      expect(done.width, closeTo(rest.width, 0.5));
+      await _close(tester);
+    });
+  });
+
+  testWidgets('dragging a finger along the bar moves the pages and the lens', (
+    tester,
+  ) async {
+    final run = _Run(samplePostsJson());
+    await _with(run, () async {
+      await _pumpFeed(tester, run);
+      await _scrollDown(tester);
+      final lens = find.byKey(const ValueKey('glass-lens'));
+      final allX = tester.getCenter(_item('All')).dx;
+      final urgentX = tester.getCenter(_item('Urgent')).dx;
+      final y = tester.getCenter(_item('All')).dy;
+
+      final g = await tester.startGesture(Offset(allX, y));
+      for (var i = 0; i < 4; i++) {
+        await g.moveBy(Offset((urgentX - allX) / 4 / 2, 0));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      // Half way along: the lens is between All and Urgent, with the finger.
+      final lensX = tester.getRect(lens).center.dx;
+      expect(lensX, inExclusiveRange(allX + 5, urgentX - 5));
+
+      for (var i = 0; i < 4; i++) {
+        await g.moveBy(Offset((urgentX - allX) / 4 / 2, 0));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await g.up();
+      await _frames(tester, 20);
+      // Settled on Urgent: its page, its item selected, the lens on it.
+      expect(find.text('City Blood Bank'), findsOneWidget);
+      expect(selectedItem(tester, 'Urgent', 1), isTrue);
+      expect(tester.getRect(lens).center.dx, closeTo(urgentX, 1));
+      expect(_barShown(tester), isTrue);
+      await _close(tester);
+    });
+  });
+
+  testWidgets('with animations off the lens never stretches', (tester) async {
+    final run = _Run(samplePostsJson());
+    await _with(run, () async {
+      await _pumpFeed(tester, run, reduceMotion: true);
+      await _scrollDown(tester);
+      final lens = find.byKey(const ValueKey('glass-lens'));
+      final rest = tester.getRect(lens);
+      final g = await tester.startGesture(const Offset(300, 200));
+      for (var i = 0; i < 6; i++) {
+        await g.moveBy(const Offset(-30, 0));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      // Swiping still works: the lens moved with the page, at its own size.
+      final mid = tester.getRect(lens);
+      expect(mid.center.dx, greaterThan(rest.center.dx));
+      expect(mid.width, closeTo(rest.width, 0.5));
+      expect(mid.height, closeTo(rest.height, 0.5));
+      await g.up();
+      await _frames(tester, 10);
+
+      // A tap jumps: the far page is there at once, none in between.
+      await tester.tap(_item('Updates'));
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(pageScroll('updates'), findsOneWidget);
+      expect(pageScroll('stories'), findsNothing);
+      expect(pageScroll('urgent'), findsNothing);
+      await _close(tester);
+    });
+  });
+
+  testWidgets('back goes to All first; from All it pops as before', (
+    tester,
+  ) async {
+    final run = _Run(samplePostsJson());
+    await _with(run, () async {
+      await _pumpFeed(tester, run, below: true);
+      await tester.tap(find.text('open the feed'));
+      await _frames(tester, 8);
+      await _scrollDown(tester);
+      await tester.tap(_item('Urgent'));
+      await _frames(tester, 20);
+      expect(selectedItem(tester, 'Urgent', 1), isTrue);
+
+      // Back from a category: All, and still on the feed.
+      await tester.binding.handlePopRoute();
+      await _frames(tester, 20);
+      expect(selectedItem(tester, 'All', 6), isTrue);
+      expect(find.text('open the feed'), findsNothing);
+
+      // Back from All: leaves the feed.
+      await tester.binding.handlePopRoute();
+      await _frames(tester, 10);
+      expect(find.text('open the feed'), findsOneWidget);
+      await _close(tester);
+    });
+  });
+
+  testWidgets('the Verify banner goes to All, then scrolls to the card', (
+    tester,
+  ) async {
+    final run = _Run(samplePostsJson())..verification = 'unverified';
+    await _with(run, () async {
+      await _pumpFeed(tester, run);
+      // Go to a category page; scroll there and back up so the banner shows.
+      await swipeLeft(tester);
+      await _scrollDown(tester, 200);
+      await _scrollUp(tester);
+      final banner = find.text('Verify your ID to unlock the rest of the app');
+      expect(banner, findsOneWidget);
+      // On the Events page (its posts; the bar is away while the banner shows).
+      expect(find.text('Capstone'), findsWidgets);
+      expect(find.text('City Blood Bank'), findsNothing);
+
+      await tester.tap(banner);
+      await _frames(tester, 30);
+      // The All page, at the top with the verify card.
+      expect(
+        find.byKey(const ValueKey('feed-scroll-all')).hitTestable(),
+        findsOneWidget,
+      );
+      expect(pageOffset(tester, 'all'), 0);
+      expect(
+        find.byKey(const ValueKey('feed-scroll-events')).hitTestable(),
+        findsNothing,
+      );
+      await _close(tester);
+    });
+  });
 }

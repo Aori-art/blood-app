@@ -1015,6 +1015,10 @@ class PostCard extends StatefulWidget {
   /// The feed passes its own; a card alone keeps its own.
   final PostLikeStore? likeStore;
 
+  /// The same post is on two pages of the feed (All and its category), so
+  /// the hero tags of its photo and avatar carry the page's name.
+  final String heroScope;
+
   const PostCard({
     super.key,
     required this.post,
@@ -1023,6 +1027,7 @@ class PostCard extends StatefulWidget {
     this.verificationStatus = 'unverified',
     this.onVerificationChanged,
     this.likeStore,
+    this.heroScope = '',
   });
 
   @override
@@ -1300,7 +1305,7 @@ class _PostCardState extends State<PostCard> {
     }
 
     final photo = Hero(
-      tag: 'author_avatar_${post.id}',
+      tag: 'author_avatar_${widget.heroScope}_${post.id}',
       child: ClipOval(child: face),
     );
     if (!_isOfficial) {
@@ -1669,12 +1674,12 @@ class _PostCardState extends State<PostCard> {
       if (image != null)
         PostImage(
           url: image,
-          heroTag: 'post_image_${post.id}_0',
+          heroTag: 'post_image_${widget.heroScope}_${post.id}_0',
           onOpen: () => openImageViewer(
             context,
             imageUrls: [image],
             initialIndex: 0,
-            heroTagPrefix: 'post_image_${post.id}',
+            heroTagPrefix: 'post_image_${widget.heroScope}_${post.id}',
           ),
           onDoubleTap: _likeFromImage,
         ),
@@ -2267,6 +2272,8 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
                   onSelected: _selectCategory,
                   visible: _barAvailable && !goHome,
                   pageController: _pages,
+                  onScrub: _scrub,
+                  onScrubEnd: _scrubEnd,
                 ),
               ),
             ),
@@ -2445,6 +2452,30 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     _goToPage(target);
   }
 
+  /// A finger drags along the bar: the pages move with it (one page per slot
+  /// of the bar). The page changes it passes through select, buzz and are
+  /// announced like a swipe's.
+  void _scrub(double pages) {
+    if (!_pages.hasClients || !_pages.position.hasPixels) return;
+    final position = _pages.position;
+    position.jumpTo(
+      (position.pixels + pages * position.viewportDimension).clamp(
+        position.minScrollExtent,
+        position.maxScrollExtent,
+      ),
+    );
+    goHomeVisible.value = false;
+  }
+
+  /// The finger left the bar: settle on the nearest page.
+  void _scrubEnd() {
+    final page = _pages.hasClients && _pages.position.hasPixels
+        ? _pages.page
+        : null;
+    if (page == null) return;
+    _goToPage(page.round().clamp(0, _pageCategories.length - 1));
+  }
+
   /// The pages: one scrolling list per category, swiped sideways. Only the
   /// vertical scrolling of the current page is read ([_onScroll]).
   Widget _buildPages(BuildContext context, {required double bottomSpace}) {
@@ -2541,7 +2572,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
                   key: ValueKey('post-${posts[i].id}'),
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    child: _entrance(i, posts[i]),
+                    child: _entrance(i, posts[i], category),
                   ),
                 );
               },
@@ -2556,9 +2587,10 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
 
   /// The first cards slide in one after another; cards further down fade in
   /// the first time they are built. A card plays its entrance only once.
-  Widget _entrance(int i, Post post) {
+  Widget _entrance(int i, Post post, FeedCategory category) {
     final card = PostCard(
       key: ValueKey(post.id),
+      heroScope: category.name,
       post: post,
       canDonate: _canDonate,
       isLoggedIn: _isLoggedIn,

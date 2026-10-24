@@ -427,6 +427,62 @@ void main() {
     });
   });
 
+  testWidgets('a like on the All page shows on its category page', (
+    tester,
+  ) async {
+    final s = _Server();
+    await _with(s, () async {
+      await _pumpFeed(tester);
+      await _tap(tester, find.text('Like 2'));
+      expect(find.text('Like 3'), findsOneWidget);
+
+      // The same post on its own page: the same heart and count at once.
+      await _scrollDown(tester);
+      await tester.tap(_categoryItem('Events'));
+      await _frames(tester, 20);
+      expect(find.text('Like 3'), findsOneWidget);
+      _expectHeartRed(tester, dark: false);
+
+      // And unliking there shows on All.
+      await _tap(tester, find.text('Like 3'));
+      expect(find.text('Like 2'), findsOneWidget);
+      await tester.tap(_categoryItem('All'));
+      await _frames(tester, 20);
+      await _scrollToTop(tester);
+      expect(find.text('Like 2'), findsWidgets);
+      _expectNoHeart();
+      await _close(tester);
+    });
+  });
+
+  testWidgets('the comment count is the same on every card of a post', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final store = PostLikeStore(send: (id, liked) async => const LikeAnswer());
+    final post = Post.fromJson(plainPostJson());
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ListView(
+            children: [
+              PostCard(post: post, likeStore: store, heroScope: 'all'),
+              PostCard(post: post, likeStore: store, heroScope: 'stories'),
+            ],
+          ),
+        ),
+      ),
+    );
+    await _frames(tester, 6);
+    expect(find.text('Comment'), findsNWidgets(2));
+    store.setComments(post.id, 7);
+    await tester.pump();
+    expect(find.text('Comment 7'), findsNWidgets(2));
+    await _close(tester);
+  });
+
   testWidgets('double tap on the photo likes once, and never unlikes', (
     tester,
   ) async {
