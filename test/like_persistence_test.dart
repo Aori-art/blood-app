@@ -203,7 +203,7 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       expect(info.value, const LikeInfo(liked: true, likes: 3));
       // ... and answers late, with the old state.
-      store.merge([(id: 1, liked: false, likes: 2)], mark);
+      store.merge([const PostSnapshot(id: 1, liked: false, likes: 2)], mark);
       expect(info.value, const LikeInfo(liked: true, likes: 3));
     });
 
@@ -212,7 +212,9 @@ void main() {
         send: (id, liked) async => const LikeAnswer(),
       );
       final info = store.watch(1, liked: false, likes: 2);
-      store.merge([(id: 1, liked: true, likes: 9)], store.mark);
+      store.merge([
+        const PostSnapshot(id: 1, liked: true, likes: 9),
+      ], store.mark);
       expect(info.value, const LikeInfo(liked: true, likes: 9));
     });
 
@@ -225,6 +227,27 @@ void main() {
       expect(info.value, const LikeInfo(liked: true, likes: 3)); // at once
       await Future<void>.delayed(Duration.zero);
       expect(info.value, const LikeInfo(liked: true, likes: 7));
+    });
+
+    test('the comment count is shared and a late feed does not undo it', () {
+      final store = PostLikeStore(
+        send: (id, liked) async => const LikeAnswer(),
+      );
+      final a = store.watchComments(1); // two cards of the same post
+      store.watch(1, liked: false, likes: 0, comments: 3);
+      final b = store.watchComments(1);
+      expect(a, same(b));
+      final mark = store.mark;
+      store.setComments(1, 4);
+      expect(a.value, 4);
+      store.merge([
+        const PostSnapshot(id: 1, liked: false, likes: 0, comments: 3),
+      ], mark);
+      expect(b.value, 4);
+      store.merge([
+        const PostSnapshot(id: 1, liked: false, likes: 0, comments: 5),
+      ], store.mark);
+      expect(b.value, 5);
     });
 
     test('a flag and a count may come as 1, "1" or a string', () {

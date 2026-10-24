@@ -1036,13 +1036,14 @@ String likeFailureMessage(LikeFailure failure) =>
     : "Couldn't save your like. Please try again.";
 
 class _PostCardState extends State<PostCard> {
-  late int commentCount;
   double _likeIconScale = 1.0;
 
-  // The heart and the count come from the store (see PostLikeStore).
+  // The heart and the counts come from the store (see PostLikeStore), so
+  // the same post on two pages always shows the same thing.
   PostLikeStore? _ownStore;
   late final PostLikeStore _store;
   late final ValueListenable<LikeInfo> _like;
+  late final ValueListenable<int> _comments;
 
   // The text split into title, info rows and body, read once per text.
   late ParsedPost _parsed = parsePostContent(widget.post.content);
@@ -1050,7 +1051,6 @@ class _PostCardState extends State<PostCard> {
   @override
   void initState() {
     super.initState();
-    commentCount = widget.post.comments;
     final shared = widget.likeStore;
     if (shared != null) {
       _store = shared;
@@ -1070,7 +1070,9 @@ class _PostCardState extends State<PostCard> {
       widget.post.id,
       liked: widget.post.liked,
       likes: widget.post.likes,
+      comments: widget.post.comments,
     );
+    _comments = _store.watchComments(widget.post.id);
   }
 
   @override
@@ -1083,17 +1085,16 @@ class _PostCardState extends State<PostCard> {
     // merges them (with care for taps that are still in flight).
     if (_ownStore != null &&
         (oldWidget.post.liked != widget.post.liked ||
-            oldWidget.post.likes != widget.post.likes)) {
+            oldWidget.post.likes != widget.post.likes ||
+            oldWidget.post.comments != widget.post.comments)) {
       _store.merge([
-        (
+        PostSnapshot(
           id: widget.post.id,
           liked: widget.post.liked,
           likes: widget.post.likes,
+          comments: widget.post.comments,
         ),
       ], _store.mark);
-    }
-    if (oldWidget.post.comments != widget.post.comments) {
-      setState(() => commentCount = widget.post.comments);
     }
   }
 
@@ -1104,12 +1105,9 @@ class _PostCardState extends State<PostCard> {
       postId: widget.post.id,
       isLoggedIn: widget.isLoggedIn,
       verificationStatus: widget.verificationStatus,
-      total: commentCount,
-      onTotalChanged: (total) {
-        if (mounted && total != commentCount) {
-          setState(() => commentCount = total);
-        }
-      },
+      total: _comments.value,
+      // The store keeps the count, even if this card has been scrolled away.
+      onTotalChanged: (total) => _store.setComments(widget.post.id, total),
       onVerificationChanged: widget.onVerificationChanged,
     );
   }
@@ -1633,14 +1631,15 @@ class _PostCardState extends State<PostCard> {
         Expanded(
           // A little wider: "Comment 12" is the longest label.
           flex: 6,
-          child: ActionPill(
-            icon: Icons.mode_comment_outlined,
-            label: commentCount > 0
-                ? 'Comment ${formatCount(commentCount)}'
-                : 'Comment',
-            semanticLabel:
-                'Comment, ${_countLabel(commentCount, 'comment', 'comments')}',
-            onTap: (_) => _openComments(),
+          child: ValueListenableBuilder<int>(
+            valueListenable: _comments,
+            builder: (context, count, _) => ActionPill(
+              icon: Icons.mode_comment_outlined,
+              label: count > 0 ? 'Comment ${formatCount(count)}' : 'Comment',
+              semanticLabel:
+                  'Comment, ${_countLabel(count, 'comment', 'comments')}',
+              onTap: (_) => _openComments(),
+            ),
           ),
         ),
         const SizedBox(width: 8),
@@ -2027,7 +2026,13 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       final posts = await NewsfeedApi.fetchPosts(donorId: donorId);
       if (!mounted) return;
       _likes.merge([
-        for (final p in posts) (id: p.id, liked: p.liked, likes: p.likes),
+        for (final p in posts)
+          PostSnapshot(
+            id: p.id,
+            liked: p.liked,
+            likes: p.likes,
+            comments: p.comments,
+          ),
       ], likesMark);
       setState(() {
         _posts = posts;

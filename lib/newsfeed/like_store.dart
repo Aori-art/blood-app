@@ -79,12 +79,32 @@ Future<LikeAnswer> sendLikeToServer(int postId, bool liked) async {
   );
 }
 
+/// What the server says about a post, for [PostLikeStore.merge].
+class PostSnapshot {
+  const PostSnapshot({
+    required this.id,
+    required this.liked,
+    required this.likes,
+    this.comments = 0,
+  });
+
+  final int id;
+  final bool liked;
+  final int likes;
+  final int comments;
+}
+
 class _Entry {
-  _Entry(bool liked, int likes)
+  _Entry(bool liked, int likes, int commentCount)
     : confirmedLiked = liked,
       confirmedLikes = likes,
       desired = liked,
-      info = ValueNotifier(LikeInfo(liked: liked, likes: likes));
+      info = ValueNotifier(LikeInfo(liked: liked, likes: likes)),
+      comments = ValueNotifier(commentCount);
+
+  /// The comment count shown, and the tap counter at its last local change.
+  final ValueNotifier<int> comments;
+  int commentsTap = -1;
 
   /// What is shown.
   final ValueNotifier<LikeInfo> info;
@@ -121,8 +141,27 @@ class PostLikeStore {
   /// The heart and count to show for [postId], kept by the store. The first
   /// call takes them from the post; later calls keep what the store knows,
   /// so a rebuilt card shows the same thing.
-  ValueListenable<LikeInfo> watch(int postId, {bool? liked, int? likes}) =>
-      (_entries[postId] ??= _Entry(liked ?? false, likes ?? 0)).info;
+  ValueListenable<LikeInfo> watch(
+    int postId, {
+    bool? liked,
+    int? likes,
+    int? comments,
+  }) => _entry(postId, liked, likes, comments).info;
+
+  _Entry _entry(int postId, bool? liked, int? likes, int? comments) =>
+      _entries[postId] ??= _Entry(liked ?? false, likes ?? 0, comments ?? 0);
+
+  /// The comment count of [postId]; the same for every card of the post.
+  ValueListenable<int> watchComments(int postId) =>
+      _entry(postId, null, null, null).comments;
+
+  /// The comments sheet knows the new total.
+  void setComments(int postId, int total) {
+    final e = _entries[postId];
+    if (e == null || e.comments.value == total) return;
+    e.commentsTap = ++_taps;
+    e.comments.value = total;
+  }
 
   /// The donor tapped Like (or Unlike) on [postId]: shown at once, sent in
   /// order, and settled by the server's answer.
@@ -178,13 +217,14 @@ class PostLikeStore {
   /// Takes the server's view of the feed. A post the donor tapped after
   /// [startedAt] (the [mark] when that feed was asked for), or whose request
   /// is still running, keeps what the donor did.
-  void merge(Iterable<({int id, bool liked, int likes})> posts, int startedAt) {
+  void merge(Iterable<PostSnapshot> posts, int startedAt) {
     for (final p in posts) {
       final e = _entries[p.id];
       if (e == null) {
-        _entries[p.id] = _Entry(p.liked, p.likes);
+        _entries[p.id] = _Entry(p.liked, p.likes, p.comments);
         continue;
       }
+      if (e.commentsTap <= startedAt) e.comments.value = p.comments;
       if (e.working || e.desired != e.confirmedLiked || e.lastTap > startedAt) {
         continue;
       }
