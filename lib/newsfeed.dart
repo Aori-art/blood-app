@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'streak/streak_controller.dart';
 import 'streak/streak_screen.dart';
@@ -25,6 +26,7 @@ import 'widgets/image_viewer.dart';
 import 'home.dart' show FloatingNavMetrics;
 import 'newsfeed/category_nav_bar.dart';
 import 'newsfeed/feed_chrome.dart';
+import 'newsfeed/like_store.dart';
 import 'newsfeed/post_content_parser.dart';
 import 'newsfeed/post_parts.dart';
 
@@ -119,6 +121,16 @@ class Post {
     this.liked = false,
   });
 
+  // The server may send a flag as true/false, 1/0 or "1"/"0", and a count as
+  // a number or a string.
+  static bool _asBool(Object? v) =>
+      v == true ||
+      v == 1 ||
+      (v is String && (v == '1' || v.toLowerCase() == 'true'));
+
+  static int _asInt(Object? v) =>
+      v is num ? v.toInt() : (int.tryParse('$v') ?? 0);
+
   factory Post.fromJson(Map<String, dynamic> json) {
     return Post(
       id: json['id'] as int,
@@ -135,14 +147,14 @@ class Post {
       timeAgo: json['timeAgo'] as String? ?? '',
       content: json['content'] as String? ?? '',
       image: json['image'] as String?,
-      likes: (json['likes'] as num?)?.toInt() ?? 0,
-      comments: (json['comments'] as num?)?.toInt() ?? 0,
+      likes: _asInt(json['likes']),
+      comments: _asInt(json['comments']),
       bloodType: json['bloodType'] as String?,
       hospital: json['hospital'] as String?,
       eventDate: json['eventDate'] as String?,
       eventLocation: json['eventLocation'] as String?,
       urgency: _urgencyFromString(json['urgency'] as String?),
-      liked: json['liked'] == true,
+      liked: _asBool(json['liked']),
     );
   }
 }
@@ -998,6 +1010,10 @@ class PostCard extends StatefulWidget {
   // Called when the comments sheet learns the donor's verification changed.
   final VoidCallback? onVerificationChanged;
 
+  /// Where likes are kept, so a card that is rebuilt shows the same heart.
+  /// The feed passes its own; a card alone keeps its own.
+  final PostLikeStore? likeStore;
+
   const PostCard({
     super.key,
     required this.post,
@@ -1005,17 +1021,27 @@ class PostCard extends StatefulWidget {
     this.isLoggedIn = false,
     this.verificationStatus = 'unverified',
     this.onVerificationChanged,
+    this.likeStore,
   });
 
   @override
   State<PostCard> createState() => _PostCardState();
 }
 
+/// The message for a like that was not saved.
+String likeFailureMessage(LikeFailure failure) =>
+    failure == LikeFailure.signedOut
+    ? 'Sign in to like posts.'
+    : "Couldn't save your like. Please try again.";
+
 class _PostCardState extends State<PostCard> {
-  late bool liked;
-  late int likeCount;
   late int commentCount;
   double _likeIconScale = 1.0;
+
+  // The heart and the count come from the store (see PostLikeStore).
+  PostLikeStore? _ownStore;
+  late final PostLikeStore _store;
+  late final ValueListenable<LikeInfo> _like;
 
   // The text split into title, info rows and body, read once per text.
   late ParsedPost _parsed = parsePostContent(widget.post.content);
@@ -1023,9 +1049,27 @@ class _PostCardState extends State<PostCard> {
   @override
   void initState() {
     super.initState();
-    liked = widget.post.liked;
-    likeCount = widget.post.likes;
     commentCount = widget.post.comments;
+    final shared = widget.likeStore;
+    if (shared != null) {
+      _store = shared;
+    } else {
+      _store = _ownStore = PostLikeStore()
+        ..onFailure = (failure) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(likeFailureMessage(failure)),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        };
+    }
+    _like = _store.watch(
+      widget.post.id,
+      liked: widget.post.liked,
+      likes: widget.post.likes,
+    );
   }
 
   @override
@@ -1034,12 +1078,18 @@ class _PostCardState extends State<PostCard> {
     if (oldWidget.post.content != widget.post.content) {
       _parsed = parsePostContent(widget.post.content);
     }
-    if (oldWidget.post.liked != widget.post.liked ||
-        oldWidget.post.likes != widget.post.likes) {
-      setState(() {
-        liked = widget.post.liked;
-        likeCount = widget.post.likes;
-      });
+    // A card on its own takes a new post's likes; in the feed the page
+    // merges them (with care for taps that are still in flight).
+    if (_ownStore != null &&
+        (oldWidget.post.liked != widget.post.liked ||
+            oldWidget.post.likes != widget.post.likes)) {
+      _store.merge([
+        (
+          id: widget.post.id,
+          liked: widget.post.liked,
+          likes: widget.post.likes,
+        ),
+      ], _store.mark);
     }
     if (oldWidget.post.comments != widget.post.comments) {
       setState(() => commentCount = widget.post.comments);
@@ -1109,81 +1159,23 @@ class _PostCardState extends State<PostCard> {
   String _countLabel(int n, String one, String many) =>
       '${formatCount(n)} ${n == 1 ? one : many}';
 
-  Future<void> _handleLike() async {
-    final wasLiked = liked;
-    final previousCount = likeCount;
-
+  /// The donor wants this post liked ([want] true) or not. The store shows it
+  /// at once, sends it in order and settles it by the server's answer.
+  void _setLiked(bool want) {
     HapticFeedback.lightImpact();
-    setState(() {
-      liked = !liked;
-      likeCount += liked ? 1 : -1;
-    });
-    if (liked && !MediaQuery.disableAnimationsOf(context)) {
+    if (want && !MediaQuery.disableAnimationsOf(context)) {
       // A quick pop: 1 → 1.3 → 1 in about 250 ms.
       setState(() => _likeIconScale = 1.3);
       Future.delayed(const Duration(milliseconds: 125), () {
         if (mounted) setState(() => _likeIconScale = 1.0);
       });
     }
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final donorId = prefs.getString('donorId');
-      if (donorId == null || donorId.isEmpty) {
-        // Not logged in — undo the optimistic toggle instead of leaving the
-        // heart in a state that was never actually persisted.
-        if (mounted) {
-          setState(() {
-            liked = wasLiked;
-            likeCount = previousCount;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Sign in to like posts.'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-        return;
-      }
-
-      final uri = Uri.parse('${AppConfig.baseUrl}/like_post.php');
-      final response = await http
-          .post(
-            uri,
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'post_id': widget.post.id,
-              'donor_id': donorId,
-              'liked': liked,
-            }),
-          )
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode != 200) {
-        throw Exception('Like request failed');
-      }
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      if (body['success'] != true) {
-        throw Exception('Like request failed');
-      }
-      if (mounted && body['likes'] != null) {
-        setState(() => likeCount = (body['likes'] as num).toInt());
-      }
-    } catch (_) {
-      // Revert on failure so the UI doesn't lie about the like state.
-      if (mounted) {
-        setState(() {
-          liked = wasLiked;
-          likeCount = previousCount;
-        });
-      }
-    }
+    _store.setLiked(widget.post.id, want);
   }
 
   // A double tap on the photo only ever likes; it never takes a like back.
   void _likeFromImage() {
-    if (!liked) _handleLike();
+    if (!_like.value.liked) _setLiked(true);
   }
 
   void _copyText() {
@@ -1614,16 +1606,22 @@ class _PostCardState extends State<PostCard> {
       children: [
         Expanded(
           flex: 5,
-          child: ActionPill(
-            icon: liked
-                ? Icons.favorite_rounded
-                : Icons.favorite_border_rounded,
-            label: likeCount > 0 ? 'Like ${formatCount(likeCount)}' : 'Like',
-            semanticLabel: 'Like, ${_countLabel(likeCount, 'like', 'likes')}',
-            toggled: liked,
-            active: liked,
-            iconScale: _likeIconScale,
-            onTap: (_) => _handleLike(),
+          child: ValueListenableBuilder<LikeInfo>(
+            valueListenable: _like,
+            builder: (context, like, _) => ActionPill(
+              icon: like.liked
+                  ? Icons.favorite_rounded
+                  : Icons.favorite_border_rounded,
+              label: like.likes > 0
+                  ? 'Like ${formatCount(like.likes)}'
+                  : 'Like',
+              semanticLabel:
+                  'Like, ${_countLabel(like.likes, 'like', 'likes')}',
+              toggled: like.liked,
+              active: like.liked,
+              iconScale: _likeIconScale,
+              onTap: (_) => _setLiked(!_like.value.liked),
+            ),
           ),
         ),
         const SizedBox(width: 8),
@@ -1782,6 +1780,9 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
   bool _programmaticScroll = false;
   int _scrollSeq = 0;
 
+  // Likes live here, so they outlive the cards that show them.
+  final PostLikeStore _likes = PostLikeStore();
+
   // Posts that have already played their entrance.
   final Set<int> _entered = {};
   // Only the cards on screen when the feed first shows slide in one after
@@ -1791,6 +1792,7 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
   @override
   void initState() {
     super.initState();
+    _likes.onFailure = _likeFailed;
     _checkLoginStatus();
     _fetchVerificationStatus();
     _loadPosts();
@@ -1994,7 +1996,20 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
     if (mounted) _fetchVerificationStatus();
   }
 
+  // A like was not saved: the heart is already back; say so.
+  void _likeFailed(LikeFailure failure) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(likeFailureMessage(failure)),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   Future<void> _loadPosts() async {
+    // Taps after this moment are newer than what the server is about to say.
+    final likesMark = _likes.mark;
     setState(() {
       _loadingPosts = true;
       _postsError = null;
@@ -2006,6 +2021,9 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       final donorId = prefs.getString('donorId');
       final posts = await NewsfeedApi.fetchPosts(donorId: donorId);
       if (!mounted) return;
+      _likes.merge([
+        for (final p in posts) (id: p.id, liked: p.liked, likes: p.likes),
+      ], likesMark);
       setState(() {
         _posts = posts;
         _loadingPosts = false;
@@ -2394,13 +2412,18 @@ class _NewsfeedPageState extends State<NewsfeedPage> {
       isLoggedIn: _isLoggedIn,
       verificationStatus: _verificationStatus,
       onVerificationChanged: _fetchVerificationStatus,
+      likeStore: _likes,
     );
-    if (!_entered.add(post.id)) return card;
-    if (i < 6 && !_staggerDone) {
+    // The widget in this slot is always a FadeSlideIn: a slot whose widget
+    // type changes between builds throws its State away, and with it the
+    // card. Only whether it animates changes, and only the first time.
+    final first = _entered.add(post.id);
+    var index = 0;
+    if (first && i < 6 && !_staggerDone) {
+      index = i;
       WidgetsBinding.instance.addPostFrameCallback((_) => _staggerDone = true);
-      return FadeSlideIn(index: i, child: card);
     }
-    return FadeSlideIn(child: card);
+    return FadeSlideIn(animate: first, index: index, child: card);
   }
 
   Widget _buildHeader(BuildContext context) {

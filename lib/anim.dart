@@ -11,9 +11,13 @@ class FadeSlideIn extends StatefulWidget {
   final Duration baseDelay;
   final Duration duration;
 
+  /// False: the child is simply there (read when the widget is first built).
+  final bool animate;
+
   const FadeSlideIn({
     super.key,
     required this.child,
+    this.animate = true,
     this.index = 0,
     this.baseDelay = const Duration(milliseconds: 60),
     this.duration = const Duration(milliseconds: 420),
@@ -47,8 +51,10 @@ class _FadeSlideInState extends State<FadeSlideIn>
     super.didChangeDependencies();
     if (_started) return;
     _started = true;
-    // With animations removed the content is simply there.
-    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
+    // With animations removed (or asked for none) the content is simply
+    // there.
+    if (!widget.animate ||
+        (MediaQuery.maybeDisableAnimationsOf(context) ?? false)) {
       _controller.value = 1;
       return;
     }
