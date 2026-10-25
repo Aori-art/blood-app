@@ -15,6 +15,8 @@ import 'package:blood/forgot_password.dart';
 import 'package:blood/help_support.dart';
 import 'package:blood/history.dart';
 import 'package:blood/home.dart';
+import 'package:blood/home_nav_glass.dart';
+import 'package:blood/home_nav_visibility.dart';
 import 'package:blood/login.dart';
 import 'package:blood/newsfeed.dart';
 import 'package:blood/notification_settings.dart';
@@ -29,14 +31,40 @@ import 'package:blood/screens/register/register3.dart';
 import 'package:blood/splash_screen/splash_screen.dart';
 import 'package:blood/streak/streak_home_screen.dart';
 import 'package:blood/streak/streak_ladder_screen.dart';
+import 'package:blood/unread_notifications.dart';
 import 'package:blood/verify.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart'
-    show WidgetTester, expect, find, findsOneWidget;
+    show WidgetTester, expect, find, findsOneWidget, isTrue;
 import 'package:http/http.dart' as http;
 
 import 'fake_streak.dart';
 import 'sample_posts.dart';
+
+/// Swipes Home's nav down, so the handle that brings it back is on screen for
+/// the audits.
+Future<void> _hideHomeNav(WidgetTester tester) async {
+  final size = tester.view.physicalSize / tester.view.devicePixelRatio;
+  // From the Home item, slowly.
+  final g = await tester.startGesture(
+    Offset(16 + (size.width - 32) / 10, size.height - 10 - 32),
+  );
+  for (var i = 1; i <= 20; i++) {
+    await g.moveBy(
+      const Offset(0, 4),
+      timeStamp: Duration(milliseconds: 40 * i),
+    );
+    await tester.pump(const Duration(milliseconds: 40));
+  }
+  await g.up(timeStamp: const Duration(seconds: 2));
+  for (var i = 0; i < 8; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+  expect(HomeNavVisibility.instance.hidden, isTrue);
+  expect(find.byType(GlassHandle).hitTestable(), findsOneWidget);
+  // Home checks for new notifications on a timer; the audits end here.
+  UnreadNotifications.instance.stop();
+}
 
 /// Opens the donations preview from Home's stat card (the sheet is then on
 /// screen for the audits).
@@ -392,5 +420,10 @@ final List<PumpableScreen> pumpableScreens = [
         'top_urgent': {'request_id': 9, 'reference': 'BR-0009'},
       },
     },
+  ),
+  PumpableScreen(
+    'home (nav hidden, the handle on show)',
+    () => const HomeScreen(),
+    act: _hideHomeNav,
   ),
 ];
