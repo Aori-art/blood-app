@@ -279,3 +279,83 @@ Future<void> fillHospitalStep(
   await formFrames(tester, 3);
   await tapInStep(tester, find.byType(Checkbox));
 }
+
+// ─── Tracking ───────────────────────────────────────────────────────────────
+
+const kStatusLabels = {
+  'pending_review': 'Waiting for the hospital',
+  'approved': 'Approved',
+  'ready': 'Ready for pickup',
+  'fulfilled': 'Completed',
+  'rejected': 'Declined',
+  'cancelled': 'Cancelled',
+  'expired': 'Expired',
+};
+
+/// A request in [status], as get_hospital_request(s) sends it.
+Map<String, dynamic> trackedRequest(
+  int id,
+  String status, {
+  bool? canCancel,
+  String? pickupDeadline = '2099-10-30 17:00:00',
+}) => {
+  ...hospitalRequestJson(facilityName: 'Charlie Blood Bank'),
+  'request_id': id,
+  'reference': 'HR-${id.toString().padLeft(4, '0')}',
+  'status': status,
+  'status_label': kStatusLabels[status],
+  'units_requested': 2,
+  'units_approved': status == 'approved' || status == 'ready' ? 1 : null,
+  'urgency': 'high',
+  'urgency_label': 'High',
+  'needed_by': '2099-10-30',
+  'created_ago': '2 hours ago',
+  'updated_ago': '5 minutes ago',
+  'hospital_message': status == 'approved' || status == 'ready'
+      ? 'Please come to the blood bank on the 2nd floor.'
+      : null,
+  'pickup_deadline': status == 'ready' ? pickupDeadline : null,
+  'rejection_reason': status == 'rejected'
+      ? 'We have no O+ platelets this week.'
+      : null,
+  'cancellation_reason': status == 'cancelled' ? 'No longer needed' : null,
+  'hospital_reference': 'PT-0042',
+  'notes': 'Surgery on Friday',
+  'can_cancel': canCancel ?? kStatusLabels.keys.take(3).contains(status),
+  'needs_attention': status == 'ready',
+};
+
+/// The donor's list: one request in every status.
+Map<String, dynamic> trackedList() => {
+  'status': 'success',
+  'counts': {'active': 3, 'history': 4},
+  'requests': [
+    for (final (i, s) in kStatusLabels.keys.indexed) trackedRequest(i + 1, s),
+  ],
+};
+
+Map<String, dynamic> trackedDetail(Map<String, dynamic> request) => {
+  'status': 'success',
+  'request': request,
+  'timeline': [
+    {
+      'key': 'submitted',
+      'label': 'Sent',
+      'at': '2099-10-25 09:00:00',
+      'done': true,
+    },
+    {
+      'key': 'reviewed',
+      'label': 'Reviewed by the hospital',
+      'at': null,
+      'done': false,
+    },
+    {'key': 'ready', 'label': 'Ready for pickup', 'at': null, 'done': false},
+  ],
+  'availability': {
+    'facility_id': 3,
+    'level': 'available',
+    'label': 'In stock',
+    'updated_ago': '2 hours ago',
+  },
+};

@@ -4,6 +4,7 @@ import 'dart:convert';
 
 import 'package:blood/alerts.dart';
 import 'package:blood/blood_requests/blood_requests_screen.dart';
+import 'package:blood/blood_requests/hospital_request_detail_screen.dart';
 import 'package:blood/blood_requests/request_blood_screen.dart';
 import 'package:blood/book.dart';
 import 'package:blood/change_password.dart';
@@ -390,6 +391,23 @@ final List<PumpableScreen> pumpableScreens = [
   ),
   PumpableScreen('digital ID', () => const DigitalIdScreen()),
   PumpableScreen('blood requests', () => const BloodRequestsScreen()),
+  PumpableScreen(
+    'my requests (every status)',
+    () => const BloodRequestsScreen(),
+    responses: {'get_hospital_requests.php': trackedList()},
+  ),
+  PumpableScreen(
+    'hospital request (ready for pickup)',
+    () => HospitalRequestDetailScreen(
+      requestId: 3,
+      now: () => DateTime(2099, 10, 30, 9),
+    ),
+    responses: {
+      'get_hospital_request_detail.php': trackedDetail(
+        trackedRequest(3, 'ready'),
+      ),
+    },
+  ),
   PumpableScreen('streak ladder', () => const StreakLadderScreen()),
   PumpableScreen(
     'streak ladder (with data)',
