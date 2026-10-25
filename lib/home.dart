@@ -2151,7 +2151,7 @@ class _HomeContentState extends State<HomeContent> {
           children: [
             const HomeSectionTitle('Blood Requests'),
             Text(
-              'Request blood or help a patient in need',
+              'Ask a hospital for blood or answer an appeal',
               style: TextStyle(fontSize: 11, color: context.palette.muted),
             ),
           ],

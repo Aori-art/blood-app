@@ -159,7 +159,7 @@ const Map<String, List<_Line>> _screenPools = {
   'alerts': [
     _Line('Notifications keep you updated on your appointments.'),
     _Line('Swipe a notification to delete it.'),
-    _Line('Urgent blood requests near you show up here too.'),
+    _Line('Updates on your blood requests show up here too.'),
     _Line('All caught up? Great, you are on top of things!'),
   ],
   'profile': [
