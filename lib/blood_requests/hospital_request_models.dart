@@ -408,40 +408,69 @@ class HospitalRequestSubmitResult {
       );
 }
 
-class HospitalRequestSummary {
-  final bool canRequest;
-  final VolunteerBlock? requestBlock;
-  final int activeCount;
-  final int maxActive;
-  final int needsAttentionCount;
+/// The most recent request in get_hospital_request_summary.php.
+class HospitalLatestRequest {
+  final int requestId;
+  final String reference;
+  final String status;
+  final String statusLabel;
+  final String bloodType;
+  final int unitsRequested;
+  final String facilityName;
+  final String? updatedAgo;
+  final bool needsAttention;
 
-  /// The most recent active request, if any.
-  final HospitalRequest? latestRequest;
-
-  HospitalRequestSummary({
-    required this.canRequest,
-    this.requestBlock,
-    required this.activeCount,
-    required this.maxActive,
-    required this.needsAttentionCount,
-    this.latestRequest,
+  HospitalLatestRequest({
+    required this.requestId,
+    required this.reference,
+    required this.status,
+    required this.statusLabel,
+    required this.bloodType,
+    required this.unitsRequested,
+    required this.facilityName,
+    this.updatedAgo,
+    required this.needsAttention,
   });
 
-  factory HospitalRequestSummary.fromJson(Map<String, dynamic> json) {
-    final latest = json['latest_request'] ?? json['active_request'];
-    return HospitalRequestSummary(
-      canRequest: _boolish(json['can_request']),
-      requestBlock: json['request_block'] is Map
-          ? VolunteerBlock.fromJson(_map(json['request_block']))
-          : null,
-      activeCount: _int(json['active_count']),
-      maxActive: _int(json['max_active'], 3),
-      needsAttentionCount: _int(json['needs_attention_count']),
-      latestRequest: latest is Map
-          ? HospitalRequest.fromJson(_map(latest))
-          : null,
-    );
-  }
+  /// Still waiting on the hospital or on the donor's pick-up.
+  bool get isActive =>
+      status == 'pending_review' || status == 'approved' || status == 'ready';
+
+  factory HospitalLatestRequest.fromJson(Map<String, dynamic> json) =>
+      HospitalLatestRequest(
+        requestId: _int(json['request_id']),
+        reference: _str(json['reference']),
+        status: _str(json['status'], 'pending_review'),
+        statusLabel: _str(json['status_label']),
+        bloodType: _str(json['blood_type']),
+        unitsRequested: _int(json['units_requested'], 1),
+        facilityName: _str(json['facility_name']),
+        updatedAgo: _strOrNull(json['updated_ago']),
+        needsAttention: _boolish(json['needs_attention']),
+      );
+}
+
+class HospitalRequestSummary {
+  final int activeCount;
+  final int readyCount;
+
+  /// The latest request, or null when the donor has none.
+  final HospitalLatestRequest? latest;
+
+  HospitalRequestSummary({
+    required this.activeCount,
+    required this.readyCount,
+    this.latest,
+  });
+
+  factory HospitalRequestSummary.fromJson(Map<String, dynamic> json) =>
+      HospitalRequestSummary(
+        activeCount: _int(json['active_count']),
+        readyCount: _int(json['ready_count']),
+        latest: json['latest'] is Map
+            ? HospitalLatestRequest.fromJson(_map(json['latest']))
+            : null,
+      );
 }
 
 class HospitalRequestListResult {

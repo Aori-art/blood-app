@@ -339,13 +339,38 @@ void main() {
       expect(HospitalRequestDetailResult.fromJson({}).availability, isNull);
 
       final summary = HospitalRequestSummary.fromJson({
-        'can_request': true,
-        'active_count': 1,
-        'latest_request': fullRequest(),
+        'status': 'success',
+        'active_count': '2',
+        'ready_count': 1,
+        'latest': {
+          'request_id': 31,
+          'reference': 'HR-0031',
+          'status': 'ready',
+          'status_label': 'Ready for pickup',
+          'blood_type': 'O+',
+          'units_requested': 2,
+          'facility_name': 'City General Hospital',
+          'updated_ago': '2 hours ago',
+          'needs_attention': true,
+        },
       });
-      expect(summary.canRequest, isTrue);
-      expect(summary.latestRequest!.reference, 'HR-0031');
-      expect(HospitalRequestSummary.fromJson({}).latestRequest, isNull);
+      expect(summary.activeCount, 2);
+      expect(summary.readyCount, 1);
+      final latest = summary.latest!;
+      expect(latest.reference, 'HR-0031');
+      expect(latest.isActive, isTrue);
+      expect(latest.facilityName, 'City General Hospital');
+      expect(latest.updatedAgo, '2 hours ago');
+      expect(latest.needsAttention, isTrue);
+      // None yet, or an odd answer.
+      expect(HospitalRequestSummary.fromJson({}).latest, isNull);
+      expect(HospitalRequestSummary.fromJson({'latest': null}).latest, isNull);
+      final odd = HospitalRequestSummary.fromJson({
+        'latest': {'status': 'fulfilled'},
+      }).latest!;
+      expect(odd.isActive, isFalse);
+      expect(odd.unitsRequested, 1);
+      expect(odd.updatedAgo, isNull);
     });
   });
 

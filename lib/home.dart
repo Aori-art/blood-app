@@ -21,6 +21,10 @@ import 'blood_requests/blood_request_detail_screen.dart';
 import 'blood_requests/blood_request_models.dart';
 import 'blood_requests/blood_request_widgets.dart';
 import 'blood_requests/blood_requests_screen.dart';
+import 'blood_requests/hospital_request_api.dart';
+import 'blood_requests/hospital_request_detail_screen.dart';
+import 'blood_requests/hospital_request_models.dart';
+import 'blood_requests/hospital_request_widgets.dart';
 import 'blood_requests/request_blood_screen.dart';
 import 'book.dart';
 import 'check.dart';
@@ -37,7 +41,6 @@ import 'donation_history.dart';
 import 'notification_service.dart';
 import 'shared_design.dart';
 import 'unread_notifications.dart';
-import 'verify.dart';
 import 'app_palette.dart';
 import 'my_avatar.dart';
 import 'my_avatar_controller.dart';
@@ -1530,6 +1533,10 @@ class _HomeContentState extends State<HomeContent> {
   bool _brLoading = true;
   bool _brError = false;
 
+  // The donor's latest request to a hospital (the status strip). It never
+  // shows a loading or error state: it appears when there is one to show.
+  HospitalRequestSummary? _hrSummary;
+
   DigitalIdData? _digitalId;
   bool _digitalIdLoaded = false;
   bool _digitalIdMasked = false;
@@ -1542,6 +1549,7 @@ class _HomeContentState extends State<HomeContent> {
     loadEligibilityData();
     loadAppointments();
     loadBloodRequestSummary();
+    loadHospitalRequestSummary();
     loadDigitalId();
   }
 
@@ -1598,7 +1606,20 @@ class _HomeContentState extends State<HomeContent> {
       loadEligibilityData(),
       loadAppointments(),
       loadBloodRequestSummary(),
+      loadHospitalRequestSummary(),
     ]);
+  }
+
+  Future<void> loadHospitalRequestSummary() async {
+    final prefs = await SharedPreferences.getInstance();
+    final donorId = prefs.getString('donorId');
+    if (donorId == null || donorId.isEmpty) return;
+    try {
+      final summary = await HospitalRequestApi.fetchSummary(donorId);
+      if (mounted) setState(() => _hrSummary = summary);
+    } catch (_) {
+      // Silent: the strip keeps what it last showed.
+    }
   }
 
   Future<void> loadBloodRequestSummary() async {
@@ -1634,7 +1655,22 @@ class _HomeContentState extends State<HomeContent> {
       context,
       MaterialPageRoute(builder: (_) => BloodRequestsScreen(initialTab: tab)),
     );
-    if (mounted) await loadBloodRequestSummary();
+    if (mounted) {
+      await Future.wait([
+        loadBloodRequestSummary(),
+        loadHospitalRequestSummary(),
+      ]);
+    }
+  }
+
+  Future<void> _openHospitalRequest(int requestId) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => HospitalRequestDetailScreen(requestId: requestId),
+      ),
+    );
+    if (mounted) await loadHospitalRequestSummary();
   }
 
   Future<void> _openBloodRequestDetail(int requestId) async {
@@ -1647,111 +1683,18 @@ class _HomeContentState extends State<HomeContent> {
     if (mounted) await loadBloodRequestSummary();
   }
 
+  // The form checks the donor itself and says why when they can't ask.
   Future<void> _openRequestBlood() async {
-    final summary = _brSummary;
-    if (summary != null && !summary.canRequest) {
-      await _showRequestBlockedSheet(summary.requestBlock);
-      return;
-    }
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const RequestBloodScreen()),
     );
-    if (mounted) await loadBloodRequestSummary();
-  }
-
-  Future<void> _showRequestBlockedSheet(VolunteerBlock? block) async {
-    await showModalBottomSheet(
-      context: context,
-      backgroundColor: context.palette.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: context.palette.border,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-            ),
-            Text(
-              'Unable to Request Blood',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: context.palette.foreground,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              block?.message ?? 'You cannot create a request right now.',
-              style: TextStyle(
-                fontSize: 13,
-                color: context.palette.muted,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 20),
-            if (block?.action == 'verify')
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(sheetContext);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const VerifyScreen()),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    disabledBackgroundColor: context.palette.border,
-                    disabledForegroundColor: context.palette.muted,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: const Text(
-                    'Verify Now',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ),
-              )
-            else
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: OutlinedButton(
-                  onPressed: () => Navigator.pop(sheetContext),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: context.palette.muted,
-                    side: BorderSide(color: context.palette.border),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: const Text(
-                    'OK',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
+    if (mounted) {
+      await Future.wait([
+        loadBloodRequestSummary(),
+        loadHospitalRequestSummary(),
+      ]);
+    }
   }
 
   Future<void> loadUserName() async {
@@ -2346,7 +2289,7 @@ class _HomeContentState extends State<HomeContent> {
               ),
               SizedBox(height: 2),
               Text(
-                'For you or a loved one',
+                'From a hospital',
                 style: TextStyle(fontSize: 11, color: AppColors.onPrimary),
               ),
             ],
@@ -2394,7 +2337,7 @@ class _HomeContentState extends State<HomeContent> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Help a Patient',
+                    'Hospital Appeals',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
@@ -2674,6 +2617,15 @@ class _HomeContentState extends State<HomeContent> {
               Expanded(child: _brHelpTile(summary)),
             ],
           ),
+          if (_hrSummary?.latest case final latest?
+              when latest.isActive) ...[
+            const SizedBox(height: 12),
+            HospitalStatusStrip(
+              latest: latest,
+              activeCount: _hrSummary!.activeCount,
+              onTap: () => _openHospitalRequest(latest.requestId),
+            ),
+          ],
           if (summary.myActiveRequest != null) ...[
             Divider(height: 28, color: context.palette.surfaceAlt),
             _brYourRequestSection(summary),

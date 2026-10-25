@@ -168,25 +168,19 @@ String hospitalStatusLabel(HospitalRequest r) {
   _ => (fg: p.muted, bg: p.surfaceAlt, dot: p.muted),
 };
 
-/// A request's status. "Ready for pickup" has a pulsing dot (still when
+/// The dot before a status. [pulsing] makes it breathe (a still dot when
 /// animations are off).
-class HospitalStatusChip extends StatefulWidget {
-  final HospitalRequest request;
+class StatusDot extends StatefulWidget {
+  final Color color;
+  final bool pulsing;
 
-  /// On the gradient hero: the chip sits on the card color.
-  final bool onGradient;
-
-  const HospitalStatusChip({
-    super.key,
-    required this.request,
-    this.onGradient = false,
-  });
+  const StatusDot({super.key, required this.color, this.pulsing = false});
 
   @override
-  State<HospitalStatusChip> createState() => _HospitalStatusChipState();
+  State<StatusDot> createState() => _StatusDotState();
 }
 
-class _HospitalStatusChipState extends State<HospitalStatusChip>
+class _StatusDotState extends State<StatusDot>
     with SingleTickerProviderStateMixin {
   late final AnimationController _pulse = AnimationController(
     vsync: this,
@@ -194,8 +188,7 @@ class _HospitalStatusChipState extends State<HospitalStatusChip>
   );
 
   bool get _pulsing =>
-      widget.request.status == 'ready' &&
-      !MediaQuery.disableAnimationsOf(context);
+      widget.pulsing && !MediaQuery.disableAnimationsOf(context);
 
   @override
   void didChangeDependencies() {
@@ -204,7 +197,7 @@ class _HospitalStatusChipState extends State<HospitalStatusChip>
   }
 
   @override
-  void didUpdateWidget(HospitalStatusChip old) {
+  void didUpdateWidget(StatusDot old) {
     super.didUpdateWidget(old);
     _syncPulse();
   }
@@ -226,48 +219,63 @@ class _HospitalStatusChipState extends State<HospitalStatusChip>
   }
 
   @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 10,
+    height: 10,
+    child: Center(
+      child: AnimatedBuilder(
+        animation: _pulse,
+        builder: (context, _) {
+          final t = _pulse.value;
+          return Container(
+            width: 6 + 4 * t,
+            height: 6 + 4 * t,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: widget.color.withValues(alpha: 1 - .5 * t),
+            ),
+          );
+        },
+      ),
+    ),
+  );
+}
+
+/// A request's status. "Ready for pickup" has a pulsing dot.
+class HospitalStatusChip extends StatelessWidget {
+  final HospitalRequest request;
+
+  /// On the gradient hero: the chip sits on the card color.
+  final bool onGradient;
+
+  const HospitalStatusChip({
+    super.key,
+    required this.request,
+    this.onGradient = false,
+  });
+
+  @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final c = hospitalStatusColors(p, widget.request.status);
+    final c = hospitalStatusColors(p, request.status);
     return Container(
-      key: ValueKey('status-${widget.request.status}'),
+      key: ValueKey('status-${request.status}'),
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
-        color: widget.onGradient ? p.surface : c.bg,
+        color: onGradient ? p.surface : c.bg,
         border: Border.all(
-          color: widget.onGradient
-              ? Colors.white
-              : c.dot.withValues(alpha: .35),
+          color: onGradient ? Colors.white : c.dot.withValues(alpha: .35),
         ),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(
-            width: 10,
-            height: 10,
-            child: Center(
-              child: AnimatedBuilder(
-                animation: _pulse,
-                builder: (context, _) {
-                  final t = _pulse.value;
-                  return Container(
-                    width: 6 + 4 * t,
-                    height: 6 + 4 * t,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: c.dot.withValues(alpha: 1 - .5 * t),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
+          StatusDot(color: c.dot, pulsing: request.status == 'ready'),
           const SizedBox(width: 5),
           Flexible(
             child: Text(
-              hospitalStatusLabel(widget.request),
+              hospitalStatusLabel(request),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -278,6 +286,112 @@ class _HospitalStatusChipState extends State<HospitalStatusChip>
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Home's slim strip for the donor's latest active request: the reference
+/// and where it stands, what and where, and when it last changed, tinted by
+/// status (ready for pickup: success, with a pulsing dot).
+class HospitalStatusStrip extends StatelessWidget {
+  final HospitalLatestRequest latest;
+
+  /// How many requests are active in all (a "+N more" when over one).
+  final int activeCount;
+  final VoidCallback onTap;
+
+  const HospitalStatusStrip({
+    super.key,
+    required this.latest,
+    required this.activeCount,
+    required this.onTap,
+  });
+
+  IconData get _icon => switch (latest.status) {
+    'ready' => Icons.local_hospital_rounded,
+    'approved' => Icons.check_circle_rounded,
+    _ => Icons.hourglass_top_rounded,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final c = hospitalStatusColors(p, latest.status);
+    final ready = latest.status == 'ready';
+    final what = [
+      '${latest.unitsRequested} ${latest.unitsRequested == 1 ? 'unit' : 'units'}'
+          '${latest.bloodType.isEmpty ? '' : ' of ${latest.bloodType}'}',
+      if (latest.facilityName.isNotEmpty) 'at ${latest.facilityName}',
+    ].join(' ');
+    final updated = [
+      if (latest.updatedAgo != null) 'Updated ${latest.updatedAgo}',
+      if (activeCount > 1) '+${activeCount - 1} more active',
+    ].join(' · ');
+    return Semantics(
+      container: true,
+      button: true,
+      child: Material(
+        key: const ValueKey('request-status-strip'),
+        color: c.bg,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 48),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              border: Border.all(color: c.dot.withValues(alpha: .4)),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Icon(_icon, color: c.fg, size: 22),
+                    if (ready)
+                      Positioned(
+                        right: -4,
+                        top: -4,
+                        child: StatusDot(color: c.dot, pulsing: true),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        [
+                          latest.reference,
+                          if (latest.statusLabel.isNotEmpty) latest.statusLabel,
+                        ].join(' · '),
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: c.fg,
+                        ),
+                      ),
+                      Text(
+                        what,
+                        style: TextStyle(fontSize: 11.5, color: p.foreground),
+                      ),
+                      if (updated.isNotEmpty)
+                        Text(
+                          updated,
+                          style: TextStyle(fontSize: 11, color: p.muted),
+                        ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: p.muted),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
