@@ -369,6 +369,8 @@ class HospitalStatusStrip extends StatelessWidget {
                           latest.reference,
                           if (latest.statusLabel.isNotEmpty) latest.statusLabel,
                         ].join(' · '),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w700,
@@ -377,11 +379,15 @@ class HospitalStatusStrip extends StatelessWidget {
                       ),
                       Text(
                         what,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(fontSize: 11.5, color: p.foreground),
                       ),
                       if (updated.isNotEmpty)
                         Text(
                           updated,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(fontSize: 11, color: p.muted),
                         ),
                     ],

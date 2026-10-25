@@ -2146,32 +2146,50 @@ class _HomeContentState extends State<HomeContent> {
       ),
       const SizedBox(width: 12),
       Expanded(
+        flex: 3,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const HomeSectionTitle('Blood Requests'),
+            Text(
+              'Blood Requests',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: context.palette.foreground,
+              ),
+            ),
             Text(
               'Ask a hospital for blood or answer an appeal',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(fontSize: 11, color: context.palette.muted),
             ),
           ],
         ),
       ),
-      TextButton(
-        onPressed: () => _openBloodRequestsHub(),
-        style: TextButton.styleFrom(
-          foregroundColor: context.palette.primaryText,
-          padding: EdgeInsets.zero,
-        ),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'View all',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-            ),
-            Icon(Icons.chevron_right_rounded, size: 16),
-          ],
+      Flexible(
+        child: TextButton(
+          onPressed: () => _openBloodRequestsHub(),
+          style: TextButton.styleFrom(
+            foregroundColor: context.palette.primaryText,
+            padding: EdgeInsets.zero,
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  'View all',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, size: 16),
+            ],
+          ),
         ),
       ),
     ],
@@ -2236,10 +2254,58 @@ class _HomeContentState extends State<HomeContent> {
     );
   }
 
+  /// The least height of the two tiles (a fixed height before): they grow
+  /// together when a title wraps or the text is large.
+  static const double _brTileMinHeight = 118;
+
+  /// What both tiles hold: the icon on top, then the title and a subtitle
+  /// at the bottom. The text can wrap to two lines and never leaves the
+  /// tile; the icon keeps room on its right for the badge.
+  Widget _brTileBody({
+    required Widget icon,
+    required String title,
+    required String subtitle,
+    required Color titleColor,
+    required Color subtitleColor,
+  }) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Padding(padding: const EdgeInsets.only(right: 28), child: icon),
+      const SizedBox(height: 8),
+      Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              height: 1.2,
+              color: titleColor,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 11, color: subtitleColor),
+          ),
+        ],
+      ),
+    ],
+  );
+
   Widget _brRequestTile() => PressableScale(
     onTap: _openRequestBlood,
     child: Container(
-      height: 118,
+      key: const ValueKey('request-tile'),
+      constraints: const BoxConstraints(minHeight: _brTileMinHeight),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
@@ -2262,124 +2328,97 @@ class _HomeContentState extends State<HomeContent> {
         painter: const DropPatternPainter(),
         child: Padding(
           padding: const EdgeInsets.all(14),
-          child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              color: Colors.white24,
-              shape: BoxShape.circle,
+          child: _brTileBody(
+            icon: Container(
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                color: Colors.white24,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.add_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
             ),
-            child: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+            title: 'Request Blood',
+            subtitle: 'From a hospital',
+            titleColor: Colors.white,
+            subtitleColor: AppColors.onPrimary,
           ),
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Request Blood',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                ),
-              ),
-              SizedBox(height: 2),
-              Text(
-                'From a hospital',
-                style: TextStyle(fontSize: 11, color: AppColors.onPrimary),
-              ),
-            ],
-          ),
-        ],
-      ),
         ),
       ),
     ),
   );
 
   Widget _brHelpTile(BloodRequestSummary summary) => PressableScale(
-    // "Help a Patient": the hospitals' appeals.
+    // The hospitals' appeals.
     onTap: () => _openBloodRequestsHub(tab: 1),
     child: Stack(
+      // Passes the row's height on, so both tiles are as tall as the
+      // taller one.
+      fit: StackFit.passthrough,
       clipBehavior: Clip.none,
       children: [
         Container(
-          height: 118,
+          key: const ValueKey('appeals-tile'),
+          constraints: const BoxConstraints(minHeight: _brTileMinHeight),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: context.palette.accentBg,
             border: Border.all(color: context.palette.primaryBorder, width: 1.5),
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: context.palette.surface,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.volunteer_activism_rounded,
-                  color: context.palette.primaryText,
-                  size: 20,
-                ),
+          child: _brTileBody(
+            icon: Container(
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: context.palette.surface,
+                shape: BoxShape.circle,
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Hospital Appeals',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: context.palette.foreground,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    summary.matchingCount > 0
-                        ? '${summary.matchingCount} match your type'
-                        : summary.openCount > 0
-                        ? '${summary.openCount} open request${summary.openCount == 1 ? '' : 's'}'
-                        : 'No requests right now',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: context.palette.muted,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+              child: Icon(
+                Icons.volunteer_activism_rounded,
+                color: context.palette.primaryText,
+                size: 20,
               ),
-            ],
+            ),
+            title: 'Hospital Appeals',
+            subtitle: summary.matchingCount > 0
+                ? '${summary.matchingCount} match your type'
+                : summary.openCount > 0
+                ? '${summary.openCount} open request${summary.openCount == 1 ? '' : 's'}'
+                : 'No requests right now',
+            titleColor: context.palette.foreground,
+            subtitleColor: context.palette.muted,
           ),
         ),
         if (summary.openCount > 0)
           Positioned(
             right: -6,
             top: -6,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: Colors.white, width: 1.5),
-              ),
-              child: Text(
-                '${summary.openCount}',
-                style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
+            // A small badge: it does not grow with the text size.
+            child: MediaQuery.withClampedTextScaling(
+              maxScaleFactor: 1.3,
+              child: Container(
+                key: const ValueKey('appeals-badge'),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: Colors.white, width: 1.5),
+                ),
+                child: Text(
+                  summary.openCount > 99 ? '99+' : '${summary.openCount}',
+                  maxLines: 1,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
@@ -2528,12 +2567,16 @@ class _HomeContentState extends State<HomeContent> {
             _brUrgentBanner(summary),
           ],
           const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(child: _brRequestTile()),
-              const SizedBox(width: 12),
-              Expanded(child: _brHelpTile(summary)),
-            ],
+          // Both tiles are as tall as the taller one (at least the old 118).
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: _brRequestTile()),
+                const SizedBox(width: 12),
+                Expanded(child: _brHelpTile(summary)),
+              ],
+            ),
           ),
           if (_hrSummary?.latest case final latest?
               when latest.isActive) ...[
