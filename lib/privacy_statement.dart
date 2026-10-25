@@ -71,6 +71,9 @@ const List<_PrivacySection> _kSections = [
         'questions (health-related information).',
     'Photos of the valid ID you upload for identity verification.',
     'Your appointments and donation records.',
+    'When you ask a hospital for blood: the patient\'s name, your '
+        'relationship to the patient, a contact number, an optional hospital '
+        'reference number and a photo of the hospital\'s blood request form.',
     'A push-notification token from your phone, so we can send you alerts.',
   ]),
   _PrivacySection(Icons.volunteer_activism_outlined, '2. Why we collect it', [
@@ -79,6 +82,8 @@ const List<_PrivacySection> _kSections = [
         'appointments.',
     'To record your donations and keep your donation history.',
     'To send you verification codes, reminders and updates.',
+    'To send your blood request to the hospital you choose and keep you '
+        'updated on it.',
   ]),
   _PrivacySection(Icons.visibility_outlined, '3. Who can see it', [
     'Only authorized Dugtong administrators and donation center staff, and '
@@ -91,6 +96,9 @@ const List<_PrivacySection> _kSections = [
         'and frame are visible to other users. You can hide your profile '
         'photo in comments at any time from the comment box or in Privacy & '
         'Security.',
+    'A blood request, the patient\'s details and the photo of the form are '
+        'shared only with the hospital you asked and authorized Dugtong '
+        'administrators. They are not shown to other donors.',
   ]),
   _PrivacySection(Icons.lock_outline_rounded, '4. How we protect it', [
     'Your password is stored in encrypted (hashed) form and is never kept '
@@ -98,6 +106,8 @@ const List<_PrivacySection> _kSections = [
     'Your email is verified with a one-time code.',
     'Your ID photos are used only for identity verification and are not '
         'shown publicly.',
+    'The photo of the hospital\'s blood request form is stored privately '
+        'and is not shown publicly.',
     'No system is completely secure, so please keep your password private.',
   ]),
   _PrivacySection(Icons.tune_rounded, '5. Your choices', [
@@ -112,7 +122,8 @@ const List<_PrivacySection> _kSections = [
     [
       'We keep your information while your account is active.',
       'When you delete your account, your personal information, ID photos, '
-          'screening answers, appointments and notifications are permanently '
+          'screening answers, appointments, notifications and blood requests '
+          '(the patient\'s details and the form photo) are permanently '
           'removed.',
       'Donation records may be kept without any information that identifies '
           'you, for blood-supply and safety records.',

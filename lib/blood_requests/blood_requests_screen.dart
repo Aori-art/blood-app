@@ -1,5 +1,6 @@
-// Hub screen for the Blood Requests feature: "Help Others" (open requests a
-// donor can volunteer for) and "My Requests" (requests the donor created).
+// Hub screen for the Blood Requests feature: "My Requests" (the donor's
+// requests to hospitals, index 0) and "Hospital Appeals" (open appeals a
+// donor can volunteer for, index 1).
 import 'package:flutter/material.dart';
 import 'package:blood/app_colors.dart';
 import 'package:flutter/rendering.dart';
@@ -14,10 +15,15 @@ import 'blood_request_api.dart';
 import 'blood_request_detail_screen.dart';
 import 'blood_request_models.dart';
 import 'blood_request_widgets.dart';
+import 'hospital_request_api.dart';
+import 'hospital_request_detail_screen.dart';
+import 'hospital_request_models.dart';
+import 'hospital_request_widgets.dart';
 import 'request_blood_screen.dart';
 import '../app_palette.dart';
 
 class BloodRequestsScreen extends StatefulWidget {
+  /// 0: My Requests, 1: Hospital Appeals.
   final int initialTab;
   const BloodRequestsScreen({super.key, this.initialTab = 0});
 
@@ -37,7 +43,7 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
 
   bool _mineLoading = true;
   bool _mineError = false;
-  BloodRequestListResult? _mineResult;
+  HospitalRequestListResult? _mineResult;
 
   final _helpScrollCtrl = ScrollController();
   final _mineScrollCtrl = ScrollController();
@@ -104,10 +110,7 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
     }
     if (mounted) setState(() { _mineLoading = true; _mineError = false; });
     try {
-      final result = await BloodRequestApi.fetchRequests(
-        donorId: _donorId!,
-        scope: 'mine',
-      );
+      final result = await HospitalRequestApi.fetchList(donorId: _donorId!);
       if (!mounted) return;
       setState(() { _mineResult = result; _mineLoading = false; });
     } catch (_) {
@@ -152,10 +155,24 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
       MaterialPageRoute(builder: (_) => const RequestBloodScreen()),
     );
     if (created == true && mounted) {
-      setState(() => _tab = 1);
-      _pageCtrl.jumpToPage(1);
+      setState(() => _tab = 0);
+      _pageCtrl.jumpToPage(0);
       await _loadMine();
     }
+  }
+
+  /// One of the donor's requests to a hospital.
+  Future<void> _openMyRequest(HospitalRequest request) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => HospitalRequestDetailScreen(
+          requestId: request.requestId,
+          initial: request,
+        ),
+      ),
+    );
+    if (mounted) await _loadMine();
   }
 
   void _handleBlockAction(String? action) {
@@ -187,7 +204,7 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
                 child: PageView(
                   controller: _pageCtrl,
                   onPageChanged: (i) => setState(() => _tab = i),
-                  children: [_helpTab(), _mineTab()],
+                  children: [_mineTab(), _helpTab()],
                 ),
               ),
             ],
@@ -200,9 +217,11 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
 
   // ─── Header & segments ──────────────────────────────────────────────────
 
+  // The header's buttons are 48 px targets (the same 38 px look), so its
+  // padding is 5 px less around them.
   Widget _header() => Container(
     width: double.infinity,
-    padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
+    padding: const EdgeInsets.fromLTRB(11, 7, 11, 13),
     decoration: const BoxDecoration(
       gradient: LinearGradient(
         colors: kHeaderGradient,
@@ -212,12 +231,12 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
     ),
     child: Row(
       children: [
-        HeaderIconButton(
+        HeaderIconButton48(
           icon: Icons.arrow_back_rounded,
           tooltip: 'Back',
           onTap: () => Navigator.pop(context),
         ),
-        const SizedBox(width: 14),
+        const SizedBox(width: 9),
         const Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -238,7 +257,7 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
             ],
           ),
         ),
-        HeaderIconButton(
+        HeaderIconButton48(
           icon: Icons.refresh_rounded,
           tooltip: 'Refresh',
           onTap: _refreshAll,
@@ -249,11 +268,16 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
 
   Widget _segmentedControl() {
     final allCount = _helpResult?.counts.all ?? 0;
-    final mineCount = _mineResult?.requests.length ?? 0;
+    final mine = _mineResult;
+    final mineCount =
+        mine?.counts['active'] ??
+        mine?.requests.where((r) => r.isActive).length ??
+        0;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      // The buttons fill the whole control (48 px targets); the pill keeps
+      // its 4 px inset.
       child: Container(
-        padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
           color: context.palette.surface,
           borderRadius: BorderRadius.circular(14),
@@ -267,19 +291,24 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
               alignment: _tab == 0 ? Alignment.centerLeft : Alignment.centerRight,
               child: FractionallySizedBox(
                 widthFactor: 0.5,
-                child: Container(
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: kCrimson,
-                    borderRadius: BorderRadius.circular(10),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Container(
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: kCrimson,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
               ),
             ),
             Row(
               children: [
-                Expanded(child: _segmentButton('Help Others', allCount, 0)),
-                Expanded(child: _segmentButton('My Requests', mineCount, 1)),
+                Expanded(child: _segmentButton('My Requests', mineCount, 0)),
+                Expanded(
+                  child: _segmentButton('Hospital Appeals', allCount, 1),
+                ),
               ],
             ),
           ],
@@ -294,47 +323,54 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
       onTap: () => _setTab(index),
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
-        height: 40,
+        height: 48,
         child: Center(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: selected ? Colors.white : context.palette.muted,
-                ),
-              ),
-              if (count > 0) ...[
-                const SizedBox(width: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? Colors.white.withValues(alpha: .25)
-                        : context.palette.surfaceAlt,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    '$count',
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            // Large text shrinks to fit rather than overflow.
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    label,
                     style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                       color: selected ? Colors.white : context.palette.muted,
                     ),
                   ),
-                ),
-              ],
-            ],
+                  if (count > 0) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? Colors.white.withValues(alpha: .25)
+                            : context.palette.surfaceAlt,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '$count',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: selected ? Colors.white : context.palette.muted,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
         ),
       ),
     );
   }
 
-  // ─── Help Others tab ────────────────────────────────────────────────────
+  // ─── Hospital Appeals tab ───────────────────────────────────────────────
 
   Widget _helpTab() {
     if (_helpLoading) {
@@ -664,14 +700,58 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
 
   // ─── My Requests tab ────────────────────────────────────────────────────
 
+  /// The note at the top of My Requests.
+  Widget _mineInfoStrip() => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: context.palette.infoBg,
+      border: Border.all(color: context.palette.infoBorder),
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.lock_outline_rounded, color: context.palette.info, size: 18),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            "Requests go to the hospital you choose. Only the hospital sees "
+            "the patient's details.",
+            style: TextStyle(
+              fontSize: 12,
+              color: context.palette.infoText,
+              height: 1.4,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Widget _sectionLabel(String text) => Padding(
+    padding: const EdgeInsets.fromLTRB(2, 6, 2, 10),
+    child: Text(
+      text,
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.4,
+        color: context.palette.muted,
+      ),
+    ),
+  );
+
   Widget _mineTab() {
     if (_mineLoading) {
       return ListView(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
-        children: const [
-          BrSkeletonCard(),
-          SizedBox(height: 12),
-          BrSkeletonCard(),
+        children: [
+          _mineInfoStrip(),
+          const SizedBox(height: 14),
+          const BrSkeletonCard(),
+          const SizedBox(height: 12),
+          const BrSkeletonCard(),
         ],
       );
     }
@@ -680,6 +760,8 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
         children: [
+          _mineInfoStrip(),
+          const SizedBox(height: 14),
           BrEmptyState(
             icon: Icons.wifi_off_rounded,
             title: "Couldn't load requests",
@@ -691,8 +773,20 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
       );
     }
 
-    final requests = _mineResult?.requests ?? const [];
-    final hasPending = requests.any((r) => r.status == 'pending_review');
+    final requests = _mineResult?.requests ?? const <HospitalRequest>[];
+    final active = requests.where((r) => r.isActive).toList();
+    final history = requests.where((r) => !r.isActive).toList();
+    var index = 0;
+    Widget card(HospitalRequest r) => Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: FadeSlideIn(
+        index: index++,
+        child: HospitalRequestCard(
+          request: r,
+          onTap: () => _openMyRequest(r),
+        ),
+      ),
+    );
 
     return RefreshIndicator(
       color: context.palette.primaryText,
@@ -702,60 +796,25 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
         children: [
-          if (hasPending) ...[
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: context.palette.infoBg,
-                border: Border.all(color: context.palette.infoBorder),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.info_outline_rounded, color: context.palette.info, size: 18),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Requests are reviewed by the Dugtong team before donors can see them.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: context.palette.infoText,
-                        height: 1.4,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-          ],
+          _mineInfoStrip(),
+          const SizedBox(height: 14),
           if (requests.isEmpty)
             BrEmptyState(
               icon: Icons.bloodtype_outlined,
               title: 'No requests yet',
-              message:
-                  'Need blood for yourself or a loved one? Create a request '
-                  'and matching donors can volunteer to help.',
+              message: 'Need blood for a patient? Ask a hospital.',
               actionLabel: 'Request Blood',
               onAction: _openRequestForm,
-            )
-          else
-            ...List.generate(
-              requests.length,
-              (i) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: FadeSlideIn(
-                  index: i,
-                  child: BloodRequestCard(
-                    request: requests[i],
-                    ownerView: true,
-                    onTap: () => _openDetail(requests[i].requestId),
-                  ),
-                ),
-              ),
             ),
+          if (active.isNotEmpty) ...[
+            _sectionLabel('Active'),
+            ...active.map(card),
+          ],
+          if (history.isNotEmpty) ...[
+            if (active.isNotEmpty) const SizedBox(height: 6),
+            _sectionLabel('History'),
+            ...history.map(card),
+          ],
         ],
       ),
     );
@@ -763,58 +822,68 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
 
   // ─── FAB ────────────────────────────────────────────────────────────────
 
-  Widget _fab() => Positioned(
-    left: 16,
-    right: 16,
-    bottom: 16,
-    child: IgnorePointer(
-      ignoring: !_fabVisible,
-      child: AnimatedSlide(
-        duration: const Duration(milliseconds: 220),
-        offset: _fabVisible ? Offset.zero : const Offset(0, 2),
-        child: AnimatedOpacity(
+  /// My Requests is empty or failed: its own button takes the FAB's place
+  /// (the FAB would cover it on a short screen).
+  bool get _mineHasOwnButton =>
+      _tab == 0 &&
+      !_mineLoading &&
+      (_mineError || (_mineResult?.requests.isEmpty ?? false));
+
+  Widget _fab() {
+    final visible = _fabVisible && !_mineHasOwnButton;
+    return Positioned(
+      left: 16,
+      right: 16,
+      bottom: 16,
+      child: IgnorePointer(
+        ignoring: !visible,
+        child: AnimatedSlide(
           duration: const Duration(milliseconds: 220),
-          opacity: _fabVisible ? 1 : 0,
-          child: Center(
-            child: PressableScale(
-              onTap: _openRequestForm,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: AppColors.primaryGradient,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(999),
-                  boxShadow: [
-                    BoxShadow(
-                      color: kCrimson.withValues(alpha: .35),
-                      blurRadius: 14,
-                      offset: const Offset(0, 6),
+          offset: visible ? Offset.zero : const Offset(0, 2),
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 220),
+            opacity: visible ? 1 : 0,
+            child: Center(
+              child: PressableScale(
+                onTap: _openRequestForm,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: AppColors.primaryGradient,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                  ],
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.add_rounded, color: Colors.white, size: 20),
-                    SizedBox(width: 8),
-                    Text(
-                      'Request Blood',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
+                    borderRadius: BorderRadius.circular(999),
+                    boxShadow: [
+                      BoxShadow(
+                        color: kCrimson.withValues(alpha: .35),
+                        blurRadius: 14,
+                        offset: const Offset(0, 6),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        'Request Blood',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }

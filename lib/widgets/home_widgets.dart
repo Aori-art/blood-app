@@ -3,6 +3,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../anim.dart';
 import '../app_colors.dart';
@@ -196,6 +197,13 @@ class HomeStatTile extends StatefulWidget {
   final Color iconColor;
   final Color iconBg;
 
+  /// Opens the preview of this stat. Not offered while the value loads.
+  final VoidCallback? onTap;
+
+  /// What a screen reader says about the card ("Blood type A+, double tap
+  /// for details").
+  final String? semanticLabel;
+
   const HomeStatTile({
     super.key,
     required this.label,
@@ -205,6 +213,8 @@ class HomeStatTile extends StatefulWidget {
     required this.icon,
     required this.iconColor,
     required this.iconBg,
+    this.onTap,
+    this.semanticLabel,
   });
 
   @override
@@ -239,11 +249,10 @@ class _HomeStatTileState extends State<HomeStatTile> {
     } else {
       value = Text(widget.text ?? '—', style: style);
     }
-    return PressFeedback(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
-        decoration: homeCardDecoration(context),
-        child: Column(
+    final tappable = widget.onTap != null && !widget.loading;
+    final content = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+      child: Column(
           children: [
             Container(
               width: 36,
@@ -271,9 +280,34 @@ class _HomeStatTileState extends State<HomeStatTile> {
               style: TextStyle(fontSize: 11, color: p.muted),
             ),
           ],
-        ),
       ),
     );
+    Widget card = Container(
+      decoration: homeCardDecoration(context),
+      // The ripple is painted on this Material, inside the rounded card.
+      child: Material(
+        type: MaterialType.transparency,
+        child: tappable
+            ? InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  widget.onTap!();
+                },
+                child: content,
+              )
+            : content,
+      ),
+    );
+    if (tappable) {
+      card = Semantics(
+        button: true,
+        label: widget.semanticLabel ?? widget.label,
+        excludeSemantics: true,
+        child: card,
+      );
+    }
+    return PressFeedback(child: card);
   }
 }
 

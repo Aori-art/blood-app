@@ -26,33 +26,39 @@ class BloodRequestApiException implements Exception {
   String toString() => message;
 }
 
+/// Reads a Blood Requests endpoint's JSON: the body when "status" is
+/// "success", otherwise a [BloodRequestApiException] with the server's code,
+/// message and field errors. Shared by every Blood Requests API.
+Map<String, dynamic> decodeBloodRequestResponse(http.Response response) {
+  Map<String, dynamic> body;
+  try {
+    final decoded = jsonDecode(response.body);
+    body = decoded is Map
+        ? Map<String, dynamic>.from(decoded)
+        : <String, dynamic>{};
+  } catch (_) {
+    body = <String, dynamic>{};
+  }
+  if (body['status'] == 'success') return body;
+
+  final code = body['code']?.toString() ?? 'UNKNOWN_ERROR';
+  final message =
+      body['message']?.toString() ?? 'Something went wrong. Please try again.';
+  Map<String, String>? errors;
+  if (body['errors'] is Map) {
+    errors = (body['errors'] as Map).map(
+      (k, v) => MapEntry(k.toString(), v.toString()),
+    );
+  }
+  throw BloodRequestApiException(code, message, errors: errors, raw: body);
+}
+
 class BloodRequestApi {
   static const _getTimeout = Duration(seconds: 10);
   static const _postTimeout = Duration(seconds: 15);
 
-  static Map<String, dynamic> _decode(http.Response response) {
-    Map<String, dynamic> body;
-    try {
-      final decoded = jsonDecode(response.body);
-      body = decoded is Map
-          ? Map<String, dynamic>.from(decoded)
-          : <String, dynamic>{};
-    } catch (_) {
-      body = <String, dynamic>{};
-    }
-    if (body['status'] == 'success') return body;
-
-    final code = body['code']?.toString() ?? 'UNKNOWN_ERROR';
-    final message =
-        body['message']?.toString() ?? 'Something went wrong. Please try again.';
-    Map<String, String>? errors;
-    if (body['errors'] is Map) {
-      errors = (body['errors'] as Map).map(
-        (k, v) => MapEntry(k.toString(), v.toString()),
-      );
-    }
-    throw BloodRequestApiException(code, message, errors: errors, raw: body);
-  }
+  static Map<String, dynamic> _decode(http.Response response) =>
+      decodeBloodRequestResponse(response);
 
   static Future<BloodRequestSummary> fetchSummary(String donorId) async {
     final response = await http
@@ -99,27 +105,6 @@ class BloodRequestApi {
     return BloodRequestDetailResult.fromJson(_decode(response));
   }
 
-  static Future<RequestFormOptions> fetchOptions(String donorId) async {
-    final uri = Uri.parse(
-      '${AppConfig.baseUrl}/get_blood_request_options.php?donor_id=$donorId',
-    );
-    final response = await http.get(uri).timeout(_getTimeout);
-    return RequestFormOptions.fromJson(_decode(response));
-  }
-
-  static Future<BloodRequestActionResult> submitRequest(
-    Map<String, dynamic> payload,
-  ) async {
-    final response = await http
-        .post(
-          Uri.parse('${AppConfig.baseUrl}/submit_blood_request.php'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode(payload),
-        )
-        .timeout(_postTimeout);
-    return BloodRequestActionResult.fromJson(_decode(response));
-  }
-
   static Future<BloodRequestActionResult> respond({
     required String donorId,
     required int requestId,
@@ -133,25 +118,6 @@ class BloodRequestApi {
             'donor_id': donorId,
             'request_id': requestId,
             'action': action,
-          }),
-        )
-        .timeout(_postTimeout);
-    return BloodRequestActionResult.fromJson(_decode(response));
-  }
-
-  static Future<BloodRequestActionResult> cancel({
-    required String donorId,
-    required int requestId,
-    required String reason,
-  }) async {
-    final response = await http
-        .post(
-          Uri.parse('${AppConfig.baseUrl}/cancel_blood_request.php'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'donor_id': donorId,
-            'request_id': requestId,
-            'reason': reason,
           }),
         )
         .timeout(_postTimeout);

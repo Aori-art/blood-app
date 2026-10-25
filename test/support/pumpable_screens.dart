@@ -4,6 +4,8 @@ import 'dart:convert';
 
 import 'package:blood/alerts.dart';
 import 'package:blood/blood_requests/blood_requests_screen.dart';
+import 'package:blood/blood_requests/hospital_request_detail_screen.dart';
+import 'package:blood/blood_requests/request_blood_screen.dart';
 import 'package:blood/book.dart';
 import 'package:blood/change_password.dart';
 import 'package:blood/check.dart';
@@ -15,6 +17,8 @@ import 'package:blood/forgot_password.dart';
 import 'package:blood/help_support.dart';
 import 'package:blood/history.dart';
 import 'package:blood/home.dart';
+import 'package:blood/home_nav_glass.dart';
+import 'package:blood/home_nav_visibility.dart';
 import 'package:blood/login.dart';
 import 'package:blood/newsfeed.dart';
 import 'package:blood/notification_settings.dart';
@@ -29,14 +33,76 @@ import 'package:blood/screens/register/register3.dart';
 import 'package:blood/splash_screen/splash_screen.dart';
 import 'package:blood/streak/streak_home_screen.dart';
 import 'package:blood/streak/streak_ladder_screen.dart';
+import 'package:blood/unread_notifications.dart';
 import 'package:blood/verify.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart'
-    show WidgetTester, expect, find, findsOneWidget;
+    show WidgetTester, expect, find, findsOneWidget, isTrue;
 import 'package:http/http.dart' as http;
 
 import 'fake_streak.dart';
+import 'hospital_request_fixtures.dart';
 import 'sample_posts.dart';
+
+/// Swipes Home's nav down, so the handle that brings it back is on screen for
+/// the audits.
+/// Fills the Request Blood form to its last step (a hospital chosen, the
+/// consent ticked) and shows the review.
+Future<void> _fillRequestForm(WidgetTester tester) async {
+  await fillToHospitalStep(tester);
+  await fillHospitalStep(tester);
+  await scrollStepTo(tester, find.byKey(const ValueKey('review-card')));
+  // The Send button turns red over 200 ms once the consent is ticked.
+  await formFrames(tester, 4);
+}
+
+/// The hospital step with a hospital that is out of stock (its note open).
+Future<void> _pickOutOfStockHospital(WidgetTester tester) async {
+  await fillToHospitalStep(tester);
+  await tapInStep(tester, find.text('Alpha Medical Center'));
+  await formFrames(tester, 3);
+}
+
+/// Lets Home finish loading, then stops its notification timer.
+Future<void> _settleHome(WidgetTester tester) async {
+  for (var i = 0; i < 8; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+  UnreadNotifications.instance.stop();
+}
+
+Future<void> _hideHomeNav(WidgetTester tester) async {
+  final size = tester.view.physicalSize / tester.view.devicePixelRatio;
+  // From the Home item, slowly.
+  final g = await tester.startGesture(
+    Offset(16 + (size.width - 32) / 10, size.height - 10 - 32),
+  );
+  for (var i = 1; i <= 20; i++) {
+    await g.moveBy(
+      const Offset(0, 4),
+      timeStamp: Duration(milliseconds: 40 * i),
+    );
+    await tester.pump(const Duration(milliseconds: 40));
+  }
+  await g.up(timeStamp: const Duration(seconds: 2));
+  for (var i = 0; i < 8; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+  expect(HomeNavVisibility.instance.hidden, isTrue);
+  expect(find.byType(GlassHandle).hitTestable(), findsOneWidget);
+  // Home checks for new notifications on a timer; the audits end here.
+  UnreadNotifications.instance.stop();
+}
+
+/// Opens the donations preview from Home's stat card (the sheet is then on
+/// screen for the audits).
+Future<void> _openDonationsPreview(WidgetTester tester) async {
+  await tester.tap(find.text('Donations'));
+  for (var i = 0; i < 12; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+  expect(find.text('Your donations'), findsOneWidget);
+}
 
 /// Scrolls the newsfeed down, so "Go to Home" gives way to the category bar.
 Future<void> _scrollFeedDown(WidgetTester tester) async {
@@ -297,6 +363,18 @@ final List<PumpableScreen> pumpableScreens = [
   PumpableScreen('book', () => const BookScreen()),
   PumpableScreen('newsfeed', () => const NewsfeedPage()),
   PumpableScreen(
+    'home (donations preview open)',
+    () => HomeContent(onNavigateToTab: (_) {}),
+    responses: {
+      'get_profile.php': {
+        'status': 'success',
+        'data': {'blood_type': 'A+', 'total_donations': 3},
+      },
+      'get_donation_history.php': {'status': 'success', 'data': _donations},
+    },
+    act: _openDonationsPreview,
+  ),
+  PumpableScreen(
     'newsfeed (category bar visible)',
     () => const NewsfeedPage(),
     responses: {
@@ -321,6 +399,23 @@ final List<PumpableScreen> pumpableScreens = [
   ),
   PumpableScreen('digital ID', () => const DigitalIdScreen()),
   PumpableScreen('blood requests', () => const BloodRequestsScreen()),
+  PumpableScreen(
+    'my requests (every status)',
+    () => const BloodRequestsScreen(),
+    responses: {'get_hospital_requests.php': trackedList()},
+  ),
+  PumpableScreen(
+    'hospital request (ready for pickup)',
+    () => HospitalRequestDetailScreen(
+      requestId: 3,
+      now: () => DateTime(2099, 10, 30, 9),
+    ),
+    responses: {
+      'get_hospital_request_detail.php': trackedDetail(
+        trackedRequest(3, 'ready'),
+      ),
+    },
+  ),
   PumpableScreen('streak ladder', () => const StreakLadderScreen()),
   PumpableScreen(
     'streak ladder (with data)',
@@ -370,5 +465,56 @@ final List<PumpableScreen> pumpableScreens = [
         'top_urgent': {'request_id': 9, 'reference': 'BR-0009'},
       },
     },
+  ),
+  PumpableScreen(
+    'home (request ready for pickup)',
+    () => HomeContent(onNavigateToTab: (_) {}),
+    responses: {
+      'get_profile.php': {
+        'status': 'success',
+        'data': {'blood_type': 'O+', 'total_donations': 4},
+      },
+      'get_blood_request_summary.php': {
+        'status': 'success',
+        'open_count': 3,
+        'matching_count': 2,
+        'urgent_matching_count': 0,
+      },
+      'get_hospital_request_summary.php': hospitalSummary('ready', active: 2),
+    },
+    act: _settleHome,
+  ),
+  PumpableScreen(
+    'alerts (hospital request notifications)',
+    () => const AlertsScreen(donorId: 7),
+    responses: {'get_notifications.php': hospitalNotifications()},
+  ),
+  PumpableScreen(
+    'request blood (patient step)',
+    () => const RequestBloodScreen(photoPicker: AlwaysPhotoPicker()),
+    responses: {'get_hospital_request_options.php': hospitalOptions()},
+  ),
+  PumpableScreen(
+    'request blood (hospital out of stock)',
+    () => const RequestBloodScreen(photoPicker: AlwaysPhotoPicker()),
+    responses: {
+      'get_hospital_request_options.php': hospitalOptions(),
+      'get_blood_availability.php': hospitalAvailability(),
+    },
+    act: _pickOutOfStockHospital,
+  ),
+  PumpableScreen(
+    'request blood (review)',
+    () => const RequestBloodScreen(photoPicker: AlwaysPhotoPicker()),
+    responses: {
+      'get_hospital_request_options.php': hospitalOptions(),
+      'get_blood_availability.php': hospitalAvailability(),
+    },
+    act: _fillRequestForm,
+  ),
+  PumpableScreen(
+    'home (nav hidden, the handle on show)',
+    () => const HomeScreen(),
+    act: _hideHomeNav,
   ),
 ];

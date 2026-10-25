@@ -4,8 +4,10 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/semantics.dart' show CustomSemanticsAction;
 import 'streak/streak_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -19,6 +21,10 @@ import 'blood_requests/blood_request_detail_screen.dart';
 import 'blood_requests/blood_request_models.dart';
 import 'blood_requests/blood_request_widgets.dart';
 import 'blood_requests/blood_requests_screen.dart';
+import 'blood_requests/hospital_request_api.dart';
+import 'blood_requests/hospital_request_detail_screen.dart';
+import 'blood_requests/hospital_request_models.dart';
+import 'blood_requests/hospital_request_widgets.dart';
 import 'blood_requests/request_blood_screen.dart';
 import 'book.dart';
 import 'check.dart';
@@ -28,12 +34,13 @@ import 'digital_id_service.dart';
 import 'history.dart';
 import 'home_nav_glass.dart';
 import 'home_nav.dart';
+import 'home_nav_visibility.dart';
+import 'home_stat_sheets.dart';
 import 'newsfeed.dart';
 import 'donation_history.dart';
 import 'notification_service.dart';
 import 'shared_design.dart';
 import 'unread_notifications.dart';
-import 'verify.dart';
 import 'app_palette.dart';
 import 'my_avatar.dart';
 import 'my_avatar_controller.dart';
@@ -50,7 +57,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen>
-    with SingleTickerProviderStateMixin
+    with TickerProviderStateMixin
     implements HomeNavHost {
   int _selectedIndex = 0;
   int _donorId = 0;
@@ -65,6 +72,29 @@ class _HomeScreenState extends State<HomeScreen>
 
   // The route Home is on, so HomeNav can pop back to it.
   ModalRoute<dynamic>? _route;
+
+  // Dragging a finger along the nav moves the pages with it: the drag is
+  // given to the TabBarView's own scroll position (found under this key),
+  // so the pages, the lens and the items all follow the finger.
+  final GlobalKey _pagerKey = GlobalKey();
+  Drag? _scrub;
+  double _scrubPage = 0;
+  int _scrubTab = 0;
+
+  // The nav can be swiped down out of the way; a small handle brings it
+  // back. 1 = shown, 0 = hidden (unbounded: the return overshoots a little).
+  // It is kept for the session only: the nav is shown on every start.
+  late final AnimationController _navShow = AnimationController.unbounded(
+    vsync: this,
+    value: 1,
+  )..addListener(_onNavShow);
+  double _navDrag = 0;
+  double _handleDrag = 0;
+  // A drag recognizer also says "cancel" after a plain tap: only a drag
+  // that started counts.
+  bool _navDragging = false;
+  bool _handleDragging = false;
+  int _handleNudge = 0;
 
   @override
   void initState() {
@@ -104,6 +134,9 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   void dispose() {
+    // Every other screen keeps the nav's full room again.
+    _navShow.dispose();
+    HomeNavVisibility.instance.reset();
     HomeNav.unregister(this);
     _tabs.animation?.removeListener(_onTabPosition);
     _tabs.dispose();
@@ -170,6 +203,8 @@ class _HomeScreenState extends State<HomeScreen>
   /// jump when animations are off) and the tab is current at once.
   void _selectTab(int index) {
     if (index < 0 || index >= _screens.length) return;
+    // A tab chosen from anywhere brings a hidden nav back first.
+    if (_navShow.value < 0.999) _showNav();
     _activate(index);
     if (_tabs.index != index) {
       _tabs.animateTo(
@@ -193,6 +228,227 @@ class _HomeScreenState extends State<HomeScreen>
     final next = position.round().clamp(0, _screens.length - 1);
     if (next != _selectedIndex) _activate(next);
   }
+
+  // ── Dragging along the nav ──────────────────────────────────────────────
+
+  /// The TabBarView's scroll position (its PageView is the first horizontal
+  /// scrollable below it).
+  ScrollPosition? _pagerPosition() {
+    ScrollableState? found;
+    void visit(Element e) {
+      if (found != null) return;
+      if (e is StatefulElement && e.state is ScrollableState) {
+        final s = e.state as ScrollableState;
+        if (s.position.axis == Axis.horizontal) {
+          found = s;
+          return;
+        }
+      }
+      e.visitChildElements(visit);
+    }
+
+    _pagerKey.currentContext?.visitChildElements(visit);
+    final position = found?.position;
+    if (position == null ||
+        !position.hasPixels ||
+        !position.hasViewportDimension) {
+      return null;
+    }
+    return position;
+  }
+
+  /// A fifth of the nav (it is the screen less 16 px on each side).
+  double get _slotWidth => (MediaQuery.sizeOf(context).width - 32) / 5;
+
+  void _scrubStart(DragStartDetails d) {
+    final position = _pagerPosition();
+    if (position == null) return;
+    _scrub?.cancel();
+    _scrubTab = _selectedIndex;
+    _scrub = position.drag(d, () => _scrub = null);
+    _scrubTo(d.localPosition.dx, d.globalPosition, d.sourceTimeStamp);
+  }
+
+  void _scrubUpdate(DragUpdateDetails d) =>
+      _scrubTo(d.localPosition.dx, d.globalPosition, d.sourceTimeStamp);
+
+  /// The finger at [x] along the nav: the pages go to the tab under it
+  /// (fractional between two), a tick for each tab passed.
+  void _scrubTo(double x, Offset global, Duration? timeStamp) {
+    final position = _pagerPosition();
+    final drag = _scrub;
+    if (position == null || drag == null) return;
+    final page = (x / _slotWidth - 0.5).clamp(0.0, 4.0);
+    _scrubPage = page;
+    final delta = page * position.viewportDimension - position.pixels;
+    if (delta.abs() > 0.01) {
+      // A drag moves the content against the finger: pixels grow as the
+      // update's delta goes negative.
+      drag.update(
+        DragUpdateDetails(
+          globalPosition: global,
+          delta: Offset(-delta, 0),
+          primaryDelta: -delta,
+          sourceTimeStamp: timeStamp,
+        ),
+      );
+    }
+    final tab = page.round();
+    if (tab != _scrubTab) {
+      _scrubTab = tab;
+      HapticFeedback.selectionClick();
+    }
+  }
+
+  void _scrubEnd(DragEndDetails d) => _settleScrub(d.primaryVelocity ?? 0);
+
+  void _scrubCancel() => _settleScrub(0);
+
+  /// The finger left the nav: on to the nearest tab, or the next one in the
+  /// direction of a flick (faster than 300 px/s).
+  void _settleScrub(double velocity) {
+    final drag = _scrub;
+    if (drag == null) return;
+    _scrub = null;
+    drag.end(DragEndDetails(primaryVelocity: 0));
+    final position = _pagerPosition();
+    if (position == null) return;
+    final page = _scrubPage;
+    var target = page.round();
+    if (velocity > 300) {
+      target = (page - 1e-6).floor() + 1;
+    } else if (velocity < -300) {
+      target = (page + 1e-6).ceil() - 1;
+    }
+    target = target.clamp(0, _screens.length - 1);
+    final to = target * position.viewportDimension;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      position.jumpTo(to);
+    } else {
+      position.animateTo(
+        to,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  // ── Hiding and showing the nav ──────────────────────────────────────────
+
+  /// How far down the nav goes to be out of sight: itself (the Check
+  /// button's overhang included), its margin, the inset and a little more.
+  double get _hideDistance =>
+      FloatingNavMetrics.overhang +
+      8 +
+      FloatingNavMetrics.barHeight +
+      FloatingNavMetrics.bottomMargin +
+      MediaQuery.paddingOf(context).bottom +
+      24;
+
+  bool get _reduceMotion => MediaQuery.disableAnimationsOf(context);
+
+  void _onNavShow() {
+    HomeNavVisibility.instance.progress.value = _navShow.value.clamp(0.0, 1.0);
+  }
+
+  void _hideNav() {
+    if (_navShow.value <= 0 && !_navShow.isAnimating) return;
+    HapticFeedback.lightImpact();
+    final reduce = _reduceMotion;
+    _navShow
+        .animateTo(
+          0,
+          duration: Duration(milliseconds: reduce ? 120 : 260),
+          curve: reduce ? Curves.linear : Curves.easeInCubic,
+        )
+        .then((_) {
+          // Gone: the handle nudges its arrow once.
+          if (mounted && !reduce && _navShow.value <= 0.001) {
+            setState(() => _handleNudge++);
+          }
+        });
+  }
+
+  void _showNav() {
+    if (_navShow.value >= 1 && !_navShow.isAnimating) return;
+    HapticFeedback.lightImpact();
+    final reduce = _reduceMotion;
+    _navShow.animateTo(
+      1,
+      duration: Duration(milliseconds: reduce ? 120 : 340),
+      curve: reduce ? Curves.linear : Curves.easeOutBack,
+    );
+  }
+
+  /// The nav follows a finger dragging it down (resisting after 24 px).
+  void _navDragStart(DragStartDetails d) {
+    _navShow.stop();
+    _navDrag = 0;
+    _navDragging = true;
+  }
+
+  double get _navDragDy =>
+      _navDrag <= 24 ? _navDrag : 24 + (_navDrag - 24) * 0.5;
+
+  void _navDragUpdate(DragUpdateDetails d) {
+    _navDrag = math.max(0, _navDrag + d.delta.dy);
+    _navShow.value = 1 - _navDragDy / _hideDistance;
+  }
+
+  void _navDragEnd(DragEndDetails d) {
+    if (!_navDragging) return;
+    _navDragging = false;
+    final velocity = d.primaryVelocity ?? 0;
+    if (_navDragDy > 28 || velocity > 350) {
+      _hideNav();
+    } else {
+      _navSpringBack();
+    }
+  }
+
+  void _navDragCancel() {
+    if (!_navDragging) return;
+    _navDragging = false;
+    _navSpringBack();
+  }
+
+  void _navSpringBack() {
+    final reduce = _reduceMotion;
+    _navShow.animateTo(
+      1,
+      duration: Duration(milliseconds: reduce ? 120 : 200),
+      curve: reduce ? Curves.linear : Curves.easeOutBack,
+    );
+  }
+
+  /// The nav comes up with a finger dragging the handle up.
+  void _handleDragStart(DragStartDetails d) {
+    _navShow.stop();
+    _handleDrag = 0;
+    _handleDragging = true;
+  }
+
+  void _handleDragUpdate(DragUpdateDetails d) {
+    _handleDrag = math.max(0, _handleDrag - d.delta.dy);
+    _navShow.value = (_handleDrag / _hideDistance).clamp(0.0, 1.0);
+  }
+
+  void _handleDragEnd(DragEndDetails d) {
+    if (!_handleDragging) return;
+    _handleDragging = false;
+    final upward = -(d.primaryVelocity ?? 0);
+    if (_handleDrag > 16 || upward > 350) {
+      _showNav();
+    } else {
+      _navShow.animateTo(
+        0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  void _handleDragCancel() => _handleDragEnd(DragEndDetails());
 
   // ── HomeNavHost ─────────────────────────────────────────────────────────
 
@@ -230,13 +486,15 @@ class _HomeScreenState extends State<HomeScreen>
         // tabs resize for the keyboard themselves; the keyboard just covers
         // the nav, as it did before.
         resizeToAvoidBottomInset: false,
-        body: Stack(
+        // The tabs rebuild their bottom room when the nav hides or shows.
+        body: HomeNavScope(child: Stack(
           children: [
             // The tabs are pages: swipe between them. Every tab stays alive
             // once it has been shown, so switching tabs (e.g. tapping Home
             // mid eligibility-check) never loses its state.
             Positioned.fill(
               child: TabBarView(
+                key: _pagerKey,
                 controller: _tabs,
                 children: [
                   for (var i = 0; i < _screens.length; i++)
@@ -264,16 +522,112 @@ class _HomeScreenState extends State<HomeScreen>
               left: 16,
               right: 16,
               bottom: safeBottom + FloatingNavMetrics.bottomMargin,
-              child: RepaintBoundary(
-                child: _FloatingNav(
-                  selectedIndex: _selectedIndex,
-                  onSelect: _selectTab,
-                  position: _tabs.animation,
+              // The one translate of the whole nav: down and out of sight
+              // when the donor swipes it away (a cross-fade without
+              // animations). Hidden, it takes no touches and says nothing.
+              child: AnimatedBuilder(
+                animation: _navShow,
+                builder: (context, child) {
+                  final v = _navShow.value;
+                  final hidden = v <= 0.001;
+                  final nav = _reduceMotion
+                      ? Opacity(opacity: v.clamp(0.0, 1.0), child: child)
+                      : Transform.translate(
+                          offset: Offset(0, (1 - v) * _hideDistance),
+                          child: child,
+                        );
+                  return IgnorePointer(
+                    ignoring: hidden,
+                    child: ExcludeSemantics(
+                      excluding: hidden,
+                      child: TickerMode(enabled: !hidden, child: nav),
+                    ),
+                  );
+                },
+                // A finger dragged along the nav (from an item or the Check
+                // button) moves the pages; dragged down, it hides the nav.
+                // Each drag keeps to the axis it starts on. A tap still goes
+                // to the item.
+                // (Screen readers get the items and an action instead.)
+                child: RawGestureDetector(
+                  behavior: HitTestBehavior.deferToChild,
+                  excludeFromSemantics: true,
+                  gestures: {
+                    HorizontalDragGestureRecognizer:
+                        GestureRecognizerFactoryWithHandlers<
+                          HorizontalDragGestureRecognizer
+                        >(HorizontalDragGestureRecognizer.new, (r) {
+                          r.onStart = _scrubStart;
+                          r.onUpdate = _scrubUpdate;
+                          r.onEnd = _scrubEnd;
+                          r.onCancel = _scrubCancel;
+                        }),
+                    VerticalDragGestureRecognizer:
+                        GestureRecognizerFactoryWithHandlers<
+                          VerticalDragGestureRecognizer
+                        >(VerticalDragGestureRecognizer.new, (r) {
+                          r.onStart = _navDragStart;
+                          r.onUpdate = _navDragUpdate;
+                          r.onEnd = _navDragEnd;
+                          r.onCancel = _navDragCancel;
+                        }),
+                  },
+                  // Swiping down is not for everyone: the same as an action.
+                  child: Semantics(
+                    container: true,
+                    explicitChildNodes: true,
+                    customSemanticsActions: {
+                      const CustomSemanticsAction(
+                        label: 'Hide navigation bar',
+                      ): _hideNav,
+                    },
+                    child: RepaintBoundary(
+                      child: _FloatingNav(
+                        selectedIndex: _selectedIndex,
+                        onSelect: _selectTab,
+                        position: _tabs.animation,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // The handle that brings the nav back: it fades in over the
+            // second half of the hide and out as the nav returns.
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: safeBottom + FloatingNavMetrics.bottomMargin,
+              child: AnimatedBuilder(
+                animation: _navShow,
+                builder: (context, child) {
+                  final v = _navShow.value.clamp(0.0, 1.0);
+                  final opacity = _reduceMotion
+                      ? 1 - v
+                      : ((1 - v) * 2 - 1).clamp(0.0, 1.0);
+                  return Visibility(
+                    visible: opacity > 0.001,
+                    maintainState: true,
+                    child: IgnorePointer(
+                      ignoring: v > 0.5,
+                      child: Opacity(opacity: opacity, child: child),
+                    ),
+                  );
+                },
+                child: Center(
+                  child: GestureDetector(
+                    excludeFromSemantics: true,
+                    onVerticalDragStart: _handleDragStart,
+                    onVerticalDragUpdate: _handleDragUpdate,
+                    onVerticalDragEnd: _handleDragEnd,
+                    onVerticalDragCancel: _handleDragCancel,
+                    child: GlassHandle(onTap: _showNav, nudge: _handleNudge),
+                  ),
                 ),
               ),
             ),
           ],
-        ),
+        )),
       ),
     );
   }
@@ -309,8 +663,12 @@ class FloatingNavMetrics {
 
   /// What every scrollable inside [HomeScreen] ends with, so its last item
   /// is never hidden behind the bar.
+  /// While the donor has swiped the bar away it is the handle's room
+  /// instead (the same value as always while the bar is shown).
   static double bottomPadding(BuildContext context) =>
-      barHeight + bottomMargin + MediaQuery.paddingOf(context).bottom + 24;
+      HomeNavScope.reserveOf(context, shown: barHeight + bottomMargin) +
+      MediaQuery.paddingOf(context).bottom +
+      24;
 
   /// True while the bar blurs what is behind it. The bar switches this off by
   /// itself (solid white at 94 %) if frames keep taking too long.
@@ -1175,6 +1533,10 @@ class _HomeContentState extends State<HomeContent> {
   bool _brLoading = true;
   bool _brError = false;
 
+  // The donor's latest request to a hospital (the status strip). It never
+  // shows a loading or error state: it appears when there is one to show.
+  HospitalRequestSummary? _hrSummary;
+
   DigitalIdData? _digitalId;
   bool _digitalIdLoaded = false;
   bool _digitalIdMasked = false;
@@ -1187,6 +1549,7 @@ class _HomeContentState extends State<HomeContent> {
     loadEligibilityData();
     loadAppointments();
     loadBloodRequestSummary();
+    loadHospitalRequestSummary();
     loadDigitalId();
   }
 
@@ -1243,7 +1606,20 @@ class _HomeContentState extends State<HomeContent> {
       loadEligibilityData(),
       loadAppointments(),
       loadBloodRequestSummary(),
+      loadHospitalRequestSummary(),
     ]);
+  }
+
+  Future<void> loadHospitalRequestSummary() async {
+    final prefs = await SharedPreferences.getInstance();
+    final donorId = prefs.getString('donorId');
+    if (donorId == null || donorId.isEmpty) return;
+    try {
+      final summary = await HospitalRequestApi.fetchSummary(donorId);
+      if (mounted) setState(() => _hrSummary = summary);
+    } catch (_) {
+      // Silent: the strip keeps what it last showed.
+    }
   }
 
   Future<void> loadBloodRequestSummary() async {
@@ -1279,7 +1655,22 @@ class _HomeContentState extends State<HomeContent> {
       context,
       MaterialPageRoute(builder: (_) => BloodRequestsScreen(initialTab: tab)),
     );
-    if (mounted) await loadBloodRequestSummary();
+    if (mounted) {
+      await Future.wait([
+        loadBloodRequestSummary(),
+        loadHospitalRequestSummary(),
+      ]);
+    }
+  }
+
+  Future<void> _openHospitalRequest(int requestId) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => HospitalRequestDetailScreen(requestId: requestId),
+      ),
+    );
+    if (mounted) await loadHospitalRequestSummary();
   }
 
   Future<void> _openBloodRequestDetail(int requestId) async {
@@ -1292,111 +1683,18 @@ class _HomeContentState extends State<HomeContent> {
     if (mounted) await loadBloodRequestSummary();
   }
 
+  // The form checks the donor itself and says why when they can't ask.
   Future<void> _openRequestBlood() async {
-    final summary = _brSummary;
-    if (summary != null && !summary.canRequest) {
-      await _showRequestBlockedSheet(summary.requestBlock);
-      return;
-    }
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const RequestBloodScreen()),
     );
-    if (mounted) await loadBloodRequestSummary();
-  }
-
-  Future<void> _showRequestBlockedSheet(VolunteerBlock? block) async {
-    await showModalBottomSheet(
-      context: context,
-      backgroundColor: context.palette.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: context.palette.border,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-            ),
-            Text(
-              'Unable to Request Blood',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: context.palette.foreground,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              block?.message ?? 'You cannot create a request right now.',
-              style: TextStyle(
-                fontSize: 13,
-                color: context.palette.muted,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 20),
-            if (block?.action == 'verify')
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(sheetContext);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const VerifyScreen()),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    disabledBackgroundColor: context.palette.border,
-                    disabledForegroundColor: context.palette.muted,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: const Text(
-                    'Verify Now',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ),
-              )
-            else
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: OutlinedButton(
-                  onPressed: () => Navigator.pop(sheetContext),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: context.palette.muted,
-                    side: BorderSide(color: context.palette.border),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: const Text(
-                    'OK',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
+    if (mounted) {
+      await Future.wait([
+        loadBloodRequestSummary(),
+        loadHospitalRequestSummary(),
+      ]);
+    }
   }
 
   Future<void> loadUserName() async {
@@ -1848,32 +2146,50 @@ class _HomeContentState extends State<HomeContent> {
       ),
       const SizedBox(width: 12),
       Expanded(
+        flex: 3,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const HomeSectionTitle('Blood Requests'),
             Text(
-              'Request blood or help a patient in need',
+              'Blood Requests',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: context.palette.foreground,
+              ),
+            ),
+            Text(
+              'Ask a hospital for blood or answer an appeal',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(fontSize: 11, color: context.palette.muted),
             ),
           ],
         ),
       ),
-      TextButton(
-        onPressed: () => _openBloodRequestsHub(),
-        style: TextButton.styleFrom(
-          foregroundColor: context.palette.primaryText,
-          padding: EdgeInsets.zero,
-        ),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'View all',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-            ),
-            Icon(Icons.chevron_right_rounded, size: 16),
-          ],
+      Flexible(
+        child: TextButton(
+          onPressed: () => _openBloodRequestsHub(),
+          style: TextButton.styleFrom(
+            foregroundColor: context.palette.primaryText,
+            padding: EdgeInsets.zero,
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  'View all',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, size: 16),
+            ],
+          ),
         ),
       ),
     ],
@@ -1885,7 +2201,7 @@ class _HomeContentState extends State<HomeContent> {
     return PressableScale(
       onTap: top != null
           ? () => _openBloodRequestDetail(top.requestId)
-          : () => _openBloodRequestsHub(),
+          : () => _openBloodRequestsHub(tab: 1),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(12),
@@ -1938,10 +2254,58 @@ class _HomeContentState extends State<HomeContent> {
     );
   }
 
+  /// The least height of the two tiles (a fixed height before): they grow
+  /// together when a title wraps or the text is large.
+  static const double _brTileMinHeight = 118;
+
+  /// What both tiles hold: the icon on top, then the title and a subtitle
+  /// at the bottom. The text can wrap to two lines and never leaves the
+  /// tile; the icon keeps room on its right for the badge.
+  Widget _brTileBody({
+    required Widget icon,
+    required String title,
+    required String subtitle,
+    required Color titleColor,
+    required Color subtitleColor,
+  }) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Padding(padding: const EdgeInsets.only(right: 28), child: icon),
+      const SizedBox(height: 8),
+      Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              height: 1.2,
+              color: titleColor,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 11, color: subtitleColor),
+          ),
+        ],
+      ),
+    ],
+  );
+
   Widget _brRequestTile() => PressableScale(
     onTap: _openRequestBlood,
     child: Container(
-      height: 118,
+      key: const ValueKey('request-tile'),
+      constraints: const BoxConstraints(minHeight: _brTileMinHeight),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
@@ -1964,123 +2328,97 @@ class _HomeContentState extends State<HomeContent> {
         painter: const DropPatternPainter(),
         child: Padding(
           padding: const EdgeInsets.all(14),
-          child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              color: Colors.white24,
-              shape: BoxShape.circle,
+          child: _brTileBody(
+            icon: Container(
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                color: Colors.white24,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.add_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
             ),
-            child: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+            title: 'Request Blood',
+            subtitle: 'From a hospital',
+            titleColor: Colors.white,
+            subtitleColor: AppColors.onPrimary,
           ),
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Request Blood',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                ),
-              ),
-              SizedBox(height: 2),
-              Text(
-                'For you or a loved one',
-                style: TextStyle(fontSize: 11, color: AppColors.onPrimary),
-              ),
-            ],
-          ),
-        ],
-      ),
         ),
       ),
     ),
   );
 
   Widget _brHelpTile(BloodRequestSummary summary) => PressableScale(
-    onTap: () => _openBloodRequestsHub(),
+    // The hospitals' appeals.
+    onTap: () => _openBloodRequestsHub(tab: 1),
     child: Stack(
+      // Passes the row's height on, so both tiles are as tall as the
+      // taller one.
+      fit: StackFit.passthrough,
       clipBehavior: Clip.none,
       children: [
         Container(
-          height: 118,
+          key: const ValueKey('appeals-tile'),
+          constraints: const BoxConstraints(minHeight: _brTileMinHeight),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: context.palette.accentBg,
             border: Border.all(color: context.palette.primaryBorder, width: 1.5),
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: context.palette.surface,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.volunteer_activism_rounded,
-                  color: context.palette.primaryText,
-                  size: 20,
-                ),
+          child: _brTileBody(
+            icon: Container(
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: context.palette.surface,
+                shape: BoxShape.circle,
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Help a Patient',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: context.palette.foreground,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    summary.matchingCount > 0
-                        ? '${summary.matchingCount} match your type'
-                        : summary.openCount > 0
-                        ? '${summary.openCount} open request${summary.openCount == 1 ? '' : 's'}'
-                        : 'No requests right now',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: context.palette.muted,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+              child: Icon(
+                Icons.volunteer_activism_rounded,
+                color: context.palette.primaryText,
+                size: 20,
               ),
-            ],
+            ),
+            title: 'Hospital Appeals',
+            subtitle: summary.matchingCount > 0
+                ? '${summary.matchingCount} match your type'
+                : summary.openCount > 0
+                ? '${summary.openCount} open request${summary.openCount == 1 ? '' : 's'}'
+                : 'No requests right now',
+            titleColor: context.palette.foreground,
+            subtitleColor: context.palette.muted,
           ),
         ),
         if (summary.openCount > 0)
           Positioned(
             right: -6,
             top: -6,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: Colors.white, width: 1.5),
-              ),
-              child: Text(
-                '${summary.openCount}',
-                style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
+            // A small badge: it does not grow with the text size.
+            child: MediaQuery.withClampedTextScaling(
+              maxScaleFactor: 1.3,
+              child: Container(
+                key: const ValueKey('appeals-badge'),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: Colors.white, width: 1.5),
+                ),
+                child: Text(
+                  summary.openCount > 99 ? '99+' : '${summary.openCount}',
+                  maxLines: 1,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
@@ -2088,88 +2426,6 @@ class _HomeContentState extends State<HomeContent> {
       ],
     ),
   );
-
-  Widget _brYourRequestSection(BloodRequestSummary summary) {
-    final r = summary.myActiveRequest!;
-    return GestureDetector(
-      onTap: () => _openBloodRequestDetail(r.requestId),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                'YOUR REQUEST',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: context.palette.muted,
-                  letterSpacing: 0.8,
-                ),
-              ),
-              if (summary.myActiveCount > 1) ...[
-                const SizedBox(width: 6),
-                Text(
-                  '+${summary.myActiveCount - 1} more',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: context.palette.muted,
-                  ),
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              BloodDropBadge(bloodType: r.bloodType, size: 38),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      r.reference,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: context.palette.foreground,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    RequestStatusChip(status: r.status, label: r.statusLabel),
-                  ],
-                ),
-              ),
-              SizedBox(
-                width: 96,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '${r.volunteersCount}/${r.requiredDonors} donors',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: context.palette.foreground,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    DonorProgressBar(
-                      volunteers: r.volunteersCount,
-                      required: r.requiredDonors,
-                      showLabel: false,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _brYourCommitmentSection(BloodRequestSummary summary) {
     final r = summary.myCommitment!;
@@ -2311,16 +2567,25 @@ class _HomeContentState extends State<HomeContent> {
             _brUrgentBanner(summary),
           ],
           const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(child: _brRequestTile()),
-              const SizedBox(width: 12),
-              Expanded(child: _brHelpTile(summary)),
-            ],
+          // Both tiles are as tall as the taller one (at least the old 118).
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: _brRequestTile()),
+                const SizedBox(width: 12),
+                Expanded(child: _brHelpTile(summary)),
+              ],
+            ),
           ),
-          if (summary.myActiveRequest != null) ...[
-            Divider(height: 28, color: context.palette.surfaceAlt),
-            _brYourRequestSection(summary),
+          if (_hrSummary?.latest case final latest?
+              when latest.isActive) ...[
+            const SizedBox(height: 12),
+            HospitalStatusStrip(
+              latest: latest,
+              activeCount: _hrSummary!.activeCount,
+              onTap: () => _openHospitalRequest(latest.requestId),
+            ),
           ],
           if (summary.myCommitment != null) ...[
             const SizedBox(height: 10),
@@ -2395,6 +2660,17 @@ class _HomeContentState extends State<HomeContent> {
                               icon: Icons.water_drop_rounded,
                               iconColor: context.palette.primaryText,
                               iconBg: context.palette.accentBg,
+                              semanticLabel: normalizeBloodType(bloodType) ==
+                                      null
+                                  ? 'Blood type not set, double tap for details'
+                                  : 'Blood type ${normalizeBloodType(bloodType)}, '
+                                      'double tap for details',
+                              onTap: () => showStatPreview(
+                                context,
+                                StatKind.bloodType,
+                                bloodType: bloodType,
+                                donations: totalDonations,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -2406,6 +2682,14 @@ class _HomeContentState extends State<HomeContent> {
                               icon: Icons.favorite_rounded,
                               iconColor: context.palette.pink,
                               iconBg: context.palette.pinkBg,
+                              semanticLabel:
+                                  'Donations $totalDonations, double tap for details',
+                              onTap: () => showStatPreview(
+                                context,
+                                StatKind.donations,
+                                bloodType: bloodType,
+                                donations: totalDonations,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -2417,6 +2701,14 @@ class _HomeContentState extends State<HomeContent> {
                               icon: Icons.people_rounded,
                               iconColor: context.palette.success,
                               iconBg: context.palette.successBg,
+                              semanticLabel:
+                                  'Lives saved ${totalDonations * 3}, double tap for details',
+                              onTap: () => showStatPreview(
+                                context,
+                                StatKind.lives,
+                                bloodType: bloodType,
+                                donations: totalDonations,
+                              ),
                             ),
                           ),
                         ],

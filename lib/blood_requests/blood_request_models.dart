@@ -85,40 +85,6 @@ class MyResponse {
   );
 }
 
-class BloodRequestPrivate {
-  final String? patientName;
-  final String? relationship;
-  final String? relationshipLabel;
-  final String? contactNumber;
-  final String? hospitalReference;
-  final String? rejectionReason;
-  final String? cancellationReason;
-  final String? fulfillmentNote;
-
-  BloodRequestPrivate({
-    this.patientName,
-    this.relationship,
-    this.relationshipLabel,
-    this.contactNumber,
-    this.hospitalReference,
-    this.rejectionReason,
-    this.cancellationReason,
-    this.fulfillmentNote,
-  });
-
-  factory BloodRequestPrivate.fromJson(Map<String, dynamic> json) =>
-      BloodRequestPrivate(
-        patientName: json['patient_name']?.toString(),
-        relationship: json['relationship']?.toString(),
-        relationshipLabel: json['relationship_label']?.toString(),
-        contactNumber: json['contact_number']?.toString(),
-        hospitalReference: json['hospital_reference']?.toString(),
-        rejectionReason: json['rejection_reason']?.toString(),
-        cancellationReason: json['cancellation_reason']?.toString(),
-        fulfillmentNote: json['fulfillment_note']?.toString(),
-      );
-}
-
 class BloodRequest {
   final int requestId;
   final String reference;
@@ -150,7 +116,6 @@ class BloodRequest {
   final String? myMatchType;
   final MyResponse? myResponse;
   final bool canHelp;
-  final BloodRequestPrivate? private;
 
   BloodRequest({
     required this.requestId,
@@ -183,7 +148,6 @@ class BloodRequest {
     this.myMatchType,
     this.myResponse,
     required this.canHelp,
-    this.private,
   });
 
   factory BloodRequest.fromJson(Map<String, dynamic> json) => BloodRequest(
@@ -224,9 +188,6 @@ class BloodRequest {
         ? MyResponse.fromJson(_map(json['my_response']))
         : null,
     canHelp: _boolish(json['can_help']),
-    private: json['private'] is Map
-        ? BloodRequestPrivate.fromJson(_map(json['private']))
-        : null,
   );
 }
 
@@ -316,47 +277,33 @@ class TopUrgentRequest {
       );
 }
 
+/// The hospital appeals' summary on Home (the donor's own requests to a
+/// hospital are HospitalRequestSummary).
 class BloodRequestSummary {
-  final bool canRequest;
-  final VolunteerBlock? requestBlock;
   final int openCount;
   final int matchingCount;
   final int urgentMatchingCount;
   final TopUrgentRequest? topUrgent;
-  final BloodRequest? myActiveRequest;
-  final int myActiveCount;
   final BloodRequest? myCommitment;
   final ViewerContext? viewer;
 
   BloodRequestSummary({
-    required this.canRequest,
-    this.requestBlock,
     required this.openCount,
     required this.matchingCount,
     required this.urgentMatchingCount,
     this.topUrgent,
-    this.myActiveRequest,
-    required this.myActiveCount,
     this.myCommitment,
     this.viewer,
   });
 
   factory BloodRequestSummary.fromJson(Map<String, dynamic> json) =>
       BloodRequestSummary(
-        canRequest: _boolish(json['can_request']),
-        requestBlock: json['request_block'] is Map
-            ? VolunteerBlock.fromJson(_map(json['request_block']))
-            : null,
         openCount: _int(json['open_count']),
         matchingCount: _int(json['matching_count']),
         urgentMatchingCount: _int(json['urgent_matching_count']),
         topUrgent: json['top_urgent'] is Map
             ? TopUrgentRequest.fromJson(_map(json['top_urgent']))
             : null,
-        myActiveRequest: json['my_active_request'] is Map
-            ? BloodRequest.fromJson(_map(json['my_active_request']))
-            : null,
-        myActiveCount: _int(json['my_active_count']),
         myCommitment: json['my_commitment'] is Map
             ? BloodRequest.fromJson(_map(json['my_commitment']))
             : null,
@@ -414,91 +361,6 @@ class UrgencyOption {
     label: json['label']?.toString() ?? '',
     description: json['description']?.toString() ?? '',
   );
-}
-
-class RequestFormOptions {
-  final bool canRequest;
-  final VolunteerBlock? requestBlock;
-  final int activeCount;
-  final int maxActive;
-  final List<BloodTypeOption> bloodTypes;
-  final List<BloodRequestFacility> facilities;
-  final List<RelationshipOption> relationships;
-  final List<UrgencyOption> urgencies;
-  final String defaultContactNumber;
-  final String defaultFirstName;
-  final String? defaultFullName;
-  final int? defaultBloodTypeId;
-  final String? defaultBloodType;
-  final bool defaultBloodTypeUnknown;
-  final int maxDonors;
-  final int maxNeededByDays;
-  final int notesMaxLength;
-  final bool autoApprove;
-
-  RequestFormOptions({
-    required this.canRequest,
-    this.requestBlock,
-    required this.activeCount,
-    required this.maxActive,
-    required this.bloodTypes,
-    required this.facilities,
-    required this.relationships,
-    required this.urgencies,
-    required this.defaultContactNumber,
-    required this.defaultFirstName,
-    this.defaultFullName,
-    this.defaultBloodTypeId,
-    this.defaultBloodType,
-    required this.defaultBloodTypeUnknown,
-    required this.maxDonors,
-    required this.maxNeededByDays,
-    required this.notesMaxLength,
-    required this.autoApprove,
-  });
-
-  factory RequestFormOptions.fromJson(Map<String, dynamic> json) {
-    final defaults = _map(json['defaults']);
-    final limits = _map(json['limits']);
-    return RequestFormOptions(
-      canRequest: _boolish(json['can_request']),
-      requestBlock: json['request_block'] is Map
-          ? VolunteerBlock.fromJson(_map(json['request_block']))
-          : null,
-      activeCount: _int(json['active_count']),
-      maxActive: _int(json['max_active'], 3),
-      bloodTypes: (json['blood_types'] as List? ?? const [])
-          .whereType<Map>()
-          .map((e) => BloodTypeOption.fromJson(Map<String, dynamic>.from(e)))
-          .toList(),
-      facilities: (json['facilities'] as List? ?? const [])
-          .whereType<Map>()
-          .map(
-            (e) => BloodRequestFacility.fromJson(Map<String, dynamic>.from(e)),
-          )
-          .toList(),
-      relationships: (json['relationships'] as List? ?? const [])
-          .whereType<Map>()
-          .map((e) => RelationshipOption.fromJson(Map<String, dynamic>.from(e)))
-          .toList(),
-      urgencies: (json['urgencies'] as List? ?? const [])
-          .whereType<Map>()
-          .map((e) => UrgencyOption.fromJson(Map<String, dynamic>.from(e)))
-          .toList(),
-      defaultContactNumber: defaults['contact_number']?.toString() ?? '',
-      defaultFirstName: defaults['first_name']?.toString() ?? '',
-      defaultFullName: defaults['full_name']?.toString(),
-      defaultBloodTypeId: defaults['blood_type_id'] == null
-          ? null
-          : _int(defaults['blood_type_id']),
-      defaultBloodType: defaults['blood_type']?.toString(),
-      defaultBloodTypeUnknown: _boolish(defaults['blood_type_unknown']),
-      maxDonors: _int(limits['max_donors'], 10),
-      maxNeededByDays: _int(limits['max_needed_by_days'], 30),
-      notesMaxLength: _int(limits['notes_max_length'], 500),
-      autoApprove: _boolish(json['auto_approve']),
-    );
-  }
 }
 
 class RequestCounts {
@@ -572,43 +434,11 @@ class TimelineEvent {
   );
 }
 
-class RequestVolunteer {
-  final String name;
-  final String? bloodType;
-  final String? matchType;
-  final String status;
-  final String? respondedAt;
-
-  RequestVolunteer({
-    required this.name,
-    this.bloodType,
-    this.matchType,
-    required this.status,
-    this.respondedAt,
-  });
-
-  factory RequestVolunteer.fromJson(Map<String, dynamic> json) =>
-      RequestVolunteer(
-        name: json['name']?.toString() ?? '',
-        bloodType: json['blood_type']?.toString(),
-        matchType: json['match_type']?.toString(),
-        status: json['status']?.toString() ?? '',
-        respondedAt: json['responded_at']?.toString(),
-      );
-}
-
 class BloodRequestDetailResult {
   final BloodRequest request;
   final ViewerContext? viewer;
-  final List<TimelineEvent> timeline;
-  final List<RequestVolunteer> volunteers;
 
-  BloodRequestDetailResult({
-    required this.request,
-    this.viewer,
-    required this.timeline,
-    required this.volunteers,
-  });
+  BloodRequestDetailResult({required this.request, this.viewer});
 
   factory BloodRequestDetailResult.fromJson(Map<String, dynamic> json) =>
       BloodRequestDetailResult(
@@ -618,14 +448,6 @@ class BloodRequestDetailResult {
         viewer: json['viewer'] is Map
             ? ViewerContext.fromJson(_map(json['viewer']))
             : null,
-        timeline: (json['timeline'] as List? ?? const [])
-            .whereType<Map>()
-            .map((e) => TimelineEvent.fromJson(Map<String, dynamic>.from(e)))
-            .toList(),
-        volunteers: (json['volunteers'] as List? ?? const [])
-            .whereType<Map>()
-            .map((e) => RequestVolunteer.fromJson(Map<String, dynamic>.from(e)))
-            .toList(),
       );
 }
 

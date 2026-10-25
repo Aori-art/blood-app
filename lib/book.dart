@@ -19,6 +19,7 @@ import 'app_palette.dart';
 import 'widgets/glow_pulse.dart';
 import 'cancel_appointment_sheet.dart';
 import 'home_nav.dart';
+import 'home_nav_visibility.dart';
 
 // Sticky bottom bar's own content height (12 top pad + 50 confirm button
 // height + 12 bottom pad) — used so the scroll content ends exactly one
@@ -1629,7 +1630,11 @@ class _BookScreenState extends State<BookScreen>
     if (widget.showBackButton) return SafeArea(top: false, child: bar);
     return Padding(
       padding: EdgeInsets.only(
-        bottom: kBottomNavBarHeight + MediaQuery.paddingOf(context).bottom + 8,
+        // Lower while the donor has swiped the nav away.
+        bottom:
+            HomeNavScope.reserveOf(context, shown: kBottomNavBarHeight) +
+            MediaQuery.paddingOf(context).bottom +
+            8,
       ),
       child: bar,
     );

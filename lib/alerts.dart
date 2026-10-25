@@ -7,10 +7,12 @@ import 'streak/streak_screen.dart';
 import 'package:http/http.dart' as http;
 import 'anim.dart';
 import 'config.dart';
+import 'blood_requests/blood_requests_screen.dart';
 import 'home.dart' show FloatingNavMetrics;
 import 'notification_service.dart';
 import 'shared_design.dart';
 import 'unread_notifications.dart';
+import 'home_nav_visibility.dart';
 import 'app_palette.dart';
 
 class NotificationModel {
@@ -364,8 +366,33 @@ class _AlertsScreenState extends State<AlertsScreen> {
     );
   }
 
+  /// Notifications about a request sent to a hospital (the server writes
+  /// hospital_request_submitted, _approved, _ready, _fulfilled, _rejected
+  /// and _cancelled).
+  static bool _isHospitalRequest(String type) =>
+      type.startsWith('hospital_request_');
+
+  /// A tap on one of them opens the donor's requests.
+  Future<void> _openMyRequests(NotificationModel n) async {
+    if (!n.isRead) _markAsRead(n.id);
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const BloodRequestsScreen()),
+    );
+  }
+
   Color _getTypeColor(String type) {
     switch (type) {
+      case 'hospital_request_submitted':
+      case 'hospital_request_approved':
+        return context.palette.info;
+      case 'hospital_request_ready':
+      case 'hospital_request_fulfilled':
+        return context.palette.success;
+      case 'hospital_request_rejected':
+        return context.palette.primaryText;
+      case 'hospital_request_cancelled':
+        return context.palette.muted;
       case 'appointment':
       case 'appointment_approved':
       case 'appointment_rescheduled':
@@ -392,6 +419,16 @@ class _AlertsScreenState extends State<AlertsScreen> {
 
   Color _getTypeBg(String type) {
     switch (type) {
+      case 'hospital_request_submitted':
+      case 'hospital_request_approved':
+        return context.palette.infoBg;
+      case 'hospital_request_ready':
+      case 'hospital_request_fulfilled':
+        return context.palette.successBg;
+      case 'hospital_request_rejected':
+        return context.palette.accentBg;
+      case 'hospital_request_cancelled':
+        return context.palette.surfaceAlt;
       case 'appointment':
       case 'appointment_approved':
       case 'appointment_rescheduled':
@@ -418,6 +455,18 @@ class _AlertsScreenState extends State<AlertsScreen> {
 
   IconData _getTypeIcon(String type) {
     switch (type) {
+      case 'hospital_request_submitted':
+        return Icons.send_rounded;
+      case 'hospital_request_approved':
+        return Icons.check_circle_rounded;
+      case 'hospital_request_ready':
+        return Icons.local_hospital_rounded;
+      case 'hospital_request_fulfilled':
+        return Icons.celebration_rounded;
+      case 'hospital_request_rejected':
+        return Icons.block_rounded;
+      case 'hospital_request_cancelled':
+        return Icons.cancel_rounded;
       case 'appointment':
       case 'appointment_rescheduled':
         return Icons.calendar_month_rounded;
@@ -445,6 +494,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
   }
 
   String _getTypeLabel(String type) {
+    if (_isHospitalRequest(type)) return 'Blood Request';
     switch (type) {
       case 'appointment':
       case 'appointment_approved':
@@ -509,9 +559,16 @@ class _AlertsScreenState extends State<AlertsScreen> {
   // ── FLOATING DELETE-ALL BUTTON ───────────────────────────────
   Widget _buildDeleteAllButton() {
     return Padding(
-      padding: const EdgeInsets.only(
+      padding: EdgeInsets.only(
+        // Lower while the donor has swiped the nav away.
         bottom:
-            8 + FloatingNavMetrics.barHeight + FloatingNavMetrics.bottomMargin,
+            8 +
+            HomeNavScope.reserveOf(
+              context,
+              shown:
+                  FloatingNavMetrics.barHeight +
+                  FloatingNavMetrics.bottomMargin,
+            ),
         right: 4,
       ),
       child: GestureDetector(
@@ -715,6 +772,10 @@ class _AlertsScreenState extends State<AlertsScreen> {
               typeIcon: _getTypeIcon(_notifications[index].notificationType),
               typeLabel: _getTypeLabel(_notifications[index].notificationType),
               onTap: () {
+                if (_isHospitalRequest(_notifications[index].notificationType)) {
+                  _openMyRequests(_notifications[index]);
+                  return;
+                }
                 setState(() {
                   if (_expandedId == _notifications[index].id) {
                     _expandedId = null;
