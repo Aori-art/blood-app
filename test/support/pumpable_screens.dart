@@ -4,6 +4,7 @@ import 'dart:convert';
 
 import 'package:blood/alerts.dart';
 import 'package:blood/blood_requests/blood_requests_screen.dart';
+import 'package:blood/blood_requests/request_blood_screen.dart';
 import 'package:blood/book.dart';
 import 'package:blood/change_password.dart';
 import 'package:blood/check.dart';
@@ -39,10 +40,28 @@ import 'package:flutter_test/flutter_test.dart'
 import 'package:http/http.dart' as http;
 
 import 'fake_streak.dart';
+import 'hospital_request_fixtures.dart';
 import 'sample_posts.dart';
 
 /// Swipes Home's nav down, so the handle that brings it back is on screen for
 /// the audits.
+/// Fills the Request Blood form to its last step (a hospital chosen, the
+/// consent ticked) and shows the review.
+Future<void> _fillRequestForm(WidgetTester tester) async {
+  await fillToHospitalStep(tester);
+  await fillHospitalStep(tester);
+  await scrollStepTo(tester, find.byKey(const ValueKey('review-card')));
+  // The Send button turns red over 200 ms once the consent is ticked.
+  await formFrames(tester, 4);
+}
+
+/// The hospital step with a hospital that is out of stock (its note open).
+Future<void> _pickOutOfStockHospital(WidgetTester tester) async {
+  await fillToHospitalStep(tester);
+  await tapInStep(tester, find.text('Alpha Medical Center'));
+  await formFrames(tester, 3);
+}
+
 Future<void> _hideHomeNav(WidgetTester tester) async {
   final size = tester.view.physicalSize / tester.view.devicePixelRatio;
   // From the Home item, slowly.
@@ -420,6 +439,29 @@ final List<PumpableScreen> pumpableScreens = [
         'top_urgent': {'request_id': 9, 'reference': 'BR-0009'},
       },
     },
+  ),
+  PumpableScreen(
+    'request blood (patient step)',
+    () => const RequestBloodScreen(photoPicker: AlwaysPhotoPicker()),
+    responses: {'get_hospital_request_options.php': hospitalOptions()},
+  ),
+  PumpableScreen(
+    'request blood (hospital out of stock)',
+    () => const RequestBloodScreen(photoPicker: AlwaysPhotoPicker()),
+    responses: {
+      'get_hospital_request_options.php': hospitalOptions(),
+      'get_blood_availability.php': hospitalAvailability(),
+    },
+    act: _pickOutOfStockHospital,
+  ),
+  PumpableScreen(
+    'request blood (review)',
+    () => const RequestBloodScreen(photoPicker: AlwaysPhotoPicker()),
+    responses: {
+      'get_hospital_request_options.php': hospitalOptions(),
+      'get_blood_availability.php': hospitalAvailability(),
+    },
+    act: _fillRequestForm,
   ),
   PumpableScreen(
     'home (nav hidden, the handle on show)',

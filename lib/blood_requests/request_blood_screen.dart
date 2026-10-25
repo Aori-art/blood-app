@@ -812,6 +812,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
       child: Scaffold(
         backgroundColor: context.palette.background,
         body: SafeArea(
+          bottom: false,
           child: Column(
             children: [
               _header(),
@@ -823,10 +824,12 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
                   children: [_step1(options), _step2(options), _step3(options)],
                 ),
               ),
-              _bottomBar(),
             ],
           ),
         ),
+        // In the Scaffold's slot, so a SnackBar floats above it instead of
+        // covering the buttons.
+        bottomNavigationBar: _bottomBar(),
       ),
     );
   }
