@@ -6,6 +6,7 @@ import 'package:blood/app_colors.dart';
 import 'package:flutter/services.dart';
 
 import '../home.dart' show kBottomNavBarHeight;
+import '../home_nav_visibility.dart';
 import '../main.dart' show appNavigatorKey;
 import '../shared_design.dart';
 import 'dugtong.dart';
@@ -120,6 +121,7 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
     _seenReset = _c.bubbleResetCount;
     _lastChatEnabled = _c.chatEnabled;
     _c.addListener(_onChanged);
+    HomeNavVisibility.instance.progress.addListener(_onNavMoved);
     _wasVisible = _visible;
     if (_wasVisible) {
       _scheduleIdle();
@@ -131,6 +133,7 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _c.removeListener(_onChanged);
+    HomeNavVisibility.instance.progress.removeListener(_onNavMoved);
     _idleTimer?.cancel();
     _celebrateTimer?.cancel();
     _chatTimer?.cancel();
@@ -324,13 +327,27 @@ class _StreakBubbleOverlayState extends State<StreakBubbleOverlay>
     if (reschedule && mounted) _scheduleChat();
   }
 
+  // The nav hid or came back: the bubble's lowest place moved with it.
+  void _onNavMoved() {
+    if (mounted && _visible) setState(() {});
+  }
+
   // ─── Position ───────────────────────────────────────────────────────────
 
   double _minY(EdgeInsets safe) => safe.top + _margin;
 
+  // The nav's room, or only the handle's while the donor has swiped the nav
+  // away (it follows the nav as it moves).
   double _maxY(Size screen, EdgeInsets safe) => math.max(
     _minY(safe),
-    screen.height - safe.bottom - kBottomNavBarHeight - _margin - _size,
+    screen.height -
+        safe.bottom -
+        HomeNavVisibility.instance.reserve(
+          kBottomNavBarHeight,
+          HomeNavVisibility.handleReserve,
+        ) -
+        _margin -
+        _size,
   );
 
   double _clampY(double y, Size screen, EdgeInsets safe) =>

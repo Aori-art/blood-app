@@ -28,6 +28,7 @@ import 'digital_id_service.dart';
 import 'history.dart';
 import 'home_nav_glass.dart';
 import 'home_nav.dart';
+import 'home_nav_visibility.dart';
 import 'home_stat_sheets.dart';
 import 'newsfeed.dart';
 import 'donation_history.dart';
@@ -105,6 +106,8 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   void dispose() {
+    // Every other screen keeps the nav's full room again.
+    HomeNavVisibility.instance.reset();
     HomeNav.unregister(this);
     _tabs.animation?.removeListener(_onTabPosition);
     _tabs.dispose();
@@ -231,7 +234,8 @@ class _HomeScreenState extends State<HomeScreen>
         // tabs resize for the keyboard themselves; the keyboard just covers
         // the nav, as it did before.
         resizeToAvoidBottomInset: false,
-        body: Stack(
+        // The tabs rebuild their bottom room when the nav hides or shows.
+        body: HomeNavScope(child: Stack(
           children: [
             // The tabs are pages: swipe between them. Every tab stays alive
             // once it has been shown, so switching tabs (e.g. tapping Home
@@ -274,7 +278,7 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             ),
           ],
-        ),
+        )),
       ),
     );
   }
@@ -310,8 +314,12 @@ class FloatingNavMetrics {
 
   /// What every scrollable inside [HomeScreen] ends with, so its last item
   /// is never hidden behind the bar.
+  /// While the donor has swiped the bar away it is the handle's room
+  /// instead (the same value as always while the bar is shown).
   static double bottomPadding(BuildContext context) =>
-      barHeight + bottomMargin + MediaQuery.paddingOf(context).bottom + 24;
+      HomeNavScope.reserveOf(context, shown: barHeight + bottomMargin) +
+      MediaQuery.paddingOf(context).bottom +
+      24;
 
   /// True while the bar blurs what is behind it. The bar switches this off by
   /// itself (solid white at 94 %) if frames keep taking too long.

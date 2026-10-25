@@ -11,6 +11,7 @@ import 'home.dart' show FloatingNavMetrics;
 import 'notification_service.dart';
 import 'shared_design.dart';
 import 'unread_notifications.dart';
+import 'home_nav_visibility.dart';
 import 'app_palette.dart';
 
 class NotificationModel {
@@ -509,9 +510,16 @@ class _AlertsScreenState extends State<AlertsScreen> {
   // ── FLOATING DELETE-ALL BUTTON ───────────────────────────────
   Widget _buildDeleteAllButton() {
     return Padding(
-      padding: const EdgeInsets.only(
+      padding: EdgeInsets.only(
+        // Lower while the donor has swiped the nav away.
         bottom:
-            8 + FloatingNavMetrics.barHeight + FloatingNavMetrics.bottomMargin,
+            8 +
+            HomeNavScope.reserveOf(
+              context,
+              shown:
+                  FloatingNavMetrics.barHeight +
+                  FloatingNavMetrics.bottomMargin,
+            ),
         right: 4,
       ),
       child: GestureDetector(
