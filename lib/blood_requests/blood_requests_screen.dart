@@ -16,6 +16,7 @@ import 'blood_request_detail_screen.dart';
 import 'blood_request_models.dart';
 import 'blood_request_widgets.dart';
 import 'hospital_request_api.dart';
+import 'hospital_request_detail_screen.dart';
 import 'hospital_request_models.dart';
 import 'hospital_request_widgets.dart';
 import 'request_blood_screen.dart';
@@ -162,7 +163,16 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
 
   /// One of the donor's requests to a hospital.
   Future<void> _openMyRequest(HospitalRequest request) async {
-    // The request's screen comes in the next step.
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => HospitalRequestDetailScreen(
+          requestId: request.requestId,
+          initial: request,
+        ),
+      ),
+    );
+    if (mounted) await _loadMine();
   }
 
   void _handleBlockAction(String? action) {
@@ -207,9 +217,11 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
 
   // ─── Header & segments ──────────────────────────────────────────────────
 
+  // The header's buttons are 48 px targets (the same 38 px look), so its
+  // padding is 5 px less around them.
   Widget _header() => Container(
     width: double.infinity,
-    padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
+    padding: const EdgeInsets.fromLTRB(11, 7, 11, 13),
     decoration: const BoxDecoration(
       gradient: LinearGradient(
         colors: kHeaderGradient,
@@ -219,12 +231,12 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
     ),
     child: Row(
       children: [
-        HeaderIconButton(
+        HeaderIconButton48(
           icon: Icons.arrow_back_rounded,
           tooltip: 'Back',
           onTap: () => Navigator.pop(context),
         ),
-        const SizedBox(width: 14),
+        const SizedBox(width: 9),
         const Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -245,7 +257,7 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
             ],
           ),
         ),
-        HeaderIconButton(
+        HeaderIconButton48(
           icon: Icons.refresh_rounded,
           tooltip: 'Refresh',
           onTap: _refreshAll,
@@ -263,8 +275,9 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
         0;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      // The buttons fill the whole control (48 px targets); the pill keeps
+      // its 4 px inset.
       child: Container(
-        padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
           color: context.palette.surface,
           borderRadius: BorderRadius.circular(14),
@@ -278,11 +291,14 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
               alignment: _tab == 0 ? Alignment.centerLeft : Alignment.centerRight,
               child: FractionallySizedBox(
                 widthFactor: 0.5,
-                child: Container(
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: kCrimson,
-                    borderRadius: BorderRadius.circular(10),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Container(
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: kCrimson,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
               ),
@@ -307,40 +323,47 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
       onTap: () => _setTab(index),
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
-        height: 40,
+        height: 48,
         child: Center(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: selected ? Colors.white : context.palette.muted,
-                ),
-              ),
-              if (count > 0) ...[
-                const SizedBox(width: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? Colors.white.withValues(alpha: .25)
-                        : context.palette.surfaceAlt,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    '$count',
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            // Large text shrinks to fit rather than overflow.
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    label,
                     style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                       color: selected ? Colors.white : context.palette.muted,
                     ),
                   ),
-                ),
-              ],
-            ],
+                  if (count > 0) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? Colors.white.withValues(alpha: .25)
+                            : context.palette.surfaceAlt,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '$count',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: selected ? Colors.white : context.palette.muted,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -799,58 +822,68 @@ class _BloodRequestsScreenState extends State<BloodRequestsScreen> {
 
   // ─── FAB ────────────────────────────────────────────────────────────────
 
-  Widget _fab() => Positioned(
-    left: 16,
-    right: 16,
-    bottom: 16,
-    child: IgnorePointer(
-      ignoring: !_fabVisible,
-      child: AnimatedSlide(
-        duration: const Duration(milliseconds: 220),
-        offset: _fabVisible ? Offset.zero : const Offset(0, 2),
-        child: AnimatedOpacity(
+  /// My Requests is empty or failed: its own button takes the FAB's place
+  /// (the FAB would cover it on a short screen).
+  bool get _mineHasOwnButton =>
+      _tab == 0 &&
+      !_mineLoading &&
+      (_mineError || (_mineResult?.requests.isEmpty ?? false));
+
+  Widget _fab() {
+    final visible = _fabVisible && !_mineHasOwnButton;
+    return Positioned(
+      left: 16,
+      right: 16,
+      bottom: 16,
+      child: IgnorePointer(
+        ignoring: !visible,
+        child: AnimatedSlide(
           duration: const Duration(milliseconds: 220),
-          opacity: _fabVisible ? 1 : 0,
-          child: Center(
-            child: PressableScale(
-              onTap: _openRequestForm,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: AppColors.primaryGradient,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(999),
-                  boxShadow: [
-                    BoxShadow(
-                      color: kCrimson.withValues(alpha: .35),
-                      blurRadius: 14,
-                      offset: const Offset(0, 6),
+          offset: visible ? Offset.zero : const Offset(0, 2),
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 220),
+            opacity: visible ? 1 : 0,
+            child: Center(
+              child: PressableScale(
+                onTap: _openRequestForm,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: AppColors.primaryGradient,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                  ],
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.add_rounded, color: Colors.white, size: 20),
-                    SizedBox(width: 8),
-                    Text(
-                      'Request Blood',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
+                    borderRadius: BorderRadius.circular(999),
+                    boxShadow: [
+                      BoxShadow(
+                        color: kCrimson.withValues(alpha: .35),
+                        blurRadius: 14,
+                        offset: const Offset(0, 6),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        'Request Blood',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }

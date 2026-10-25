@@ -9,7 +9,7 @@ import '../app_colors.dart';
 import '../app_palette.dart';
 import '../shared_design.dart';
 import 'blood_request_widgets.dart';
-import 'blood_requests_screen.dart';
+import 'hospital_request_detail_screen.dart';
 import 'hospital_request_models.dart';
 
 // ─── Stock chip ─────────────────────────────────────────────────────────────
@@ -629,7 +629,10 @@ class HospitalRequestSubmittedScreen extends StatelessWidget {
                   label: 'Track Request',
                   onTap: () => Navigator.of(context).pushReplacement(
                     MaterialPageRoute(
-                      builder: (_) => const BloodRequestsScreen(),
+                      builder: (_) => HospitalRequestDetailScreen(
+                        requestId: request.requestId,
+                        initial: request,
+                      ),
                     ),
                   ),
                 ),
@@ -700,6 +703,52 @@ class HospitalRequestSubmittedScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    ),
+  );
+}
+
+/// HeaderIconButton's look (a 38 px glass circle on the gradient) in a
+/// 48 px tap target. Put it where a HeaderIconButton was with 5 px less
+/// padding around it, and it sits where that one did.
+class HeaderIconButton48 extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  const HeaderIconButton48({
+    super.key,
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: tooltip,
+    child: Semantics(
+      button: true,
+      label: tooltip,
+      excludeSemantics: true,
+      child: InkResponse(
+        onTap: onTap,
+        radius: 24,
+        child: SizedBox(
+          width: 48,
+          height: 48,
+          child: Center(
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.16),
+                border: Border.all(color: Colors.white30, width: 1.2),
+              ),
+              child: Icon(icon, color: Colors.white, size: 18),
+            ),
+          ),
+        ),
       ),
     ),
   );
