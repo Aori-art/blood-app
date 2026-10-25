@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'streak/streak_screen.dart';
@@ -67,6 +68,14 @@ class _HomeScreenState extends State<HomeScreen>
 
   // The route Home is on, so HomeNav can pop back to it.
   ModalRoute<dynamic>? _route;
+
+  // Dragging a finger along the nav moves the pages with it: the drag is
+  // given to the TabBarView's own scroll position (found under this key),
+  // so the pages, the lens and the items all follow the finger.
+  final GlobalKey _pagerKey = GlobalKey();
+  Drag? _scrub;
+  double _scrubPage = 0;
+  int _scrubTab = 0;
 
   @override
   void initState() {
@@ -198,6 +207,110 @@ class _HomeScreenState extends State<HomeScreen>
     if (next != _selectedIndex) _activate(next);
   }
 
+  // ── Dragging along the nav ──────────────────────────────────────────────
+
+  /// The TabBarView's scroll position (its PageView is the first horizontal
+  /// scrollable below it).
+  ScrollPosition? _pagerPosition() {
+    ScrollableState? found;
+    void visit(Element e) {
+      if (found != null) return;
+      if (e is StatefulElement && e.state is ScrollableState) {
+        final s = e.state as ScrollableState;
+        if (s.position.axis == Axis.horizontal) {
+          found = s;
+          return;
+        }
+      }
+      e.visitChildElements(visit);
+    }
+
+    _pagerKey.currentContext?.visitChildElements(visit);
+    final position = found?.position;
+    if (position == null ||
+        !position.hasPixels ||
+        !position.hasViewportDimension) {
+      return null;
+    }
+    return position;
+  }
+
+  /// A fifth of the nav (it is the screen less 16 px on each side).
+  double get _slotWidth => (MediaQuery.sizeOf(context).width - 32) / 5;
+
+  void _scrubStart(DragStartDetails d) {
+    final position = _pagerPosition();
+    if (position == null) return;
+    _scrub?.cancel();
+    _scrubTab = _selectedIndex;
+    _scrub = position.drag(d, () => _scrub = null);
+    _scrubTo(d.localPosition.dx, d.globalPosition, d.sourceTimeStamp);
+  }
+
+  void _scrubUpdate(DragUpdateDetails d) =>
+      _scrubTo(d.localPosition.dx, d.globalPosition, d.sourceTimeStamp);
+
+  /// The finger at [x] along the nav: the pages go to the tab under it
+  /// (fractional between two), a tick for each tab passed.
+  void _scrubTo(double x, Offset global, Duration? timeStamp) {
+    final position = _pagerPosition();
+    final drag = _scrub;
+    if (position == null || drag == null) return;
+    final page = (x / _slotWidth - 0.5).clamp(0.0, 4.0);
+    _scrubPage = page;
+    final delta = page * position.viewportDimension - position.pixels;
+    if (delta.abs() > 0.01) {
+      // A drag moves the content against the finger: pixels grow as the
+      // update's delta goes negative.
+      drag.update(
+        DragUpdateDetails(
+          globalPosition: global,
+          delta: Offset(-delta, 0),
+          primaryDelta: -delta,
+          sourceTimeStamp: timeStamp,
+        ),
+      );
+    }
+    final tab = page.round();
+    if (tab != _scrubTab) {
+      _scrubTab = tab;
+      HapticFeedback.selectionClick();
+    }
+  }
+
+  void _scrubEnd(DragEndDetails d) => _settleScrub(d.primaryVelocity ?? 0);
+
+  void _scrubCancel() => _settleScrub(0);
+
+  /// The finger left the nav: on to the nearest tab, or the next one in the
+  /// direction of a flick (faster than 300 px/s).
+  void _settleScrub(double velocity) {
+    final drag = _scrub;
+    if (drag == null) return;
+    _scrub = null;
+    drag.end(DragEndDetails(primaryVelocity: 0));
+    final position = _pagerPosition();
+    if (position == null) return;
+    final page = _scrubPage;
+    var target = page.round();
+    if (velocity > 300) {
+      target = (page - 1e-6).floor() + 1;
+    } else if (velocity < -300) {
+      target = (page + 1e-6).ceil() - 1;
+    }
+    target = target.clamp(0, _screens.length - 1);
+    final to = target * position.viewportDimension;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      position.jumpTo(to);
+    } else {
+      position.animateTo(
+        to,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
   // ── HomeNavHost ─────────────────────────────────────────────────────────
 
   /// HomeNav.goTo: back to Home (closing every screen above it), then the
@@ -242,6 +355,7 @@ class _HomeScreenState extends State<HomeScreen>
             // mid eligibility-check) never loses its state.
             Positioned.fill(
               child: TabBarView(
+                key: _pagerKey,
                 controller: _tabs,
                 children: [
                   for (var i = 0; i < _screens.length; i++)
@@ -269,11 +383,27 @@ class _HomeScreenState extends State<HomeScreen>
               left: 16,
               right: 16,
               bottom: safeBottom + FloatingNavMetrics.bottomMargin,
-              child: RepaintBoundary(
-                child: _FloatingNav(
-                  selectedIndex: _selectedIndex,
-                  onSelect: _selectTab,
-                  position: _tabs.animation,
+              // A finger dragged along the nav (from an item or the Check
+              // button) moves the pages; a tap still goes to the item.
+              child: RawGestureDetector(
+                behavior: HitTestBehavior.deferToChild,
+                gestures: {
+                  HorizontalDragGestureRecognizer:
+                      GestureRecognizerFactoryWithHandlers<
+                        HorizontalDragGestureRecognizer
+                      >(HorizontalDragGestureRecognizer.new, (r) {
+                        r.onStart = _scrubStart;
+                        r.onUpdate = _scrubUpdate;
+                        r.onEnd = _scrubEnd;
+                        r.onCancel = _scrubCancel;
+                      }),
+                },
+                child: RepaintBoundary(
+                  child: _FloatingNav(
+                    selectedIndex: _selectedIndex,
+                    onSelect: _selectTab,
+                    position: _tabs.animation,
+                  ),
                 ),
               ),
             ),
