@@ -38,6 +38,16 @@ import 'package:http/http.dart' as http;
 import 'fake_streak.dart';
 import 'sample_posts.dart';
 
+/// Opens the donations preview from Home's stat card (the sheet is then on
+/// screen for the audits).
+Future<void> _openDonationsPreview(WidgetTester tester) async {
+  await tester.tap(find.text('Donations'));
+  for (var i = 0; i < 12; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+  expect(find.text('Your donations'), findsOneWidget);
+}
+
 /// Scrolls the newsfeed down, so "Go to Home" gives way to the category bar.
 Future<void> _scrollFeedDown(WidgetTester tester) async {
   await tester.drag(
@@ -296,6 +306,18 @@ final List<PumpableScreen> pumpableScreens = [
   PumpableScreen('eligibility check', () => const CheckScreen()),
   PumpableScreen('book', () => const BookScreen()),
   PumpableScreen('newsfeed', () => const NewsfeedPage()),
+  PumpableScreen(
+    'home (donations preview open)',
+    () => HomeContent(onNavigateToTab: (_) {}),
+    responses: {
+      'get_profile.php': {
+        'status': 'success',
+        'data': {'blood_type': 'A+', 'total_donations': 3},
+      },
+      'get_donation_history.php': {'status': 'success', 'data': _donations},
+    },
+    act: _openDonationsPreview,
+  ),
   PumpableScreen(
     'newsfeed (category bar visible)',
     () => const NewsfeedPage(),

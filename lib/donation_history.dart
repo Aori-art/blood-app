@@ -19,6 +19,7 @@ import 'widgets/count_up_text.dart';
 import 'widgets/glow_pulse.dart';
 import 'app_palette.dart';
 import 'home_nav.dart';
+import 'donation_history_data.dart';
 
 class DonationHistoryScreen extends StatefulWidget {
   const DonationHistoryScreen({super.key});
@@ -102,26 +103,13 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
     }
 
     try {
-      final response = await http.get(
-        Uri.parse(
-          "${AppConfig.baseUrl}/get_donation_history.php?donor_id=$donorId",
-        ),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-
-        if (data["status"] == "success") {
-          setState(() {
-            donations = data["data"];
-            isLoading = false;
-          });
-        } else {
-          setState(() => isLoading = false);
-        }
-      } else {
-        setState(() => isLoading = false);
-      }
+      // The same loading the Home preview of the donations uses.
+      final list = await DonationHistoryApi.fetch(donorId);
+      if (!mounted) return;
+      setState(() {
+        donations = list;
+        isLoading = false;
+      });
     } catch (e) {
       debugPrint("Error: $e");
       setState(() => isLoading = false);
@@ -203,28 +191,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
     ]);
   }
 
-  String formatDate(String date) {
-    try {
-      final d = DateTime.parse(date);
-      const months = [
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
-        'May',
-        'Jun',
-        'Jul',
-        'Aug',
-        'Sep',
-        'Oct',
-        'Nov',
-        'Dec',
-      ];
-      return "${months[d.month - 1]} ${d.day}, ${d.year}";
-    } catch (e) {
-      return date;
-    }
-  }
+  String formatDate(String date) => formatDonationDate(date);
 
   String _formatTimestamp(String? raw) {
     if (raw == null || raw.isEmpty) return "N/A";
@@ -321,20 +288,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
     }
   }
 
-  String _donationStatusLabel(String? raw) {
-    switch ((raw ?? '').toLowerCase()) {
-      case 'completed':
-        return 'Completed';
-      case 'pending':
-        return 'Pending';
-      case 'deferred':
-        return 'Deferred';
-      case 'failed':
-        return 'Failed';
-      default:
-        return 'Unknown';
-    }
-  }
+  String _donationStatusLabel(String? raw) => donationStatusLabel(raw);
 
   // ── Derived from the list already loaded (no new calls) ─────────────────
 

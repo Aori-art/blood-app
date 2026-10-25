@@ -28,6 +28,7 @@ import 'digital_id_service.dart';
 import 'history.dart';
 import 'home_nav_glass.dart';
 import 'home_nav.dart';
+import 'home_stat_sheets.dart';
 import 'newsfeed.dart';
 import 'donation_history.dart';
 import 'notification_service.dart';
@@ -2395,6 +2396,17 @@ class _HomeContentState extends State<HomeContent> {
                               icon: Icons.water_drop_rounded,
                               iconColor: context.palette.primaryText,
                               iconBg: context.palette.accentBg,
+                              semanticLabel: normalizeBloodType(bloodType) ==
+                                      null
+                                  ? 'Blood type not set, double tap for details'
+                                  : 'Blood type ${normalizeBloodType(bloodType)}, '
+                                      'double tap for details',
+                              onTap: () => showStatPreview(
+                                context,
+                                StatKind.bloodType,
+                                bloodType: bloodType,
+                                donations: totalDonations,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -2406,6 +2418,14 @@ class _HomeContentState extends State<HomeContent> {
                               icon: Icons.favorite_rounded,
                               iconColor: context.palette.pink,
                               iconBg: context.palette.pinkBg,
+                              semanticLabel:
+                                  'Donations $totalDonations, double tap for details',
+                              onTap: () => showStatPreview(
+                                context,
+                                StatKind.donations,
+                                bloodType: bloodType,
+                                donations: totalDonations,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -2417,6 +2437,14 @@ class _HomeContentState extends State<HomeContent> {
                               icon: Icons.people_rounded,
                               iconColor: context.palette.success,
                               iconBg: context.palette.successBg,
+                              semanticLabel:
+                                  'Lives saved ${totalDonations * 3}, double tap for details',
+                              onTap: () => showStatPreview(
+                                context,
+                                StatKind.lives,
+                                bloodType: bloodType,
+                                donations: totalDonations,
+                              ),
                             ),
                           ),
                         ],
