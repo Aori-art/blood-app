@@ -9,8 +9,7 @@ import '../config.dart';
 import 'blood_request_api.dart';
 import 'hospital_request_models.dart';
 
-/// The endpoints. The list, detail, cancel and summary names follow the
-/// pattern of the others; change them here if the server's differ.
+/// The endpoints. (The summary's name follows the pattern of the others.)
 class HospitalRequestEndpoints {
   static const options = 'get_hospital_request_options.php';
   static const availability = 'get_blood_availability.php';
@@ -125,15 +124,16 @@ class HospitalRequestApi {
     );
   }
 
+  /// The donor's requests: [scope] is active, history or all.
   static Future<HospitalRequestListResult> fetchList({
     required String donorId,
-    String filter = 'all',
+    String scope = 'all',
   }) async {
     final response = await http
         .get(
           _uri(HospitalRequestEndpoints.list, {
             'donor_id': donorId,
-            'filter': filter,
+            'scope': scope,
           }),
         )
         .timeout(_getTimeout);
@@ -159,8 +159,9 @@ class HospitalRequestApi {
     );
   }
 
-  /// Cancels a request; returns it as it is now (null if the server sent
-  /// none back).
+  /// Cancels a request ([reason]: 3 to 300 characters); returns it as it is
+  /// now (null if the server sent none back). Errors: NOT_FOUND,
+  /// NOT_CANCELLABLE, INVALID_INPUT.
   static Future<HospitalRequest?> cancel({
     required String donorId,
     required int requestId,

@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import '../app_colors.dart';
 import '../app_palette.dart';
 import '../shared_design.dart';
+import 'blood_request_widgets.dart';
 import 'blood_requests_screen.dart';
 import 'hospital_request_models.dart';
 
@@ -121,6 +122,294 @@ class StockChipSkeleton extends StatelessWidget {
       ),
     ),
   );
+}
+
+// ─── Request status ─────────────────────────────────────────────────────────
+
+/// What the donor sees for each status (when the server sends no label).
+String hospitalStatusLabel(HospitalRequest r) {
+  if (r.statusLabel.isNotEmpty) return r.statusLabel;
+  return switch (r.status) {
+    'pending_review' => 'Waiting for the hospital',
+    'approved' => 'Approved',
+    'ready' => 'Ready for pickup',
+    'fulfilled' => 'Completed',
+    'rejected' => 'Declined',
+    'cancelled' => 'Cancelled',
+    'expired' => 'Expired',
+    _ => r.status,
+  };
+}
+
+/// The colors of a status: waiting = warning, approved = info, ready and
+/// completed = success, declined = critical, cancelled and expired = muted.
+/// (Light mode writes the label in the family's darker role, as the stock
+/// chip does, so small text stays readable on its tint.)
+({Color fg, Color bg, Color dot}) hospitalStatusColors(
+  AppPalette p,
+  String status,
+) => switch (status) {
+  'pending_review' => (
+    fg: p.isDark ? p.warning : p.warningText,
+    bg: p.warningBg,
+    dot: p.warning,
+  ),
+  'approved' => (fg: p.infoText, bg: p.infoBg, dot: p.info),
+  'ready' || 'fulfilled' => (
+    fg: p.isDark ? p.success : p.successDark,
+    bg: p.successBg,
+    dot: p.success,
+  ),
+  'rejected' => (
+    fg: p.isDark ? p.criticalText : p.primaryText,
+    bg: p.accentBg,
+    dot: p.criticalText,
+  ),
+  _ => (fg: p.muted, bg: p.surfaceAlt, dot: p.muted),
+};
+
+/// A request's status. "Ready for pickup" has a pulsing dot (still when
+/// animations are off).
+class HospitalStatusChip extends StatefulWidget {
+  final HospitalRequest request;
+
+  /// On the gradient hero: the chip sits on the card color.
+  final bool onGradient;
+
+  const HospitalStatusChip({
+    super.key,
+    required this.request,
+    this.onGradient = false,
+  });
+
+  @override
+  State<HospitalStatusChip> createState() => _HospitalStatusChipState();
+}
+
+class _HospitalStatusChipState extends State<HospitalStatusChip>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  );
+
+  bool get _pulsing =>
+      widget.request.status == 'ready' &&
+      !MediaQuery.disableAnimationsOf(context);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncPulse();
+  }
+
+  @override
+  void didUpdateWidget(HospitalStatusChip old) {
+    super.didUpdateWidget(old);
+    _syncPulse();
+  }
+
+  void _syncPulse() {
+    if (_pulsing) {
+      if (!_pulse.isAnimating) _pulse.repeat(reverse: true);
+    } else if (_pulse.isAnimating || _pulse.value != 0) {
+      _pulse
+        ..stop()
+        ..value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final c = hospitalStatusColors(p, widget.request.status);
+    return Container(
+      key: ValueKey('status-${widget.request.status}'),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: widget.onGradient ? p.surface : c.bg,
+        border: Border.all(
+          color: widget.onGradient
+              ? Colors.white
+              : c.dot.withValues(alpha: .35),
+        ),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 10,
+            height: 10,
+            child: Center(
+              child: AnimatedBuilder(
+                animation: _pulse,
+                builder: (context, _) {
+                  final t = _pulse.value;
+                  return Container(
+                    width: 6 + 4 * t,
+                    height: 6 + 4 * t,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: c.dot.withValues(alpha: 1 - .5 * t),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              hospitalStatusLabel(widget.request),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: c.fg,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "2 units · Whole blood · A+"
+String hospitalRequestSummaryLine(HospitalRequest r) {
+  final units =
+      '${r.unitsRequested} ${r.unitsRequested == 1 ? 'unit' : 'units'}';
+  final component = r.componentLabel.isNotEmpty
+      ? r.componentLabel
+      : r.component;
+  return [units, component, r.bloodType].where((s) => s.isNotEmpty).join(' · ');
+}
+
+/// One of the donor's requests in the list. A request ready for pickup has a
+/// success border and an "Action needed" label.
+class HospitalRequestCard extends StatelessWidget {
+  final HospitalRequest request;
+  final VoidCallback onTap;
+
+  const HospitalRequestCard({
+    super.key,
+    required this.request,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final r = request;
+    final ready = r.status == 'ready';
+    final when = [
+      if (r.neededBy != null) 'Needed by ${brShortDate(r.neededBy)}',
+      if ((r.updatedAgo ?? r.createdAgo) != null)
+        'Updated ${r.updatedAgo ?? r.createdAgo}',
+    ].join(' · ');
+    return Semantics(
+      container: true,
+      button: true,
+      child: Material(
+        color: p.surface,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          key: ValueKey('request-card-${r.requestId}'),
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Ink(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: ready ? p.success.withValues(alpha: .7) : p.border,
+                width: ready ? 1.5 : 1,
+              ),
+              boxShadow: p.shadow,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (ready || r.needsAttention)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.notifications_active_rounded,
+                          size: 14,
+                          color: p.isDark ? p.success : p.successDark,
+                        ),
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: Text(
+                            'Action needed',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: p.isDark ? p.success : p.successDark,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                Row(
+                  children: [
+                    BloodDropBadge(bloodType: r.bloodType, size: 44),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            r.facility?.name ?? 'Hospital',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: p.foreground,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            hospitalRequestSummaryLine(r),
+                            style: TextStyle(fontSize: 12, color: p.muted),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.chevron_right_rounded, color: p.muted),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    UrgencyChip(urgency: r.urgency),
+                    HospitalStatusChip(request: r),
+                  ],
+                ),
+                if (when.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(when, style: TextStyle(fontSize: 11, color: p.muted)),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // ─── The form photo picker ──────────────────────────────────────────────────
@@ -338,11 +627,9 @@ class HospitalRequestSubmittedScreen extends StatelessWidget {
                 const SizedBox(height: 28),
                 PrimaryButton(
                   label: 'Track Request',
-                  // The request's own screen comes later: for now, the
-                  // donor's requests.
                   onTap: () => Navigator.of(context).pushReplacement(
                     MaterialPageRoute(
-                      builder: (_) => const BloodRequestsScreen(initialTab: 1),
+                      builder: (_) => const BloodRequestsScreen(),
                     ),
                   ),
                 ),

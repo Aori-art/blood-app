@@ -568,7 +568,7 @@ class _RequestBloodScreenState extends State<RequestBloodScreen> {
   void _openMyRequests() {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => const BloodRequestsScreen(initialTab: 1),
+        builder: (_) => const BloodRequestsScreen(),
       ),
     );
   }

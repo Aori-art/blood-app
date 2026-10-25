@@ -2240,7 +2240,7 @@ class _HomeContentState extends State<HomeContent> {
     return PressableScale(
       onTap: top != null
           ? () => _openBloodRequestDetail(top.requestId)
-          : () => _openBloodRequestsHub(),
+          : () => _openBloodRequestsHub(tab: 1),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(12),
@@ -2359,7 +2359,8 @@ class _HomeContentState extends State<HomeContent> {
   );
 
   Widget _brHelpTile(BloodRequestSummary summary) => PressableScale(
-    onTap: () => _openBloodRequestsHub(),
+    // "Help a Patient": the hospitals' appeals.
+    onTap: () => _openBloodRequestsHub(tab: 1),
     child: Stack(
       clipBehavior: Clip.none,
       children: [
