@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/semantics.dart' show CustomSemanticsAction;
 import 'streak/streak_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -53,7 +54,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen>
-    with SingleTickerProviderStateMixin
+    with TickerProviderStateMixin
     implements HomeNavHost {
   int _selectedIndex = 0;
   int _donorId = 0;
@@ -76,6 +77,21 @@ class _HomeScreenState extends State<HomeScreen>
   Drag? _scrub;
   double _scrubPage = 0;
   int _scrubTab = 0;
+
+  // The nav can be swiped down out of the way; a small handle brings it
+  // back. 1 = shown, 0 = hidden (unbounded: the return overshoots a little).
+  // It is kept for the session only: the nav is shown on every start.
+  late final AnimationController _navShow = AnimationController.unbounded(
+    vsync: this,
+    value: 1,
+  )..addListener(_onNavShow);
+  double _navDrag = 0;
+  double _handleDrag = 0;
+  // A drag recognizer also says "cancel" after a plain tap: only a drag
+  // that started counts.
+  bool _navDragging = false;
+  bool _handleDragging = false;
+  int _handleNudge = 0;
 
   @override
   void initState() {
@@ -116,6 +132,7 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void dispose() {
     // Every other screen keeps the nav's full room again.
+    _navShow.dispose();
     HomeNavVisibility.instance.reset();
     HomeNav.unregister(this);
     _tabs.animation?.removeListener(_onTabPosition);
@@ -183,6 +200,8 @@ class _HomeScreenState extends State<HomeScreen>
   /// jump when animations are off) and the tab is current at once.
   void _selectTab(int index) {
     if (index < 0 || index >= _screens.length) return;
+    // A tab chosen from anywhere brings a hidden nav back first.
+    if (_navShow.value < 0.999) _showNav();
     _activate(index);
     if (_tabs.index != index) {
       _tabs.animateTo(
@@ -311,6 +330,123 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
+  // ── Hiding and showing the nav ──────────────────────────────────────────
+
+  /// How far down the nav goes to be out of sight: itself (the Check
+  /// button's overhang included), its margin, the inset and a little more.
+  double get _hideDistance =>
+      FloatingNavMetrics.overhang +
+      8 +
+      FloatingNavMetrics.barHeight +
+      FloatingNavMetrics.bottomMargin +
+      MediaQuery.paddingOf(context).bottom +
+      24;
+
+  bool get _reduceMotion => MediaQuery.disableAnimationsOf(context);
+
+  void _onNavShow() {
+    HomeNavVisibility.instance.progress.value = _navShow.value.clamp(0.0, 1.0);
+  }
+
+  void _hideNav() {
+    if (_navShow.value <= 0 && !_navShow.isAnimating) return;
+    HapticFeedback.lightImpact();
+    final reduce = _reduceMotion;
+    _navShow
+        .animateTo(
+          0,
+          duration: Duration(milliseconds: reduce ? 120 : 260),
+          curve: reduce ? Curves.linear : Curves.easeInCubic,
+        )
+        .then((_) {
+          // Gone: the handle nudges its arrow once.
+          if (mounted && !reduce && _navShow.value <= 0.001) {
+            setState(() => _handleNudge++);
+          }
+        });
+  }
+
+  void _showNav() {
+    if (_navShow.value >= 1 && !_navShow.isAnimating) return;
+    HapticFeedback.lightImpact();
+    final reduce = _reduceMotion;
+    _navShow.animateTo(
+      1,
+      duration: Duration(milliseconds: reduce ? 120 : 340),
+      curve: reduce ? Curves.linear : Curves.easeOutBack,
+    );
+  }
+
+  /// The nav follows a finger dragging it down (resisting after 24 px).
+  void _navDragStart(DragStartDetails d) {
+    _navShow.stop();
+    _navDrag = 0;
+    _navDragging = true;
+  }
+
+  double get _navDragDy =>
+      _navDrag <= 24 ? _navDrag : 24 + (_navDrag - 24) * 0.5;
+
+  void _navDragUpdate(DragUpdateDetails d) {
+    _navDrag = math.max(0, _navDrag + d.delta.dy);
+    _navShow.value = 1 - _navDragDy / _hideDistance;
+  }
+
+  void _navDragEnd(DragEndDetails d) {
+    if (!_navDragging) return;
+    _navDragging = false;
+    final velocity = d.primaryVelocity ?? 0;
+    if (_navDragDy > 28 || velocity > 350) {
+      _hideNav();
+    } else {
+      _navSpringBack();
+    }
+  }
+
+  void _navDragCancel() {
+    if (!_navDragging) return;
+    _navDragging = false;
+    _navSpringBack();
+  }
+
+  void _navSpringBack() {
+    final reduce = _reduceMotion;
+    _navShow.animateTo(
+      1,
+      duration: Duration(milliseconds: reduce ? 120 : 200),
+      curve: reduce ? Curves.linear : Curves.easeOutBack,
+    );
+  }
+
+  /// The nav comes up with a finger dragging the handle up.
+  void _handleDragStart(DragStartDetails d) {
+    _navShow.stop();
+    _handleDrag = 0;
+    _handleDragging = true;
+  }
+
+  void _handleDragUpdate(DragUpdateDetails d) {
+    _handleDrag = math.max(0, _handleDrag - d.delta.dy);
+    _navShow.value = (_handleDrag / _hideDistance).clamp(0.0, 1.0);
+  }
+
+  void _handleDragEnd(DragEndDetails d) {
+    if (!_handleDragging) return;
+    _handleDragging = false;
+    final upward = -(d.primaryVelocity ?? 0);
+    if (_handleDrag > 16 || upward > 350) {
+      _showNav();
+    } else {
+      _navShow.animateTo(
+        0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  void _handleDragCancel() => _handleDragEnd(DragEndDetails());
+
   // ── HomeNavHost ─────────────────────────────────────────────────────────
 
   /// HomeNav.goTo: back to Home (closing every screen above it), then the
@@ -383,26 +519,106 @@ class _HomeScreenState extends State<HomeScreen>
               left: 16,
               right: 16,
               bottom: safeBottom + FloatingNavMetrics.bottomMargin,
-              // A finger dragged along the nav (from an item or the Check
-              // button) moves the pages; a tap still goes to the item.
-              child: RawGestureDetector(
-                behavior: HitTestBehavior.deferToChild,
-                gestures: {
-                  HorizontalDragGestureRecognizer:
-                      GestureRecognizerFactoryWithHandlers<
-                        HorizontalDragGestureRecognizer
-                      >(HorizontalDragGestureRecognizer.new, (r) {
-                        r.onStart = _scrubStart;
-                        r.onUpdate = _scrubUpdate;
-                        r.onEnd = _scrubEnd;
-                        r.onCancel = _scrubCancel;
-                      }),
+              // The one translate of the whole nav: down and out of sight
+              // when the donor swipes it away (a cross-fade without
+              // animations). Hidden, it takes no touches and says nothing.
+              child: AnimatedBuilder(
+                animation: _navShow,
+                builder: (context, child) {
+                  final v = _navShow.value;
+                  final hidden = v <= 0.001;
+                  final nav = _reduceMotion
+                      ? Opacity(opacity: v.clamp(0.0, 1.0), child: child)
+                      : Transform.translate(
+                          offset: Offset(0, (1 - v) * _hideDistance),
+                          child: child,
+                        );
+                  return IgnorePointer(
+                    ignoring: hidden,
+                    child: ExcludeSemantics(
+                      excluding: hidden,
+                      child: TickerMode(enabled: !hidden, child: nav),
+                    ),
+                  );
                 },
-                child: RepaintBoundary(
-                  child: _FloatingNav(
-                    selectedIndex: _selectedIndex,
-                    onSelect: _selectTab,
-                    position: _tabs.animation,
+                // A finger dragged along the nav (from an item or the Check
+                // button) moves the pages; dragged down, it hides the nav.
+                // Each drag keeps to the axis it starts on. A tap still goes
+                // to the item.
+                // (Screen readers get the items and an action instead.)
+                child: RawGestureDetector(
+                  behavior: HitTestBehavior.deferToChild,
+                  excludeFromSemantics: true,
+                  gestures: {
+                    HorizontalDragGestureRecognizer:
+                        GestureRecognizerFactoryWithHandlers<
+                          HorizontalDragGestureRecognizer
+                        >(HorizontalDragGestureRecognizer.new, (r) {
+                          r.onStart = _scrubStart;
+                          r.onUpdate = _scrubUpdate;
+                          r.onEnd = _scrubEnd;
+                          r.onCancel = _scrubCancel;
+                        }),
+                    VerticalDragGestureRecognizer:
+                        GestureRecognizerFactoryWithHandlers<
+                          VerticalDragGestureRecognizer
+                        >(VerticalDragGestureRecognizer.new, (r) {
+                          r.onStart = _navDragStart;
+                          r.onUpdate = _navDragUpdate;
+                          r.onEnd = _navDragEnd;
+                          r.onCancel = _navDragCancel;
+                        }),
+                  },
+                  // Swiping down is not for everyone: the same as an action.
+                  child: Semantics(
+                    container: true,
+                    explicitChildNodes: true,
+                    customSemanticsActions: {
+                      const CustomSemanticsAction(
+                        label: 'Hide navigation bar',
+                      ): _hideNav,
+                    },
+                    child: RepaintBoundary(
+                      child: _FloatingNav(
+                        selectedIndex: _selectedIndex,
+                        onSelect: _selectTab,
+                        position: _tabs.animation,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // The handle that brings the nav back: it fades in over the
+            // second half of the hide and out as the nav returns.
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: safeBottom + FloatingNavMetrics.bottomMargin,
+              child: AnimatedBuilder(
+                animation: _navShow,
+                builder: (context, child) {
+                  final v = _navShow.value.clamp(0.0, 1.0);
+                  final opacity = _reduceMotion
+                      ? 1 - v
+                      : ((1 - v) * 2 - 1).clamp(0.0, 1.0);
+                  return Visibility(
+                    visible: opacity > 0.001,
+                    maintainState: true,
+                    child: IgnorePointer(
+                      ignoring: v > 0.5,
+                      child: Opacity(opacity: opacity, child: child),
+                    ),
+                  );
+                },
+                child: Center(
+                  child: GestureDetector(
+                    excludeFromSemantics: true,
+                    onVerticalDragStart: _handleDragStart,
+                    onVerticalDragUpdate: _handleDragUpdate,
+                    onVerticalDragEnd: _handleDragEnd,
+                    onVerticalDragCancel: _handleDragCancel,
+                    child: GlassHandle(onTap: _showNav, nudge: _handleNudge),
                   ),
                 ),
               ),

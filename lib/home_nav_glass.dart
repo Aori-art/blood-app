@@ -142,6 +142,7 @@ class NavShadowPainter extends CustomPainter {
     required this.shadow,
     required this.blurSigma,
     required this.hairline,
+    this.offsetY = 10,
     super.repaint,
   });
 
@@ -149,6 +150,9 @@ class NavShadowPainter extends CustomPainter {
   final Color shadow;
   final double blurSigma;
   final Color hairline;
+
+  /// How far below the outline the shadow falls.
+  final double offsetY;
 
   /// Light: black 10 %, blur 28. Dark: black 38 %, blur 30. Both 10 px down.
   factory NavShadowPainter.of(
@@ -167,7 +171,7 @@ class NavShadowPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final outline = path(size);
     canvas.save();
-    canvas.translate(0, 10);
+    canvas.translate(0, offsetY);
     canvas.drawPath(
       outline,
       Paint()
@@ -186,6 +190,7 @@ class NavShadowPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(NavShadowPainter old) =>
+      old.offsetY != offsetY ||
       old.shadow != shadow ||
       old.blurSigma != blurSigma ||
       old.hairline != hairline;
@@ -361,4 +366,132 @@ class NavLensPainter extends CustomPainter {
       old.rim != rim ||
       old.shadow != shadow ||
       old.opacity != opacity;
+}
+
+// ── The handle ──────────────────────────────────────────────────────────────
+
+/// The small glass capsule that brings the nav back after the donor swiped
+/// it away: the bar's glass (tint, sheen, rim, shadow) without the blur, and
+/// an arrow up. 52 x 28, in a 48 px tall target.
+///
+/// Each time [nudge] changes the arrow nudges up twice (not a loop).
+class GlassHandle extends StatefulWidget {
+  const GlassHandle({super.key, required this.onTap, this.nudge = 0});
+
+  final VoidCallback onTap;
+  final int nudge;
+
+  static const double width = 52;
+  static const double height = 28;
+  static const double targetHeight = 48;
+
+  @override
+  State<GlassHandle> createState() => _GlassHandleState();
+}
+
+class _GlassHandleState extends State<GlassHandle>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _bump = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 700),
+  );
+
+  @override
+  void didUpdateWidget(GlassHandle old) {
+    super.didUpdateWidget(old);
+    if (old.nudge != widget.nudge &&
+        !MediaQuery.disableAnimationsOf(context)) {
+      _bump.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _bump.dispose();
+    super.dispose();
+  }
+
+  static Path _capsule(Size size) => Path()
+    ..addRRect(
+      RRect.fromRectAndRadius(
+        Offset.zero & size,
+        Radius.circular(size.height / 2),
+      ),
+    );
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final dark = p.isDark;
+    // No blur behind it: a denser tint (0.80) keeps it readable on anything.
+    final colors = NavGlassColors(
+      tintTop: p.surface.withValues(alpha: 0.80),
+      tintBottom: p.surface.withValues(alpha: 0.88),
+      sheen: Colors.white.withValues(alpha: dark ? 0.10 : 0.22),
+      rimStart: Colors.white.withValues(alpha: dark ? 0.35 : 0.85),
+      rimMid: Colors.white.withValues(alpha: dark ? 0.05 : 0.15),
+      rimEnd: Colors.white.withValues(alpha: dark ? 0.20 : 0.55),
+    );
+    final radius = BorderRadius.circular(GlassHandle.height / 2);
+    return Semantics(
+      button: true,
+      label: 'Show navigation bar',
+      onTap: widget.onTap,
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        child: SizedBox(
+          width: 64,
+          height: GlassHandle.targetHeight,
+          child: Center(
+            child: SizedBox(
+              width: GlassHandle.width,
+              height: GlassHandle.height,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  CustomPaint(
+                    painter: NavShadowPainter(
+                      path: _capsule,
+                      shadow: Colors.black.withValues(
+                        alpha: dark ? 0.38 : 0.10,
+                      ),
+                      blurSigma: 6,
+                      offsetY: 3,
+                      hairline: p.border.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  ClipRRect(
+                    borderRadius: radius,
+                    child: CustomPaint(
+                      painter: NavGlassPainter(path: _capsule, colors: colors),
+                    ),
+                  ),
+                  Center(
+                    child: AnimatedBuilder(
+                      animation: _bump,
+                      builder: (context, child) => Transform.translate(
+                        // Two little nudges up.
+                        offset: Offset(
+                          0,
+                          -3 * math.sin(2 * math.pi * _bump.value).abs(),
+                        ),
+                        child: child,
+                      ),
+                      child: Icon(
+                        Icons.keyboard_arrow_up_rounded,
+                        size: 22,
+                        color: p.primaryText,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
