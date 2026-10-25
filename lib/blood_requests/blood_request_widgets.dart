@@ -403,21 +403,9 @@ class DonorProgressBar extends StatelessWidget {
 class BloodRequestCard extends StatelessWidget {
   final BloodRequest request;
   final VoidCallback? onTap;
-  final bool ownerView;
-  const BloodRequestCard({
-    super.key,
-    required this.request,
-    this.onTap,
-    this.ownerView = false,
-  });
+  const BloodRequestCard({super.key, required this.request, this.onTap});
 
   Widget _rightBadge(BuildContext context) {
-    if (ownerView) {
-      return RequestStatusChip(
-        status: request.status,
-        label: request.statusLabel,
-      );
-    }
     if (request.myResponse?.isCommitted == true) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -467,8 +455,7 @@ class BloodRequestCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final critical = request.urgency == 'critical';
-    final showUrgency =
-        !ownerView || request.status == 'open' || request.status == 'pending_review';
+    const showUrgency = true;
     final locationBits = [request.facility?.typeLabel, request.facility?.locationLine]
         .where((e) => e != null && e.isNotEmpty)
         .join(' · ');

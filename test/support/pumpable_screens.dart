@@ -63,6 +63,14 @@ Future<void> _pickOutOfStockHospital(WidgetTester tester) async {
   await formFrames(tester, 3);
 }
 
+/// Lets Home finish loading, then stops its notification timer.
+Future<void> _settleHome(WidgetTester tester) async {
+  for (var i = 0; i < 8; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+  UnreadNotifications.instance.stop();
+}
+
 Future<void> _hideHomeNav(WidgetTester tester) async {
   final size = tester.view.physicalSize / tester.view.devicePixelRatio;
   // From the Home item, slowly.
@@ -457,6 +465,29 @@ final List<PumpableScreen> pumpableScreens = [
         'top_urgent': {'request_id': 9, 'reference': 'BR-0009'},
       },
     },
+  ),
+  PumpableScreen(
+    'home (request ready for pickup)',
+    () => HomeContent(onNavigateToTab: (_) {}),
+    responses: {
+      'get_profile.php': {
+        'status': 'success',
+        'data': {'blood_type': 'O+', 'total_donations': 4},
+      },
+      'get_blood_request_summary.php': {
+        'status': 'success',
+        'open_count': 3,
+        'matching_count': 2,
+        'urgent_matching_count': 0,
+      },
+      'get_hospital_request_summary.php': hospitalSummary('ready', active: 2),
+    },
+    act: _settleHome,
+  ),
+  PumpableScreen(
+    'alerts (hospital request notifications)',
+    () => const AlertsScreen(donorId: 7),
+    responses: {'get_notifications.php': hospitalNotifications()},
   ),
   PumpableScreen(
     'request blood (patient step)',

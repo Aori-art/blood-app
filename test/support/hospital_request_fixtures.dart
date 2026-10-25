@@ -359,3 +359,53 @@ Map<String, dynamic> trackedDetail(Map<String, dynamic> request) => {
     'updated_ago': '2 hours ago',
   },
 };
+
+// ─── Home and Alerts ────────────────────────────────────────────────────────
+
+/// get_hospital_request_summary.php with the latest request in [status] (or
+/// none).
+Map<String, dynamic> hospitalSummary(String? status, {int active = 1}) => {
+  'status': 'success',
+  'active_count': status == null ? 0 : active,
+  'ready_count': status == 'ready' ? 1 : 0,
+  'latest': status == null
+      ? null
+      : {
+          'request_id': 31,
+          'reference': 'HR-0031',
+          'status': status,
+          'status_label': kStatusLabels[status],
+          'blood_type': 'O+',
+          'units_requested': 2,
+          'facility_name': 'Charlie Blood Bank',
+          'updated_ago': '2 hours ago',
+          'needs_attention': status == 'ready',
+        },
+};
+
+/// One notification of each type the server writes for a hospital request.
+const kHospitalNotificationTypes = [
+  'hospital_request_submitted',
+  'hospital_request_approved',
+  'hospital_request_ready',
+  'hospital_request_fulfilled',
+  'hospital_request_rejected',
+  'hospital_request_cancelled',
+];
+
+Map<String, dynamic> hospitalNotifications() => {
+  'success': true,
+  'unread_count': 3,
+  'notifications': [
+    for (final (i, t) in kHospitalNotificationTypes.indexed)
+      {
+        'notification_id': i + 1,
+        'title': 'Request update ${i + 1}',
+        'message': 'Message for $t',
+        'notification_type': t,
+        'is_read': i >= 3,
+        'date': 'Oct 16, 2026',
+        'created_at': '2026-10-16 08:00:00',
+      },
+  ],
+};

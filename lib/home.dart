@@ -2388,88 +2388,6 @@ class _HomeContentState extends State<HomeContent> {
     ),
   );
 
-  Widget _brYourRequestSection(BloodRequestSummary summary) {
-    final r = summary.myActiveRequest!;
-    return GestureDetector(
-      onTap: () => _openBloodRequestDetail(r.requestId),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                'YOUR REQUEST',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: context.palette.muted,
-                  letterSpacing: 0.8,
-                ),
-              ),
-              if (summary.myActiveCount > 1) ...[
-                const SizedBox(width: 6),
-                Text(
-                  '+${summary.myActiveCount - 1} more',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: context.palette.muted,
-                  ),
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              BloodDropBadge(bloodType: r.bloodType, size: 38),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      r.reference,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: context.palette.foreground,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    RequestStatusChip(status: r.status, label: r.statusLabel),
-                  ],
-                ),
-              ),
-              SizedBox(
-                width: 96,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '${r.volunteersCount}/${r.requiredDonors} donors',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: context.palette.foreground,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    DonorProgressBar(
-                      volunteers: r.volunteersCount,
-                      required: r.requiredDonors,
-                      showLabel: false,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _brYourCommitmentSection(BloodRequestSummary summary) {
     final r = summary.myCommitment!;
     return GestureDetector(
@@ -2625,10 +2543,6 @@ class _HomeContentState extends State<HomeContent> {
               activeCount: _hrSummary!.activeCount,
               onTap: () => _openHospitalRequest(latest.requestId),
             ),
-          ],
-          if (summary.myActiveRequest != null) ...[
-            Divider(height: 28, color: context.palette.surfaceAlt),
-            _brYourRequestSection(summary),
           ],
           if (summary.myCommitment != null) ...[
             const SizedBox(height: 10),

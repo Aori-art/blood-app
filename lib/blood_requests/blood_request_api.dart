@@ -105,27 +105,6 @@ class BloodRequestApi {
     return BloodRequestDetailResult.fromJson(_decode(response));
   }
 
-  static Future<RequestFormOptions> fetchOptions(String donorId) async {
-    final uri = Uri.parse(
-      '${AppConfig.baseUrl}/get_blood_request_options.php?donor_id=$donorId',
-    );
-    final response = await http.get(uri).timeout(_getTimeout);
-    return RequestFormOptions.fromJson(_decode(response));
-  }
-
-  static Future<BloodRequestActionResult> submitRequest(
-    Map<String, dynamic> payload,
-  ) async {
-    final response = await http
-        .post(
-          Uri.parse('${AppConfig.baseUrl}/submit_blood_request.php'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode(payload),
-        )
-        .timeout(_postTimeout);
-    return BloodRequestActionResult.fromJson(_decode(response));
-  }
-
   static Future<BloodRequestActionResult> respond({
     required String donorId,
     required int requestId,
@@ -139,25 +118,6 @@ class BloodRequestApi {
             'donor_id': donorId,
             'request_id': requestId,
             'action': action,
-          }),
-        )
-        .timeout(_postTimeout);
-    return BloodRequestActionResult.fromJson(_decode(response));
-  }
-
-  static Future<BloodRequestActionResult> cancel({
-    required String donorId,
-    required int requestId,
-    required String reason,
-  }) async {
-    final response = await http
-        .post(
-          Uri.parse('${AppConfig.baseUrl}/cancel_blood_request.php'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'donor_id': donorId,
-            'request_id': requestId,
-            'reason': reason,
           }),
         )
         .timeout(_postTimeout);
